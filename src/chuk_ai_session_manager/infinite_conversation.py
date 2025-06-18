@@ -14,7 +14,7 @@ from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.storage import SessionStoreProvider
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
 
 # Type for LLM function callbacks
 LLMCallbackAsync = Callable[[List[Dict[str, str]], str], Any]
@@ -83,7 +83,8 @@ class InfiniteConversationManager:
             The current session ID (may be a new one if threshold was exceeded)
         """
         # Get the store
-        store = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         
         # Get the current session
         session = await store.get(session_id)
@@ -221,7 +222,8 @@ class InfiniteConversationManager:
             A list of messages suitable for an LLM call
         """
         # Get the store
-        store = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         
         # Get the current session
         session = await store.get(session_id)
@@ -273,7 +275,8 @@ class InfiniteConversationManager:
         *reverse* (closest parent first).  Tests expect root-first order,
         so we reverse it and then append the current session.
         """
-        store = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         session = await store.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")

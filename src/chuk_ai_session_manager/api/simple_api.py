@@ -1,4 +1,4 @@
-# chuk_ai_session_manager/simple_api.py
+# chuk_ai_session_manager/api/simple_api.py
 """
 Super simple developer API for session management with any LLM.
 
@@ -26,8 +26,7 @@ from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.storage import SessionStoreProvider
-from chuk_ai_session_manager.storage.providers.memory import InMemorySessionStore
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,18 +50,12 @@ class SessionManager:
         Args:
             session_id: Use existing session or create new one
             auto_save: Automatically save after each operation
-            store: Custom storage backend (defaults to in-memory)
+            store: Custom storage backend (defaults to CHUK Sessions)
         """
         self.auto_save = auto_save
         self._session: Optional[Session] = None
         self._session_id = session_id
         self._is_new_session = session_id is None  # Track if this is a new session
-        
-        # Set up storage if not already configured
-        if store:
-            SessionStoreProvider.set_store(store)
-        elif SessionStoreProvider._store is None:
-            SessionStoreProvider.set_store(InMemorySessionStore())
         
         # If no session_id provided, generate one now for convenience
         if not self._session_id:
@@ -78,7 +71,8 @@ class SessionManager:
                 self._session_id = self._session.id
             else:
                 # Try to load existing session
-                store = SessionStoreProvider.get_store()
+                backend = get_backend()
+                store = ChukSessionsStore(backend)
                 self._session = await store.get(self._session_id)
                 if self._session is None:
                     raise ValueError(f"Session {self._session_id} not found")
@@ -115,12 +109,18 @@ class SessionManager:
         """
         session = await self._ensure_session()
         
-        event = SessionEvent(
+        event = await SessionEvent.create_with_tokens(
             message=message,
+            prompt=message,
+            model="gpt-4o-mini",  # Default model for token counting
             source=EventSource.USER,
-            type=EventType.MESSAGE,
-            metadata=metadata or {}
+            type=EventType.MESSAGE
         )
+        
+        # Add metadata if provided
+        if metadata:
+            for key, value in metadata.items():
+                await event.set_metadata(key, value)
         
         if self.auto_save:
             await session.add_event_and_save(event)
@@ -157,12 +157,18 @@ class SessionManager:
             **(metadata or {})
         }
         
-        event = SessionEvent(
+        event = await SessionEvent.create_with_tokens(
             message=response,
+            prompt="",  # No prompt for AI response
+            completion=response,
+            model=model,
             source=EventSource.LLM,
-            type=EventType.MESSAGE,
-            metadata=full_metadata
+            type=EventType.MESSAGE
         )
+        
+        # Add metadata
+        for key, value in full_metadata.items():
+            await event.set_metadata(key, value)
         
         if self.auto_save:
             await session.add_event_and_save(event)
@@ -205,9 +211,13 @@ class SessionManager:
         event = SessionEvent(
             message=tool_message,
             source=EventSource.SYSTEM,
-            type=EventType.TOOL_CALL,
-            metadata=metadata or {}
+            type=EventType.TOOL_CALL
         )
+        
+        # Add metadata if provided
+        if metadata:
+            for key, value in metadata.items():
+                await event.set_metadata(key, value)
         
         if self.auto_save:
             await session.add_event_and_save(event)
@@ -297,7 +307,8 @@ class SessionManager:
     async def save(self) -> None:
         """Manually save the session (if auto_save is False)."""
         if self._session:
-            store = SessionStoreProvider.get_store()
+            backend = get_backend()
+            store = ChukSessionsStore(backend)
             await store.save(self._session)
     
     async def clear(self) -> None:
@@ -350,7 +361,10 @@ async def track_llm_call(
     await session_manager.user_says(user_input)
     
     # Call the LLM
-    ai_response = await llm_function(user_input)
+    if asyncio.iscoroutinefunction(llm_function):
+        ai_response = await llm_function(user_input)
+    else:
+        ai_response = llm_function(user_input)
     
     # Track AI response
     session_id = await session_manager.ai_responds(

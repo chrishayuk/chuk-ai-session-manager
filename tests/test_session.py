@@ -11,16 +11,15 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.storage import InMemorySessionStore, SessionStoreProvider
+from chuk_ai_session_manager.session_storage import ChukSessionsStore, setup_chuk_sessions_storage
 
 MessageT = str  # simple alias for tests
 
 @pytest.fixture
-def in_memory_store():
-    """Create and register an in-memory store for each test."""
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
-    return store
+def chuk_store():
+    """Create and register a CHUK Sessions store for each test."""
+    backend = setup_chuk_sessions_storage(sandbox_id="test-session")
+    return ChukSessionsStore(backend)
 
 
 def test_default_fields_and_metadata():
@@ -64,7 +63,7 @@ def test_active_run_selection():
 
 
 @pytest.mark.asyncio
-async def test_add_and_remove_child(in_memory_store):
+async def test_add_and_remove_child(chuk_store):
     sess = Session[MessageT]()
     await sess.add_child('c1')
     assert sess.child_ids == ['c1']
@@ -76,17 +75,17 @@ async def test_add_and_remove_child(in_memory_store):
 
 
 @pytest.mark.asyncio
-async def test_hierarchy_sync_and_ancestors(in_memory_store):
+async def test_hierarchy_sync_and_ancestors(chuk_store):
     # create parent and save
     parent = Session[MessageT]()
-    await in_memory_store.save(parent)
+    await chuk_store.save(parent)
     
     # create child with parent_id
     child = Session[MessageT](parent_id=parent.id)
     await child.async_init()  # Need to call this explicitly now
     
     # Check parent's children
-    parent = await in_memory_store.get(parent.id)  # Reload parent
+    parent = await chuk_store.get(parent.id)  # Reload parent
     assert child.id in parent.child_ids
     
     # ancestors
@@ -95,22 +94,22 @@ async def test_hierarchy_sync_and_ancestors(in_memory_store):
 
 
 @pytest.mark.asyncio
-async def test_descendants(in_memory_store):
+async def test_descendants(chuk_store):
     # build root->child->grand
     root = Session[MessageT]()
     child = Session[MessageT]()
     grand = Session[MessageT]()
     
-    await in_memory_store.save(root)
-    await in_memory_store.save(child)
-    await in_memory_store.save(grand)
+    await chuk_store.save(root)
+    await chuk_store.save(child)
+    await chuk_store.save(grand)
     
     root.child_ids = [child.id]
     child.child_ids = [grand.id]
     
     # Save updated sessions
-    await in_memory_store.save(root)
-    await in_memory_store.save(child)
+    await chuk_store.save(root)
+    await chuk_store.save(child)
     
     desc = await root.descendants()
     ids = [s.id for s in desc]
@@ -139,9 +138,9 @@ async def test_add_event():
 
 
 @pytest.mark.asyncio
-async def test_add_event_and_save(in_memory_store):
+async def test_add_event_and_save(chuk_store):
     sess = Session[MessageT]()
-    await in_memory_store.save(sess)
+    await chuk_store.save(sess)
     
     event = SessionEvent(message="test")
     await sess.add_event_and_save(event)
@@ -150,7 +149,7 @@ async def test_add_event_and_save(in_memory_store):
     assert event in sess.events
     
     # Verify session was saved
-    saved_sess = await in_memory_store.get(sess.id)
+    saved_sess = await chuk_store.get(sess.id)
     assert event in saved_sess.events
 
 
@@ -267,9 +266,9 @@ async def test_state_management():
 
 
 @pytest.mark.asyncio
-async def test_create_class_method(in_memory_store):
+async def test_create_class_method(chuk_store):
     parent_sess = Session[MessageT]()
-    await in_memory_store.save(parent_sess)
+    await chuk_store.save(parent_sess)
     
     # Create a session with parent
     sess = await Session.create(parent_id=parent_sess.id)
@@ -278,9 +277,9 @@ async def test_create_class_method(in_memory_store):
     assert sess.parent_id == parent_sess.id
     
     # Verify parent-child relationship
-    parent = await in_memory_store.get(parent_sess.id)
+    parent = await chuk_store.get(parent_sess.id)
     assert sess.id in parent.child_ids
     
     # Verify session was saved
-    saved_sess = await in_memory_store.get(sess.id)
+    saved_sess = await chuk_store.get(sess.id)
     assert saved_sess is not None

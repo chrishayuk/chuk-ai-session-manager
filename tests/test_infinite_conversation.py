@@ -11,7 +11,7 @@ from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.storage import SessionStoreProvider, InMemorySessionStore
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore, setup_chuk_sessions_storage
 from chuk_ai_session_manager.infinite_conversation import InfiniteConversationManager
 
 
@@ -21,9 +21,8 @@ from chuk_ai_session_manager.infinite_conversation import InfiniteConversationMa
 
 @pytest_asyncio.fixture
 async def store():
-    mem = InMemorySessionStore()
-    SessionStoreProvider.set_store(mem)
-    return mem
+    backend = setup_chuk_sessions_storage(sandbox_id="test-infinite")
+    return ChukSessionsStore(backend)
 
 
 @pytest_asyncio.fixture
@@ -56,22 +55,22 @@ async def session(store):
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.asyncio
-async def test_process_message_no_segmentation(manager, session, llm_callback):
+async def test_process_message_no_segmentation(manager, session, llm_callback, store):
     sid = session.id
     nid = await manager.process_message(sid, "hi", EventSource.USER, llm_callback)
     assert nid == sid
-    updated = await SessionStoreProvider.get_store().get(sid)
+    updated = await store.get(sid)
     assert updated.events[-1].message == "hi"
 
 
 @pytest.mark.asyncio
-async def test_process_message_with_segmentation(manager, session, llm_callback):
+async def test_process_message_with_segmentation(manager, session, llm_callback, store):
     sid = session.id
     with patch.object(manager, "_should_create_new_segment", return_value=True):
         nid = await manager.process_message(sid, "seg", EventSource.USER, llm_callback)
     assert nid != sid
     # summary recorded on original segment
-    original = await SessionStoreProvider.get_store().get(sid)
+    original = await store.get(sid)
     assert any(e.type == EventType.SUMMARY for e in original.events)
 
 

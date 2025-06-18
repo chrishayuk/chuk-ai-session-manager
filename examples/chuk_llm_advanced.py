@@ -1,44 +1,28 @@
 #!/usr/bin/env python3
-# """
-# CHUK LLM Advanced API Integration with Session Management
-# ========================================================
+"""
+CHUK LLM Advanced API Integration with Session Management
+========================================================
 
-# This example demonstrates integration with chuk-llm's advanced client API,
-# providing complete session management, tool integration, and observability
-# for production AI applications.
+This example demonstrates integration with chuk-llm's advanced client API,
+providing complete session management, tool integration, and observability
+for production AI applications.
 
-# Run with:
-#     uv run examples/chuk_llm_advanced_demo.py \
-#         --provider openai \
-#         --model gpt-4o-mini \
-#         --prompt "I need to know the weather in Tokyo and calculate 15.5 × 23.2"
+Run with:
+    uv run examples/chuk_llm_advanced_demo.py \
+        --provider openai \
+        --model gpt-4o-mini \
+        --prompt "I need to know the weather in Tokyo and calculate 15.5 × 23.2"
 
-# For completely clean output (no debug logs):
-#     PYTHONDEVMODE=0 uv run examples/chuk_llm_advanced_demo.py
+For completely clean output (no debug logs):
+    PYTHONDEVMODE=0 uv run examples/chuk_llm_advanced_demo.py
 
-# Features demonstrated:
-# - Advanced chuk-llm client integration
-# - Session-aware tool processing
-# - Complete message and tool tracking
-# - Token usage and cost monitoring
-# - Production-ready error handling
-# """ demonstrates integration with chuk-llm's advanced client API,
-# providing complete session management, tool integration, and observability
-# for production AI applications.
-
-# Run with:
-#     uv run examples/chuk_llm_advanced_demo.py \
-#         --provider openai \
-#         --model gpt-4o-mini \
-#         --prompt "I need to know the weather in Tokyo and calculate 15.5 × 23.2"
-
-# Features demonstrated:
-# - Advanced chuk-llm client integration
-# - Session-aware tool processing
-# - Complete message and tool tracking
-# - Token usage and cost monitoring
-# - Production-ready error handling
-# """
+Features demonstrated:
+- Advanced chuk-llm client integration
+- Session-aware tool processing
+- Complete message and tool tracking
+- Token usage and cost monitoring
+- Production-ready error handling
+"""
 
 import argparse
 import asyncio
@@ -47,24 +31,25 @@ import logging
 import os
 import sys
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 from dotenv import load_dotenv
 
 # CHUK LLM imports
 from chuk_llm.llm.client import get_client
 from chuk_llm.llm.system_prompt_generator import SystemPromptGenerator
 
-# Session manager imports - corrected imports
+# Session manager imports - FIXED to work with current architecture
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.session import Session, SessionEvent
-from chuk_ai_session_manager.storage import SessionStoreProvider
-from chuk_ai_session_manager.storage.providers.memory import InMemorySessionStore
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore, setup_chuk_sessions_storage
 
 # Load environment variables
 load_dotenv()
 
 # Set up logging with quieter external loggers
-logging.basicConfig(level=logging.DEBUG)  # Changed to DEBUG to see our debug messages
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Quiet down noisy loggers
@@ -75,6 +60,8 @@ logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("anthropic").setLevel(logging.ERROR)
 logging.getLogger("chuk_llm").setLevel(logging.WARNING)
+logging.getLogger("chuk_sessions").setLevel(logging.WARNING)
+logging.getLogger("chuk_ai_session_manager").setLevel(logging.WARNING)
 
 
 class SessionAwareLLMClient:
@@ -95,16 +82,19 @@ class SessionAwareLLMClient:
         """Create completion with tool support and session tracking."""
         
         # Log user message
-        await self.session.add_event_and_save(SessionEvent(
+        user_event = await SessionEvent.create_with_tokens(
             message=user_prompt,
+            prompt=user_prompt,
+            model=self.model,
             source=EventSource.USER,
-            metadata={
-                "timestamp": self._get_timestamp(),
-                "provider": self.provider,
-                "model": self.model,
-                "type": "user_input"
-            }
-        ))
+            type=EventType.MESSAGE
+        )
+        await user_event.set_metadata("timestamp", self._get_timestamp())
+        await user_event.set_metadata("provider", self.provider)
+        await user_event.set_metadata("model", self.model)
+        await user_event.set_metadata("type", "user_input")
+        
+        await self.session.add_event_and_save(user_event)
         
         # Generate system prompt
         system_prompt = self.system_prompt_generator.generate_prompt(system_context or {})
@@ -136,33 +126,37 @@ class SessionAwareLLMClient:
             
         except Exception as e:
             # Log error
-            await self.session.add_event_and_save(SessionEvent(
+            error_event = SessionEvent(
                 message=f"LLM Error: {str(e)}",
                 source=EventSource.SYSTEM,
-                type=EventType.ERROR,
-                metadata={
-                    "timestamp": self._get_timestamp(),
-                    "provider": self.provider,
-                    "model": self.model,
-                    "error_type": type(e).__name__
-                }
-            ))
+                type=EventType.MESSAGE  # Using MESSAGE since ERROR doesn't exist
+            )
+            await error_event.set_metadata("timestamp", self._get_timestamp())
+            await error_event.set_metadata("provider", self.provider)
+            await error_event.set_metadata("model", self.model)
+            await error_event.set_metadata("error_type", type(e).__name__)
+            
+            await self.session.add_event_and_save(error_event)
             raise
         
         # Log LLM response
-        await self.session.add_event_and_save(SessionEvent(
+        llm_event = await SessionEvent.create_with_tokens(
             message={
                 "content": response_content,
                 "tool_calls": tool_calls
             },
+            prompt="",  # No prompt for LLM response
+            completion=response_content,
+            model=self.model,
             source=EventSource.LLM,
-            metadata={
-                "timestamp": self._get_timestamp(),
-                "provider": self.provider,
-                "model": self.model,
-                "has_tool_calls": len(tool_calls) > 0
-            }
-        ))
+            type=EventType.MESSAGE
+        )
+        await llm_event.set_metadata("timestamp", self._get_timestamp())
+        await llm_event.set_metadata("provider", self.provider)
+        await llm_event.set_metadata("model", self.model)
+        await llm_event.set_metadata("has_tool_calls", len(tool_calls) > 0)
+        
+        await self.session.add_event_and_save(llm_event)
         
         # Process tool calls if any
         tool_results = []
@@ -288,7 +282,7 @@ class SessionAwareLLMClient:
                 result = await self._demo_tool_execution(tool_name, arguments)
                 
                 # Log tool execution
-                await self.session.add_event_and_save(SessionEvent(
+                tool_event = SessionEvent(
                     message={
                         "tool": tool_name,
                         "arguments": arguments,
@@ -296,13 +290,13 @@ class SessionAwareLLMClient:
                         "call_id": call.get("id", "unknown")
                     },
                     source=EventSource.SYSTEM,
-                    type=EventType.TOOL_CALL,
-                    metadata={
-                        "timestamp": self._get_timestamp(),
-                        "tool_name": tool_name,
-                        "success": result.get("success", True) if isinstance(result, dict) else True
-                    }
-                ))
+                    type=EventType.TOOL_CALL
+                )
+                await tool_event.set_metadata("timestamp", self._get_timestamp())
+                await tool_event.set_metadata("tool_name", tool_name)
+                await tool_event.set_metadata("success", result.get("success", True) if isinstance(result, dict) else True)
+                
+                await self.session.add_event_and_save(tool_event)
                 
                 tool_results.append({
                     "tool": tool_name,
@@ -361,7 +355,6 @@ class SessionAwareLLMClient:
     
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
-        from datetime import datetime
         return datetime.now().isoformat()
 
 
@@ -375,17 +368,21 @@ async def run_session_aware_llm(provider: str, model: str, prompt: str) -> None:
     print(f"🚀 CHUK LLM Advanced API + Session Manager Integration")
     print("=" * 60)
     
-    # Setup session manager
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
+    # Setup session manager with CHUK Sessions backend
+    setup_chuk_sessions_storage(sandbox_id="chuk-llm-demo", default_ttl_hours=1)
     
-    # Create session
-    session = await Session.create(metadata={
-        "example": "advanced_llm_demo",
-        "provider": provider,
-        "model": model,
-        "description": "Advanced LLM integration with tools and session tracking"
-    })
+    # Create session with metadata
+    session = await Session.create()
+    await session.metadata.set_property("example", "advanced_llm_demo")
+    await session.metadata.set_property("provider", provider)
+    await session.metadata.set_property("model", model)
+    await session.metadata.set_property("description", "Advanced LLM integration with tools and session tracking")
+    
+    # Save the session with updated metadata
+    backend = get_backend()
+    store = ChukSessionsStore(backend)
+    await store.save(session)
+    
     print(f"📝 Created session: {session.id}")
     
     # Create session-aware LLM client
@@ -448,11 +445,7 @@ async def run_session_aware_llm(provider: str, model: str, prompt: str) -> None:
                     print(f"   ✅ Result: {result_data}")
         
         # Get updated session with latest events
-        # Since add_event_and_save() saves to store but doesn't update our local session object,
-        # we need to get the fresh session data
-        store = SessionStoreProvider.get_store()
         try:
-            # Try to get fresh session from store
             fresh_session = await store.get(session.id)
             if fresh_session and hasattr(fresh_session, 'events'):
                 session = fresh_session
@@ -470,6 +463,8 @@ async def run_session_aware_llm(provider: str, model: str, prompt: str) -> None:
         print(f"   Events this call: {events_added}")
         print(f"   Created: {session.metadata.created_at}")
         print(f"   Updated: {session.metadata.updated_at}")
+        print(f"   Total tokens: {session.total_tokens}")
+        print(f"   Estimated cost: ${session.total_cost:.6f}")
         
         # Show event breakdown
         event_types = {}
@@ -512,8 +507,8 @@ async def run_session_aware_llm(provider: str, model: str, prompt: str) -> None:
                     content = content[:57] + "..."
                 print(f"   {i}. {source_emoji} {event_type_str} {content}")
             
-            # Show timestamp
-            timestamp = event.metadata.get("timestamp", "Unknown") if event.metadata else "Unknown"
+            # Show timestamp from metadata
+            timestamp = await event.get_metadata("timestamp", "Unknown")
             print(f"       ⏰ {timestamp}")
         
         print(f"\n✅ Advanced LLM integration demo completed!")
@@ -524,17 +519,17 @@ async def run_session_aware_llm(provider: str, model: str, prompt: str) -> None:
         print(f"❌ Error: {e}")
         
         # Log the error to session
-        await session.add_event_and_save(SessionEvent(
+        error_event = SessionEvent(
             message=f"Demo failed: {str(e)}",
             source=EventSource.SYSTEM,
-            type=EventType.ERROR,
-            metadata={
-                "timestamp": client._get_timestamp() if 'client' in locals() else "",
-                "error_type": type(e).__name__,
-                "provider": provider,
-                "model": model
-            }
-        ))
+            type=EventType.MESSAGE
+        )
+        await error_event.set_metadata("timestamp", client._get_timestamp() if 'client' in locals() else datetime.now().isoformat())
+        await error_event.set_metadata("error_type", type(e).__name__)
+        await error_event.set_metadata("provider", provider)
+        await error_event.set_metadata("model", model)
+        
+        await session.add_event_and_save(error_event)
 
 
 def main() -> None:

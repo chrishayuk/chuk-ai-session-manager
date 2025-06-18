@@ -31,12 +31,12 @@ from chuk_llm import (
     ask_anthropic_sync,
 )
 
-# Session manager imports
+# Session manager imports - FIXED for current architecture
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.session import Session, SessionEvent
-from chuk_ai_session_manager.storage import SessionStoreProvider
-from chuk_ai_session_manager.storage.providers.memory import InMemorySessionStore
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore, setup_chuk_sessions_storage
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -50,7 +50,9 @@ logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("anthropic").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 logging.getLogger("h11").setLevel(logging.ERROR)
-logging.getLogger("chuk_llm").setLevel(logging.WARNING)  # Keep some chuk_llm logs but reduce them
+logging.getLogger("chuk_llm").setLevel(logging.WARNING)
+logging.getLogger("chuk_sessions").setLevel(logging.WARNING)
+logging.getLogger("chuk_ai_session_manager").setLevel(logging.WARNING)
 
 
 class TrackedLLM:
@@ -75,19 +77,34 @@ class TrackedLLM:
         if metadata:
             base_metadata.update(metadata)
         
-        # Track user message
-        await self.session.add_event_and_save(SessionEvent(
+        # Track user message with token counting
+        user_event = await SessionEvent.create_with_tokens(
             message=user_message,
+            prompt=user_message,
+            model=model,
             source=EventSource.USER,
-            metadata=base_metadata
-        ))
+            type=EventType.MESSAGE
+        )
+        # Add metadata
+        for key, value in base_metadata.items():
+            await user_event.set_metadata(key, value)
         
-        # Track assistant response
-        await self.session.add_event_and_save(SessionEvent(
+        await self.session.add_event_and_save(user_event)
+        
+        # Track assistant response with token counting
+        assistant_event = await SessionEvent.create_with_tokens(
             message=response,
+            prompt="",  # No prompt for response
+            completion=response,
+            model=model,
             source=EventSource.LLM,
-            metadata=base_metadata
-        ))
+            type=EventType.MESSAGE
+        )
+        # Add metadata
+        for key, value in base_metadata.items():
+            await assistant_event.set_metadata(key, value)
+        
+        await self.session.add_event_and_save(assistant_event)
         
         logger.debug(f"💾 Tracked {provider}/{model} interaction")
     
@@ -157,15 +174,19 @@ async def demonstrate_simple_tracking():
     print("🚀 CHUK LLM Simple Functions + Session Tracking")
     print("="*60)
     
-    # Initialize session store and set as provider
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
+    # Setup CHUK Sessions backend
+    setup_chuk_sessions_storage(sandbox_id="chuk-llm-simple-demo", default_ttl_hours=1)
     
-    # Create session using the proper API
-    session = await Session.create(metadata={
-        "example": "simple_functions_tracking",
-        "description": "Using CHUK LLM simple functions with session tracking"
-    })
+    # Create session with metadata
+    session = await Session.create()
+    await session.metadata.set_property("example", "simple_functions_tracking")
+    await session.metadata.set_property("description", "Using CHUK LLM simple functions with session tracking")
+    
+    # Save session with metadata
+    backend = get_backend()
+    store = ChukSessionsStore(backend)
+    await store.save(session)
+    
     print(f"📝 Created session: {session.id}")
     
     # Create tracked LLM wrapper
@@ -197,6 +218,14 @@ async def demonstrate_simple_tracking():
     for provider, response in results.items():
         print(f"{provider.capitalize()}: {response}")
     
+    # Get fresh session data with all events
+    try:
+        fresh_session = await store.get(session.id)
+        if fresh_session:
+            session = fresh_session
+    except Exception as e:
+        logger.warning(f"Could not refresh session: {e}")
+    
     # Show session tracking results
     print("\n📊 Session Tracking Results:")
     print("-" * 40)
@@ -205,16 +234,23 @@ async def demonstrate_simple_tracking():
     print(f"📅 Created: {session.metadata.created_at}")
     print(f"🔄 Updated: {session.metadata.updated_at}")
     print(f"📝 Total Events: {len(session.events)}")
+    print(f"🎯 Total Tokens: {session.total_tokens}")
+    print(f"💰 Estimated Cost: ${session.total_cost:.6f}")
     
     print(f"\n🗃️ Event History:")
     for i, event in enumerate(session.events, 1):
-        timestamp = event.metadata.get('timestamp', 'Unknown') if event.metadata else 'Unknown'
-        provider = event.metadata.get('provider', 'Unknown') if event.metadata else 'Unknown'
-        model = event.metadata.get('model', 'Unknown') if event.metadata else 'Unknown'
+        timestamp = await event.get_metadata('timestamp', 'Unknown')
+        provider = await event.get_metadata('provider', 'Unknown')
+        model = await event.get_metadata('model', 'Unknown')
         
         print(f"  {i}. [{event.source.value}] {provider}/{model}")
-        print(f"     Content: {str(event.message)[:60]}...")
+        content = str(event.message)
+        if len(content) > 60:
+            content = content[:57] + "..."
+        print(f"     Content: {content}")
         print(f"     Time: {timestamp}")
+        if event.token_usage:
+            print(f"     Tokens: {event.token_usage.total_tokens}")
         print()
 
 
@@ -234,35 +270,42 @@ async def demonstrate_conversation_vs_simple():
     response2 = await ask_openai_gpt4o_mini("What's my name?")
     print(f"Call 2: {response2}")  # Won't remember Alice
     
-    print("\n📌 Conversation API (Stateful):")
-    print("✅ Pros: Maintains context, natural conversation flow")
-    print("🔶 Trade-offs: More setup, need to manage conversation lifecycle")
+    print("\n📌 With Session Tracking (Stateful-like):")
+    print("✅ Pros: Still simple functions but with complete tracking")
+    print("📊 Benefit: Full observability and session management")
     
     try:
-        # Use the correct conversation API import
-        from chuk_llm.api.conversation import conversation
+        # Create a new session for this demo
+        demo_session = await Session.create()
+        await demo_session.metadata.set_property("demo", "conversation_comparison")
         
-        async with conversation(provider="openai", model="gpt-4o-mini") as conv:
-            response1 = await conv.say("My name is Alice")
-            print(f"Call 1: {response1}")
-            
-            response2 = await conv.say("What's my name?")
-            print(f"Call 2: {response2}")  # Will remember Alice!
-            
+        tracked_llm = TrackedLLM(demo_session)
+        
+        # Same calls but now tracked
+        response1 = await tracked_llm.ask_openai_gpt4o_mini("My name is Alice")
+        print(f"Tracked Call 1: {response1}")
+        
+        response2 = await tracked_llm.ask_openai_gpt4o_mini("What's my name?")
+        print(f"Tracked Call 2: {response2}")  # Still won't remember Alice, but now tracked!
+        
+        print(f"\n📈 Session now has {len(demo_session.events)} tracked events")
+        
     except Exception as e:
-        print(f"⚠️ Conversation API demo failed: {e}")
-        print("💡 Using fallback demonstration instead...")
-        
-        # Fallback: show context preservation with a single conversation simulation
-        print("📝 Simulating conversational context:")
-        context_prompt = """Previous conversation:
+        print(f"⚠️ Tracking demo failed: {e}")
+        logger.exception("Error in tracking demo")
+    
+    print("\n💡 Advanced: Context Simulation with Simple Functions:")
+    print("📝 You can simulate conversation context by including history:")
+    
+    # Demonstrate context simulation
+    context_prompt = """Previous conversation:
 User: My name is Alice
 Assistant: Nice to meet you, Alice!
 
 Current question: What's my name?"""
-        
-        response = await ask_openai_gpt4o_mini(context_prompt)
-        print(f"Simulated context-aware response: {response}")
+    
+    response = await ask_openai_gpt4o_mini(context_prompt)
+    print(f"Context-aware response: {response}")
 
 
 async def main():
@@ -275,9 +318,10 @@ async def main():
         print("="*60)
         print("🎯 Key Takeaways:")
         print("  • Simple functions: Great for stateless interactions")
-        print("  • Conversation API: Better for multi-turn conversations") 
-        print("  • Session tracking: Works with both approaches")
+        print("  • Session tracking: Adds observability without complexity")
+        print("  • Token & cost tracking: Built-in with create_with_tokens")
         print("  • Parallel requests: Easy with simple functions")
+        print("  • Production ready: Full audit trail for all interactions")
         print("  • Choose based on your use case!")
         
     except Exception as e:

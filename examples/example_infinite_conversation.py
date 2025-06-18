@@ -17,11 +17,11 @@ import logging
 from typing import List, Dict, Any, Optional, Callable, Union
 from datetime import datetime, timezone
 
-# Import session manager components
+# Import session manager components - FIXED for current architecture
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.storage import SessionStoreProvider, InMemorySessionStore
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore, setup_chuk_sessions_storage
 
 # Import the InfiniteConversationManager
 from chuk_ai_session_manager.infinite_conversation import (
@@ -35,6 +35,18 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Quiet down ALL the noisy loggers
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("requests").setLevel(logging.ERROR)
+logging.getLogger("openai").setLevel(logging.ERROR)
+logging.getLogger("anthropic").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+logging.getLogger("h11").setLevel(logging.ERROR)
+logging.getLogger("chuk_llm").setLevel(logging.WARNING)
+logging.getLogger("chuk_sessions").setLevel(logging.WARNING)
+logging.getLogger("chuk_ai_session_manager").setLevel(logging.WARNING)
 
 # Sample conversation data for simulation
 CONVERSATION = [
@@ -83,9 +95,10 @@ async def demonstrate_infinite_conversation(
     """Demonstrate the InfiniteConversationManager with a simulated conversation."""
     print(f"\n=== Demonstrating InfiniteConversationManager with {strategy} strategy ===\n")
     
-    # Set up storage
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
+    # Set up CHUK Sessions storage backend
+    setup_chuk_sessions_storage(sandbox_id="infinite-conversation-demo", default_ttl_hours=2)
+    backend = get_backend()
+    store = ChukSessionsStore(backend)
     
     # Create the conversation manager with a low threshold for demonstration
     manager = InfiniteConversationManager(
@@ -95,6 +108,7 @@ async def demonstrate_infinite_conversation(
     
     # Create the initial session
     initial_session = await Session.create()
+    await store.save(initial_session)
     current_session_id = initial_session.id
     
     print(f"Created initial session: {current_session_id}")
@@ -170,9 +184,10 @@ async def compare_summarization_strategies():
     for strategy in strategies:
         print(f"\nTesting {strategy} summarization strategy...")
         
-        # Reset store for each test
-        store = InMemorySessionStore()
-        SessionStoreProvider.set_store(store)
+        # Set up fresh storage for each test
+        setup_chuk_sessions_storage(sandbox_id=f"infinite-demo-{strategy}", default_ttl_hours=1)
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         
         # Create manager with this strategy
         manager = InfiniteConversationManager(
@@ -182,6 +197,7 @@ async def compare_summarization_strategies():
         
         # Create session
         session = await Session.create()
+        await store.save(session)
         session_id = session.id
         
         # Add messages until threshold is reached
@@ -216,8 +232,11 @@ async def compare_summarization_strategies():
                 print("Conversation completed without reaching token threshold.")
                 print("Forcing summarization...")
                 
+                # Get the session from store
+                current_session = await store.get(session_id)
+                
                 # Force create a summary
-                summary = await manager._create_summary(session, simulated_llm_call)
+                summary = await manager._create_summary(current_session, simulated_llm_call)
                 summaries.append((strategy, summary))
                 print(f"Generated summary: {summary[:100]}...")
     
@@ -237,14 +256,16 @@ async def demonstrate_full_conversation_history():
     print("\n=== Demonstrating Full Conversation History Retrieval ===\n")
     
     # Set up storage
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
+    setup_chuk_sessions_storage(sandbox_id="infinite-history-demo", default_ttl_hours=1)
+    backend = get_backend()
+    store = ChukSessionsStore(backend)
     
     # Create manager
     manager = InfiniteConversationManager(token_threshold=1000)
     
     # Run the conversation to create multiple segments
     session = await Session.create()
+    await store.save(session)
     session_id = session.id
     
     print(f"Created initial session: {session_id}")
@@ -265,7 +286,10 @@ async def demonstrate_full_conversation_history():
     # Now retrieve the full history
     history = await manager.get_full_conversation_history(session_id)
     
-    print(f"\nRetrieved full conversation history across {len(await manager.get_session_chain(session_id))} session segments")
+    # Get session chain for count
+    session_chain = await manager.get_session_chain(session_id)
+    
+    print(f"\nRetrieved full conversation history across {len(session_chain)} session segments")
     print(f"History contains {len(history)} total exchanges\n")
     
     # Print a sample of the history
@@ -280,8 +304,79 @@ async def demonstrate_full_conversation_history():
         print(f"  {len(history)-2+i}. [{role}]: {content[:50]}...")
 
 
+async def demonstrate_session_segmentation():
+    """Demonstrate how sessions are segmented when token thresholds are exceeded."""
+    print("\n=== Demonstrating Session Segmentation ===\n")
+    
+    # Set up storage
+    setup_chuk_sessions_storage(sandbox_id="segmentation-demo", default_ttl_hours=1)
+    backend = get_backend()
+    store = ChukSessionsStore(backend)
+    
+    # Create manager with very low threshold to force segmentation
+    manager = InfiniteConversationManager(
+        token_threshold=500,  # Very low threshold
+        max_turns_per_segment=3,  # Also limit turns per segment
+        summarization_strategy=SummarizationStrategy.BASIC
+    )
+    
+    # Create initial session
+    session = await Session.create()
+    await store.save(session)
+    session_id = session.id
+    session_history = [session_id]
+    
+    print(f"Starting with session: {session_id}")
+    print("Token threshold: 500, Max turns per segment: 3")
+    
+    # Process conversation and track session changes
+    for i, turn in enumerate(CONVERSATION):
+        role = turn["role"]
+        content = turn["content"]
+        source = EventSource.USER if role == "user" else EventSource.LLM
+        
+        print(f"\nProcessing turn {i+1}: {role.upper()}: {content[:30]}...")
+        
+        new_session_id = await manager.process_message(
+            session_id,
+            content,
+            source,
+            simulated_llm_call
+        )
+        
+        if new_session_id != session_id:
+            print(f"  🔄 Session transition: {session_id} -> {new_session_id}")
+            session_history.append(new_session_id)
+            session_id = new_session_id
+        else:
+            print(f"  ✅ Staying in session: {session_id}")
+    
+    print(f"\nSegmentation complete!")
+    print(f"Total sessions created: {len(session_history)}")
+    print(f"Session chain: {' -> '.join([s[:8] + '...' for s in session_history])}")
+    
+    # Analyze each session
+    print("\nSession Analysis:")
+    for i, sess_id in enumerate(session_history):
+        sess = await store.get(sess_id)
+        if sess:
+            message_events = [e for e in sess.events if e.type == EventType.MESSAGE]
+            summary_events = [e for e in sess.events if e.type == EventType.SUMMARY]
+            
+            print(f"  Session {i+1} ({sess_id[:8]}...):")
+            print(f"    Messages: {len(message_events)}")
+            print(f"    Summaries: {len(summary_events)}")
+            print(f"    Total tokens: {sess.total_tokens}")
+            
+            if summary_events:
+                print(f"    Summary: {str(summary_events[-1].message)[:50]}...")
+
+
 async def main():
     """Run all demonstrations."""
+    
+    print("🚀 Infinite Conversation Manager Demonstration")
+    print("=" * 60)
     
     # Demonstrate basic usage
     await demonstrate_infinite_conversation(SummarizationStrategy.BASIC)
@@ -291,6 +386,19 @@ async def main():
     
     # Demonstrate full history retrieval
     await demonstrate_full_conversation_history()
+    
+    # Demonstrate session segmentation
+    await demonstrate_session_segmentation()
+    
+    print("\n✅ All demonstrations completed successfully!")
+    print("=" * 60)
+    print("🎯 Key Features Demonstrated:")
+    print("  • Automatic session segmentation based on token thresholds")
+    print("  • Multiple summarization strategies for different use cases")
+    print("  • Hierarchical session management with parent-child relationships")
+    print("  • Full conversation history retrieval across session segments")
+    print("  • Context building for LLM calls with summary inclusion")
+    print("  • Production-ready infinite conversation handling")
 
 
 if __name__ == "__main__":

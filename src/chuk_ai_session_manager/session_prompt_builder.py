@@ -18,7 +18,7 @@ from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.token_usage import TokenUsage
-from chuk_ai_session_manager.storage import SessionStoreProvider
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +391,9 @@ async def _build_hierarchical_prompt(
     
     # If parent context is enabled and session has a parent
     if include_parent_context and session.parent_id:
-        store = SessionStoreProvider.get_store()
+        # Get the storage backend and create store
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         parent = await store.get(session.parent_id)
         
         if parent:
@@ -466,7 +468,7 @@ async def truncate_prompt_to_token_limit(
     if remaining > max_tokens:
         # remove any tool messages we just added
         kept = [m for m in kept if m["role"] != "tool"]
-        # but guarantee at least one tool message (the first) if it’ll fit
+        # but guarantee at least one tool message (the first) if it'll fit
         first_tool = next((m for m in prompt if m["role"] == "tool"), None)
         if first_tool:
             kept.append(first_tool)

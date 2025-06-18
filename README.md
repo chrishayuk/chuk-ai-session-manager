@@ -48,10 +48,10 @@ This isn't just a demo framework - it's designed for production AI applications 
 
 ```python
 import asyncio
-from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.storage import SessionStoreProvider, InMemorySessionStore
+from chuk_ai_session_manager.chuk_sessions_storage import get_backend, ChukSessionsStore, InMemorySessionStore
 
 async def main():
     # Set up storage
@@ -94,8 +94,8 @@ import asyncio
 import json
 from openai import AsyncOpenAI
 from chuk_tool_processor.registry import initialize
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.storage import SessionStoreProvider, InMemorySessionStore
+from chuk_ai_session_manager.session import Session
+from chuk_ai_session_manager.chuk_sessions_storage import get_backend, ChukSessionsStore, InMemorySessionStore
 
 # Import tools - auto-registers via decorators
 from your_tools import sample_tools
@@ -138,7 +138,7 @@ asyncio.run(openai_integration_demo())
 
 ### In-Memory (Default)
 ```python
-from chuk_ai_session_manager.storage import InMemorySessionStore, SessionStoreProvider
+from chuk_ai_session_manager.chuk_sessions_storage import InMemorySessionStore, SessionStoreProvider
 
 # Great for testing or single-process applications
 store = InMemorySessionStore()
@@ -147,7 +147,7 @@ SessionStoreProvider.set_store(store)
 
 ### File Storage
 ```python
-from chuk_ai_session_manager.storage.providers.file import create_file_session_store
+from chuk_ai_session_manager.chuk_sessions_storage.providers.file import create_file_session_store
 
 # Persistent JSON file storage with async I/O
 store = await create_file_session_store(directory="./sessions")
@@ -156,7 +156,7 @@ SessionStoreProvider.set_store(store)
 
 ### Redis Storage
 ```python
-from chuk_ai_session_manager.storage.providers.redis import create_redis_session_store
+from chuk_ai_session_manager.chuk_sessions_storage.providers.redis import create_redis_session_store
 
 # Distributed storage for production with TTL
 store = await create_redis_session_store(

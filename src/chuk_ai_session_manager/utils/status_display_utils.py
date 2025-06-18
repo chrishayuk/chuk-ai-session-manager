@@ -34,6 +34,14 @@ from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.session_prompt_builder import build_prompt_from_session
 
+# Status display utilities
+def format_status(success: bool, success_msg: str = "SUCCESS", failure_msg: str = "FAILED") -> str:
+    """Format status with correct emoji."""
+    if success:
+        return f"✅ {success_msg}"
+    else:
+        return f"❌ {failure_msg}"
+
 # Import from chuk_tool_processor (using the working pattern)
 from chuk_tool_processor.registry import initialize, get_default_registry
 from chuk_tool_processor.models.tool_call import ToolCall
@@ -266,7 +274,7 @@ class LLMRetryManager:
             # Check if response has tool calls
             tool_calls = response.get("tool_calls", [])
             if not tool_calls:
-                print(f"   ❌ No tool calls in response")
+                print(f"   {format_status(False, failure_msg='No tool calls in response')}")
                 continue
             
             # Try to execute the tool calls
@@ -286,13 +294,13 @@ class LLMRetryManager:
                 # Check if all tools executed successfully
                 failed_tools = [r for r in tool_results if r.error]
                 if failed_tools:
-                    print(f"   ❌ {len(failed_tools)} tools failed:")
+                    print(f"   {format_status(False, failure_msg=f'{len(failed_tools)} tools failed:')}")
                     for failed in failed_tools:
                         print(f"      • {failed.tool}: {failed.error}")
                     continue
                 
                 # Success! All tools executed
-                print(f"   ✅ All {len(tool_results)} tools executed successfully")
+                print(f"   {format_status(True, success_msg=f'All {len(tool_results)} tools executed successfully')}")
                 
                 # Update the last event to mark success
                 session = await store.get(self.session_id)
@@ -310,7 +318,7 @@ class LLMRetryManager:
                 return response, tool_results
                 
             except Exception as e:
-                print(f"   ❌ Tool execution failed: {e}")
+                print(f"   {format_status(False, failure_msg=f'Tool execution failed: {e}')}")
                 continue
         
         # If we get here, all attempts failed

@@ -23,7 +23,7 @@ from chuk_tool_processor.models.tool_result import ToolResult
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.storage import SessionStoreProvider
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,8 @@ class SessionAwareToolProcessor:
 
     @classmethod
     async def create(cls, session_id: str, **kwargs):
-        store = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         if not await store.get(session_id):
             raise ValueError(f"Session {session_id} not found")
         return cls(session_id=session_id, **kwargs)
@@ -114,7 +115,8 @@ class SessionAwareToolProcessor:
 
     # ─────────────────────────── public API ────────────────────────────
     async def process_llm_message(self, llm_msg: Dict[str, Any], _) -> List[ToolResult]:
-        store   = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         session = await store.get(self.session_id)
         if not session:
             raise ValueError(f"Session {self.session_id} not found")

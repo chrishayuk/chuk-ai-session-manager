@@ -12,9 +12,9 @@ import pytest_asyncio
 
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.storage import (
-    InMemorySessionStore,
-    SessionStoreProvider,
+from chuk_ai_session_manager.session_storage import (
+    ChukSessionsStore,
+    setup_chuk_sessions_storage,
 )
 from chuk_ai_session_manager.session_aware_tool_processor import (
     SessionAwareToolProcessor,
@@ -24,11 +24,17 @@ from chuk_ai_session_manager.session_aware_tool_processor import (
 # ───────────────────────── fixtures ──────────────────────────
 @pytest_asyncio.fixture
 async def sid():
-    store = InMemorySessionStore()
-    SessionStoreProvider.set_store(store)
+    backend = setup_chuk_sessions_storage(sandbox_id="test-tool-processor")
+    store = ChukSessionsStore(backend)
     sess = Session()
     await store.save(sess)
     return sess.id
+
+
+@pytest_asyncio.fixture 
+async def chuk_store():
+    backend = setup_chuk_sessions_storage(sandbox_id="test-tool-processor")
+    return ChukSessionsStore(backend)
 
 
 # ───────────────────────── helpers ───────────────────────────
@@ -80,7 +86,7 @@ async def test_cache_behavior(sid):
 
 
 @pytest.mark.asyncio
-async def test_retry_behavior(sid):
+async def test_retry_behavior(sid, chuk_store):
     proc = await SessionAwareToolProcessor.create(
         session_id=sid, max_retries=2, retry_delay=0.001
     )
@@ -93,7 +99,7 @@ async def test_retry_behavior(sid):
         out = await proc.process_llm_message(_dummy_msg(), _noop_llm)
         assert out[0].result == {"v": 1}
 
-    sess = await SessionStoreProvider.get_store().get(sid)
+    sess = await chuk_store.get(sid)
     # successful TOOL_CALL should have been logged on attempt 2
     tc_events = [e for e in sess.events if e.type == EventType.TOOL_CALL]
     assert len(tc_events) == 1

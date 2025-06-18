@@ -28,10 +28,10 @@ from openai import AsyncOpenAI
 # Add current directory to path
 sys.path.insert(0, os.getcwd())
 
-# Session manager imports
-from chuk_ai_session_manager.storage.providers.memory import InMemorySessionStore
-from chuk_ai_session_manager.storage import SessionStoreProvider
-from chuk_ai_session_manager.models.session import Session, SessionEvent
+# Session manager imports - FIXED for current architecture
+from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore, setup_chuk_sessions_storage
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 
@@ -43,6 +43,29 @@ from chuk_tool_processor.execution.tool_executor import ToolExecutor
 
 # Import sample tools - this triggers auto-registration
 import sample_tools
+
+# --------------------------------------------------------------------------- #
+# logging
+# --------------------------------------------------------------------------- #
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Quiet down noisy loggers
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("requests").setLevel(logging.ERROR)
+logging.getLogger("openai").setLevel(logging.ERROR)
+logging.getLogger("anthropic").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+logging.getLogger("h11").setLevel(logging.ERROR)
+logging.getLogger("chuk_llm").setLevel(logging.WARNING)
+logging.getLogger("chuk_sessions").setLevel(logging.WARNING)
+logging.getLogger("chuk_ai_session_manager").setLevel(logging.WARNING)
+logging.getLogger("chuk_tool_processor").setLevel(logging.WARNING)
+
 
 ##############################################################################
 # Clean Tool Processor with Registry Auto-Discovery
@@ -66,7 +89,8 @@ class CleanSessionAwareToolProcessor:
     
     async def process_llm_message(self, llm_msg: dict) -> list:
         """Process tool calls from LLM message."""
-        store = SessionStoreProvider.get_store()
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
         session = await store.get(self.session_id)
         
         # Log LLM message
@@ -115,7 +139,7 @@ class CleanSessionAwareToolProcessor:
                 source=EventSource.SYSTEM,
                 type=EventType.TOOL_CALL,
             )
-            await tool_event.update_metadata("parent_event_id", llm_event.id)
+            await tool_event.set_metadata("parent_event_id", llm_event.id)
             await session.add_event_and_save(tool_event)
         
         return results
@@ -286,10 +310,15 @@ async def main() -> None:
         # Setup OpenAI client
         client = await get_openai_client()
         
-        # Setup session manager
-        store = InMemorySessionStore()
-        SessionStoreProvider.set_store(store)
+        # Setup session manager with CHUK Sessions backend
+        setup_chuk_sessions_storage(sandbox_id="clean-openai-demo", default_ttl_hours=1)
+        backend = get_backend()
+        store = ChukSessionsStore(backend)
+        
         session = await Session.create()
+        await session.metadata.set_property("demo", "clean_openai_integration")
+        await session.metadata.set_property("provider", "openai")
+        await store.save(session)
         
         # Create clean tool processor
         processor = await CleanSessionAwareToolProcessor.create(session_id=session.id)
@@ -361,8 +390,10 @@ async def main() -> None:
                 else:
                     print(f"   📊 Result: {result.result}")
         
-        # Show session tree
+        # Refresh session from store to get all events
         session = await store.get(session.id)
+        
+        # Show session tree
         print(f"\n📊 Session Event Tree:")
         print("=" * 40)
         await pretty_print_session_tree(session)
@@ -376,8 +407,31 @@ async def main() -> None:
             for model, usage in session.token_summary.usage_by_model.items():
                 print(f"   📊 {model}: {usage.total_tokens} tokens (${usage.estimated_cost_usd:.6f})")
         
+        # Show session statistics
+        print(f"\n📈 Session Statistics:")
+        print(f"   Session ID: {session.id}")
+        print(f"   Total events: {len(session.events)}")
+        print(f"   Created: {session.metadata.created_at}")
+        print(f"   Updated: {session.metadata.updated_at}")
+        
+        # Event breakdown
+        event_types = {}
+        for event in session.events:
+            event_type = f"{event.source.value}:{event.type.value}"
+            event_types[event_type] = event_types.get(event_type, 0) + 1
+        
+        print(f"   Event breakdown:")
+        for event_type, count in event_types.items():
+            print(f"     {event_type}: {count}")
+        
         print(f"\n🎉 Clean demo completed successfully!")
         print("=" * 60)
+        print("🎯 Key Achievements:")
+        print("  • Auto-discovered tools from registry")
+        print("  • Clean OpenAI function generation")
+        print("  • Session-aware tool execution")
+        print("  • Complete conversation tracking")
+        print("  • Token usage and cost analytics")
         
     except Exception as e:
         print(f"❌ Demo failed: {e}")
@@ -392,6 +446,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s"
 )
+
+# Quiet down noisy loggers
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("openai").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 if __name__ == "__main__":
     asyncio.run(main())
