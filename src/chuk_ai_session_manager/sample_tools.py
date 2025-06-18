@@ -1,4 +1,4 @@
-# sample_tools.py
+# chuk_ai_session_manager/sample_tools.py
 """
 Sample tools for chuk session manager demos - corrected version following registry example
 """

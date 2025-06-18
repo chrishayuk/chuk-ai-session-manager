@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.3"
+version = "0.4"
 description = "Session manager for AI applications"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,10 +36,26 @@ include = ["chuk_ai_session_manager*"]
 # pytest settings so it finds your src/ layout automatically
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = "-v"
-asyncio_default_fixture_loop_scope = "function"
-asyncio_mode = "strict"
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--tb=short",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests", 
+    "slow: Slow tests",
+    "asyncio: Async tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 
 [tool.black]
 line-length = 88

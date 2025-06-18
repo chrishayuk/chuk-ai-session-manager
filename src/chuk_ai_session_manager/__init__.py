@@ -15,7 +15,18 @@ Quick Start:
     await sm.ai_responds("It's sunny and 72°F", model="gpt-4")
 """
 
-# Simple API exports - the main things developers need
+# Import core models first (these have no circular dependencies)
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+
+# Import storage setup (this should work now with the fixed session_storage.py)
+from chuk_ai_session_manager.session_storage import setup_chuk_sessions_storage
+
+# Import other models (these might depend on storage being set up)
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
+
+# Import the simple API (this should work now that storage is fixed)
 from chuk_ai_session_manager.api.simple_api import (
     SessionManager,
     track_conversation,
@@ -23,15 +34,6 @@ from chuk_ai_session_manager.api.simple_api import (
     quick_conversation,
     track_infinite_conversation
 )
-
-# Core models for advanced users
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
-
-# Storage backend setup
-from chuk_ai_session_manager.session_storage import setup_chuk_sessions_storage
 
 __version__ = "0.1.0"
 

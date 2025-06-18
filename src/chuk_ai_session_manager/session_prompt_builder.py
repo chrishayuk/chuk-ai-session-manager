@@ -37,7 +37,8 @@ async def build_prompt_from_session(
     max_tokens: Optional[int] = None,
     model: str = "gpt-3.5-turbo",
     include_parent_context: bool = False,
-    current_query: Optional[str] = None
+    current_query: Optional[str] = None,
+    max_history: int = 5  # Add this parameter for conversation strategy
 ) -> List[Dict[str, str]]:
     """
     Build a prompt for the next LLM call from a Session asynchronously.
@@ -49,6 +50,7 @@ async def build_prompt_from_session(
         model: Model to use for token counting
         include_parent_context: Whether to include context from parent sessions
         current_query: Current user query for relevance-based context selection
+        max_history: Maximum number of messages to include for conversation strategy
         
     Returns:
         A list of message dictionaries suitable for LLM API calls
@@ -72,7 +74,7 @@ async def build_prompt_from_session(
     elif strategy == PromptStrategy.TOOL_FOCUSED:
         return await _build_tool_focused_prompt(session)
     elif strategy == PromptStrategy.CONVERSATION:
-        return await _build_conversation_prompt(session, max_history=5)
+        return await _build_conversation_prompt(session, max_history)
     elif strategy == PromptStrategy.HIERARCHICAL:
         return await _build_hierarchical_prompt(session, include_parent_context)
     else:
@@ -112,7 +114,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, str]]:
     
     if assistant_msg is None:
         # Only the user message exists so far
-        return [{"role": "user", "content": first_user.message}] if first_user else []
+        return [{"role": "user", "content": _extract_content(first_user.message)}] if first_user else []
 
     # Children of that assistant
     children = [
@@ -126,11 +128,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, str]]:
     # Assemble prompt
     prompt: List[Dict[str, str]] = []
     if first_user:
-        # Handle both string messages and dict messages
-        user_content = first_user.message
-        if isinstance(user_content, dict) and "content" in user_content:
-            user_content = user_content["content"]
-        prompt.append({"role": "user", "content": user_content})
+        prompt.append({"role": "user", "content": _extract_content(first_user.message)})
 
     # ALWAYS add the assistant marker - but strip its free text
     prompt.append({"role": "assistant", "content": None})
@@ -164,6 +162,24 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, str]]:
             prompt.append({"role": "system", "content": str(summary.message)})
 
     return prompt
+
+
+def _extract_content(message: Any) -> str:
+    """
+    Extract content string from a message that could be a string or dict.
+    
+    Args:
+        message: The message content (string, dict, or other)
+        
+    Returns:
+        The extracted content as a string
+    """
+    if isinstance(message, str):
+        return message
+    elif isinstance(message, dict) and "content" in message:
+        return message["content"]
+    else:
+        return str(message)
 
 
 async def _build_task_focused_prompt(session: Session) -> List[Dict[str, str]]:
@@ -201,17 +217,11 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, str]]:
     prompt = []
     
     # Always include the first user message (the main task)
-    first_content = first_user.message
-    if isinstance(first_content, dict) and "content" in first_content:
-        first_content = first_content["content"]
-    prompt.append({"role": "user", "content": first_content})
+    prompt.append({"role": "user", "content": _extract_content(first_user.message)})
     
     # Include the latest user message if different from the first
     if latest_user and latest_user.id != first_user.id:
-        latest_content = latest_user.message
-        if isinstance(latest_content, dict) and "content" in latest_content:
-            latest_content = latest_content["content"]
-        prompt.append({"role": "user", "content": latest_content})
+        prompt.append({"role": "user", "content": _extract_content(latest_user.message)})
     
     # Include assistant response placeholder
     if assistant_msg:
@@ -274,10 +284,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, str]]:
     prompt = []
     
     # Include user message
-    user_content = latest_user.message
-    if isinstance(user_content, dict) and "content" in user_content:
-        user_content = user_content["content"]
-    prompt.append({"role": "user", "content": user_content})
+    prompt.append({"role": "user", "content": _extract_content(latest_user.message)})
     
     # Include assistant placeholder
     if assistant_msg:
@@ -334,26 +341,23 @@ async def _build_conversation_prompt(
     
     # Build the conversation history
     prompt = []
-    for msg in recent_messages:
+    for i, msg in enumerate(recent_messages):
         role = "user" if msg.source == EventSource.USER else "assistant"
-        content = msg.message
+        content = _extract_content(msg.message)
         
-        # Handle different message formats
-        if isinstance(content, dict) and "content" in content:
-            content = content["content"]
-        
-        # For the last assistant message, set content to None
-        if role == "assistant" and msg == recent_messages[-1] and msg.source != EventSource.USER:
-            content = None
+        # For the last assistant message, set content to None and add tool calls
+        if (role == "assistant" and 
+            msg == recent_messages[-1] and 
+            msg.source != EventSource.USER):
+            
+            # Add the message first with None content
+            prompt.append({"role": role, "content": None})
             
             # Add tool call results for this assistant message
             tool_calls = [
                 e for e in session.events
                 if e.type == EventType.TOOL_CALL and e.metadata.get("parent_event_id") == msg.id
             ]
-            
-            # Add the message first, then tools
-            prompt.append({"role": role, "content": content})
             
             # Add tool results
             for tc in tool_calls:
@@ -366,11 +370,9 @@ async def _build_conversation_prompt(
                         "name": tool_name,
                         "content": json.dumps(tool_result, default=str),
                     })
-                    
-            # Skip adding this message again
-            continue
-            
-        prompt.append({"role": role, "content": content})
+        else:
+            # Regular message
+            prompt.append({"role": role, "content": content})
     
     return prompt
 
@@ -391,32 +393,38 @@ async def _build_hierarchical_prompt(
     
     # If parent context is enabled and session has a parent
     if include_parent_context and session.parent_id:
-        # Get the storage backend and create store
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
-        parent = await store.get(session.parent_id)
-        
-        if parent:
-            # Find the most recent summary in parent
-            summary_event = next(
-                (e for e in reversed(parent.events) 
-                 if e.type == EventType.SUMMARY),
-                None
-            )
+        try:
+            # Get the storage backend and create store
+            backend = get_backend()
+            store = ChukSessionsStore(backend)
+            parent = await store.get(session.parent_id)
             
-            if summary_event:
-                # Extract summary content
-                summary_content = summary_event.message
-                if isinstance(summary_content, dict) and "note" in summary_content:
-                    summary_content = summary_content["note"]
-                elif isinstance(summary_content, dict) and "content" in summary_content:
-                    summary_content = summary_content["content"]
-                    
-                # Add parent context at the beginning
-                prompt.insert(0, {
-                    "role": "system",
-                    "content": f"Context from previous conversation: {summary_content}"
-                })
+            if parent:
+                # Find the most recent summary in parent
+                summary_event = next(
+                    (e for e in reversed(parent.events) 
+                     if e.type == EventType.SUMMARY),
+                    None
+                )
+                
+                if summary_event:
+                    # Extract summary content
+                    summary_content = summary_event.message
+                    if isinstance(summary_content, dict) and "note" in summary_content:
+                        summary_content = summary_content["note"]
+                    elif isinstance(summary_content, dict) and "content" in summary_content:
+                        summary_content = summary_content["content"]
+                    else:
+                        summary_content = str(summary_content)
+                        
+                    # Add parent context at the beginning
+                    prompt.insert(0, {
+                        "role": "system",
+                        "content": f"Context from previous conversation: {summary_content}"
+                    })
+        except Exception as e:
+            # If we can't load parent context, just continue with minimal prompt
+            logger.warning(f"Could not load parent context for session {session.parent_id}: {e}")
     
     return prompt
 

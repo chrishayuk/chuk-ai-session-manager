@@ -289,36 +289,6 @@ pip install chuk-ai-session-manager
 | **Production Ready** | Requires additional work | Built for production |
 | **Learning Curve** | Steep | 5 minutes to productivity |
 
-## 🚀 Migration Guides
-
-### From LangChain Memory
-```python
-# Old LangChain way
-from langchain.memory import ConversationBufferMemory
-memory = ConversationBufferMemory()
-memory.save_context({"input": "Hi"}, {"output": "Hello"})
-
-# New CHUK way (much simpler!)
-from chuk_ai_session_manager import track_conversation
-await track_conversation("Hi", "Hello")
-```
-
-### From Manual Session Management
-```python
-# Old manual way
-conversations = {}
-def save_conversation(user_id, message, response):
-    if user_id not in conversations:
-        conversations[user_id] = []
-    conversations[user_id].append({"user": message, "ai": response})
-
-# New CHUK way
-from chuk_ai_session_manager import SessionManager
-sm = SessionManager(session_id=user_id)
-await sm.user_says(message)
-await sm.ai_responds(response)
-```
-
 ## 📖 More Examples
 
 Check out the `/examples` directory for complete working examples:
@@ -340,16 +310,9 @@ Check out the `/examples` directory for complete working examples:
 - ✅ Complete conversation analytics and observability
 - ✅ Framework-agnostic solution that works with any LLM library
 
-**Consider alternatives if you:**
-- ❌ Only need basic in-memory conversation history
-- ❌ Are locked into a specific framework (LangChain, etc.)
-- ❌ Don't need cost tracking or analytics
-- ❌ Are building simple, stateless AI applications
-
 ## 🤝 Community & Support
 
 - 📖 **Documentation**: [Full docs with tutorials](link-to-docs)
-- 💬 **Discord**: Join our community for help and discussions
 - 🐛 **Issues**: Report bugs on GitHub
 - 💡 **Feature Requests**: Suggest new features
 - 📧 **Support**: enterprise@chuk.dev for production support

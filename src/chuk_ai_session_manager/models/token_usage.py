@@ -175,7 +175,7 @@ class TokenUsage(BaseModel):
         )
     
     @staticmethod
-    def _count_tokens_sync(text: Optional[str], model: str = "gpt-3.5-turbo") -> int:
+    def _count_tokens_sync(text: Optional[Union[str, Any]], model: str = "gpt-3.5-turbo") -> int:
         """
         Synchronous implementation of count_tokens.
         
@@ -187,6 +187,17 @@ class TokenUsage(BaseModel):
             The number of tokens
         """
         if text is None:
+            return 0
+        
+        # Convert to string if not already a string
+        if not isinstance(text, str):
+            try:
+                text = str(text)
+            except Exception:
+                return 0
+        
+        # Empty string has 0 tokens
+        if not text:
             return 0
             
         if TIKTOKEN_AVAILABLE:
@@ -206,7 +217,7 @@ class TokenUsage(BaseModel):
         return int(len(text) / 4)
     
     @staticmethod
-    async def count_tokens(text: Optional[str], model: str = "gpt-3.5-turbo") -> int:
+    async def count_tokens(text: Optional[Union[str, Any]], model: str = "gpt-3.5-turbo") -> int:
         """
         Async version of count_tokens.
         
