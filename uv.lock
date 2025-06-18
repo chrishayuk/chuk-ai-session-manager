@@ -186,7 +186,7 @@ wheels = [
 
 [[package]]
 name = "chuk-ai-session-manager"
-version = "0.2"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "chuk-sessions" },
@@ -216,6 +216,7 @@ dev = [
     { name = "chuk-llm" },
     { name = "fastapi" },
     { name = "geopy" },
+    { name = "openai" },
     { name = "pytest-asyncio" },
     { name = "tiktoken" },
     { name = "uvicorn" },
@@ -242,6 +243,7 @@ dev = [
     { name = "chuk-llm", specifier = ">=0.3" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "geopy", specifier = ">=2.4.1" },
+    { name = "openai", specifier = ">=1.88.0" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
     { name = "tiktoken", specifier = ">=0.9.0" },
     { name = "uvicorn", specifier = ">=0.34.2" },
