@@ -322,10 +322,14 @@ class TestSession:
         # Import Session here to avoid circular imports
         from chuk_ai_session_manager.models.session import Session
         
-        # Patch the correct import path - where get_backend is actually imported FROM
-        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_backend:
+        # Patch the storage system
+        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_get_backend, \
+             patch('chuk_ai_session_manager.session_storage.ChukSessionsStore') as mock_store_class:
+            
+            mock_backend = AsyncMock()
             mock_store = AsyncMock()
-            mock_backend.return_value = mock_store
+            mock_get_backend.return_value = mock_backend
+            mock_store_class.return_value = mock_store
             mock_store.save = AsyncMock()
             
             session = await Session.create()
@@ -340,10 +344,14 @@ class TestSession:
         """Test Session creation with parent."""
         from chuk_ai_session_manager.models.session import Session
         
-        # Patch the correct import path
-        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_backend:
+        # Patch the storage system
+        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_get_backend, \
+             patch('chuk_ai_session_manager.session_storage.ChukSessionsStore') as mock_store_class:
+            
+            mock_backend = AsyncMock()
             mock_store = AsyncMock()
-            mock_backend.return_value = mock_store
+            mock_get_backend.return_value = mock_backend
+            mock_store_class.return_value = mock_store
             mock_store.get.return_value = None  # Parent doesn't exist for simplicity
             mock_store.save = AsyncMock()
             
@@ -372,10 +380,14 @@ class TestSession:
         """Test adding event and saving session."""
         from chuk_ai_session_manager.models.session import Session
         
-        # Patch the correct import path
-        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_backend:
+        # Patch the storage system properly
+        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_get_backend, \
+             patch('chuk_ai_session_manager.session_storage.ChukSessionsStore') as mock_store_class:
+            
+            mock_backend = AsyncMock()
             mock_store = AsyncMock()
-            mock_backend.return_value = mock_store
+            mock_get_backend.return_value = mock_backend
+            mock_store_class.return_value = mock_store
             mock_store.save = AsyncMock()
             
             session = Session()
@@ -384,7 +396,8 @@ class TestSession:
             await session.add_event_and_save(event)
             
             assert len(session.events) == 1
-            mock_store.save.assert_called_once()
+            # Verify save was called
+            mock_store.save.assert_called_once_with(session)
     
     async def test_session_state_management(self):
         """Test session state operations."""

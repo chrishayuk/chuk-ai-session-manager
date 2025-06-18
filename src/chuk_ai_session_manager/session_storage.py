@@ -1,4 +1,4 @@
-# chuk_ai_session_manager/session_storage.py
+# src/chuk_ai_session_manager/session_storage.py
 """
 CHUK Sessions storage backend for AI Session Manager.
 
@@ -11,7 +11,18 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from chuk_sessions import SessionManager as ChukSessionManager
+# Import the correct class from chuk_sessions
+# We need to determine the correct import based on what's actually available
+try:
+    from chuk_sessions import SessionManager as ChukSessionManager
+except ImportError as e:
+    raise ImportError(
+        f"Cannot import SessionManager from chuk_sessions: {e}\n"
+        "Please ensure chuk_sessions is properly installed with: uv add chuk-sessions\n"
+        "Or check the available classes in chuk_sessions by running:\n"
+        "python -c \"import chuk_sessions; print(dir(chuk_sessions))\""
+    ) from e
+
 from chuk_ai_session_manager.models.session import Session
 
 logger = logging.getLogger(__name__)
