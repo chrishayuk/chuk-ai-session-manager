@@ -1,281 +1,756 @@
-# chuk-ai-session-manager
+# CHUK AI Session Manager Documentation
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A powerful session management system for AI applications that provides automatic conversation tracking, token usage monitoring, tool call logging, infinite context support, and hierarchical session relationships.
 
-**The easiest way to add conversation tracking to any AI application.**
+## Table of Contents
 
-Track conversations, monitor costs, and manage infinite context with just 3 lines of code. Built for production, designed for simplicity.
+1. [Overview](#overview)
+2. [Import Issues & Fixes](#import-issues--fixes)
+3. [Core Architecture](#core-architecture)
+4. [Quick Start](#quick-start)
+5. [Simple API](#simple-api)
+6. [Advanced Usage](#advanced-usage)
+7. [Core Models](#core-models)
+8. [Infinite Context](#infinite-context)
+9. [Tool Integration](#tool-integration)
+10. [Session Storage](#session-storage)
+11. [Prompt Building](#prompt-building)
+12. [Configuration](#configuration)
 
-## 🚀 30-Second Start
+## Overview
+
+The CHUK AI Session Manager is designed to solve common challenges in AI application development:
+
+- **Conversation Tracking**: Automatically track user-AI interactions
+- **Token Management**: Monitor usage and costs across different models
+- **Infinite Context**: Handle conversations that exceed token limits through automatic summarization
+- **Tool Integration**: Log tool calls and results seamlessly
+- **Session Hierarchy**: Create parent-child relationships between conversation segments
+- **Flexible Storage**: Built on CHUK Sessions for reliable persistence
+
+### Key Features
+
+- **Zero-friction API**: Simple functions for common tasks
+- **Async-first**: Built for modern Python async/await patterns
+- **Token-aware**: Automatic token counting and cost estimation
+- **Provider-agnostic**: Works with any LLM provider (OpenAI, Anthropic, etc.)
+- **Hierarchical sessions**: Support for complex conversation structures
+- **Automatic summarization**: Maintains context across session segments
+
+## Import Structure
+
+With the clean `__init__.py`, all components should be available at the top level:
+
+```python
+from chuk_ai_session_manager import (
+    # Simple API - Primary interface for most users
+    SessionManager,
+    track_conversation,
+    track_llm_call,
+    quick_conversation,
+    track_infinite_conversation,
+    track_tool_use,
+    get_session_stats,
+    get_conversation_history,
+    
+    # Core Models
+    Session,
+    SessionEvent,
+    SessionMetadata,
+    SessionRun,
+    RunStatus,
+    
+    # Enums
+    EventSource,
+    EventType,
+    
+    # Token Management
+    TokenUsage,
+    TokenSummary,
+    
+    # Advanced Components
+    InfiniteConversationManager,
+    SummarizationStrategy,
+    SessionAwareToolProcessor,
+    build_prompt_from_session,
+    PromptStrategy,
+    truncate_prompt_to_token_limit,
+    
+    # Storage
+    setup_chuk_sessions_storage,
+    
+    # Exceptions
+    SessionManagerError,
+    SessionNotFound,
+    SessionAlreadyExists,
+    InvalidSessionOperation,
+    TokenLimitExceeded,
+    StorageError,
+    ToolProcessingError,
+    
+    # Utilities
+    configure_storage,
+    get_version,
+    is_available
+)
+```
+
+### Verifying Installation
+
+Check that everything is working:
+
+```python
+import chuk_ai_session_manager as casm
+
+print(f"Version: {casm.get_version()}")
+print("Available components:", casm.is_available())
+
+# This should show all components as True
+# {
+#   "core_enums": True,
+#   "core_models": True, 
+#   "simple_api": True,
+#   "storage": True,
+#   "infinite_context": True,
+#   "tool_processor": True,
+#   "prompt_builder": True,
+#   "token_tracking": True,
+#   "exceptions": True,
+#   "session_manager": True
+# }
+```
+
+## Core Architecture
+
+The system is built around several key components working together to provide seamless conversation management:
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Simple API    │    │ SessionManager   │    │ Core Models     │
+│                 │    │                  │    │                 │
+│ track_conversation() │    │ High-level API   │    │ Session         │
+│ track_llm_call()     │    │ Infinite context │    │ SessionEvent    │
+│ quick_conversation() │    │ Auto-summarization│   │ TokenUsage      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Tool Processor  │    │ Storage Backend  │    │ Prompt Builder  │
+│                 │    │                  │    │                 │
+│ Session-aware   │    │ CHUK Sessions    │    │ Multiple        │
+│ Tool execution  │    │ JSON persistence │    │ strategies      │
+│ Retry & caching │    │ TTL management   │    │ Token limits    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+**Key Components:**
+- **Simple API**: One-line functions for common operations
+- **SessionManager**: High-level conversation management with infinite context
+- **Core Models**: Session, SessionEvent, TokenUsage for data modeling
+- **Tool Processor**: Automatic tool call tracking with retry and caching
+- **Storage Backend**: CHUK Sessions for reliable persistence
+- **Prompt Builder**: Intelligent context building for LLM calls
+
+## Quick Start
+
+### Installation
 
 ```bash
+# Install the package
 uv add chuk-ai-session-manager
+
+# Or with pip
+pip install chuk-ai-session-manager
 ```
+
+### Basic Usage
 
 ```python
 from chuk_ai_session_manager import track_conversation
 
-# Track any AI conversation in one line
-await track_conversation("Hello!", "Hi there! How can I help?")
-```
-
-That's it! 🎉 Your conversation is now tracked with full observability.
-
-## ✨ Why Choose CHUK?
-
-- **🔥 Stupidly Simple**: 3 lines to track any conversation
-- **💰 Cost Smart**: Automatic token counting and cost tracking
-- **♾️ Infinite Context**: No more "conversation too long" errors
-- **🔧 Any LLM**: Works with OpenAI, Anthropic, local models, anything
-- **📊 Full Observability**: See exactly what's happening in your AI app
-- **🚀 Production Ready**: Used in real applications, not just demos
-
-## 🎯 Perfect For
-
-- **Building chatbots** that remember conversations
-- **Tracking LLM costs** across your entire application  
-- **Managing long conversations** without hitting token limits
-- **Debugging AI applications** with complete audit trails
-- **Production AI systems** that need reliable session management
-
-## 📱 Quick Examples
-
-### Track Any Conversation
-```python
-from chuk_ai_session_manager import track_conversation
-
-# Works with any LLM response
+# Track a simple conversation
 session_id = await track_conversation(
     user_message="What's the weather like?",
-    ai_response="It's sunny and 75°F in your area.",
+    ai_response="I don't have access to real-time weather data.",
+    model="gpt-3.5-turbo",
+    provider="openai"
+)
+
+print(f"Conversation tracked in session: {session_id}")
+```
+
+### With Statistics
+
+```python
+from chuk_ai_session_manager import quick_conversation
+
+stats = await quick_conversation(
+    user_message="Explain quantum computing",
+    ai_response="Quantum computing uses quantum mechanical phenomena...",
     model="gpt-4",
+    provider="openai"
+)
+
+print(f"Tokens used: {stats['total_tokens']}")
+print(f"Estimated cost: ${stats['estimated_cost']:.4f}")
+```
+
+### Basic Integration with Your LLM
+
+```python
+from chuk_ai_session_manager import track_llm_call
+import openai
+
+async def my_openai_call(prompt):
+    response = await openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+# Track your LLM call automatically
+response, session_id = await track_llm_call(
+    user_input="Explain machine learning",
+    llm_function=my_openai_call,
+    model="gpt-3.5-turbo",
+    provider="openai"
+)
+
+print(f"AI Response: {response}")
+print(f"Tracked in session: {session_id}")
+```
+
+## Simple API
+
+The Simple API provides convenient functions for common tasks:
+
+```python
+from chuk_ai_session_manager import (
+    track_conversation,
+    track_llm_call,
+    quick_conversation,
+    track_infinite_conversation,
+    track_tool_use,
+    get_session_stats,
+    get_conversation_history
+)
+```
+
+### `track_conversation()`
+
+The simplest way to track a conversation turn - perfect for one-off tracking:
+
+```python
+session_id = await track_conversation(
+    user_message="Hello!",
+    ai_response="Hi there! How can I help?",
+    model="gpt-3.5-turbo",
+    provider="openai",
+    session_id=None,  # Optional: continue existing session
+    infinite_context=False,  # Enable infinite context
+    token_threshold=4000  # Token limit for segmentation
+)
+
+# Returns the session ID for continuing the conversation later
+```
+
+### `track_llm_call()`
+
+Wrap your LLM function calls for automatic tracking:
+
+```python
+async def call_openai(prompt):
+    # Your OpenAI API call here
+    response = await openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+response, session_id = await track_llm_call(
+    user_input="Explain machine learning",
+    llm_function=call_openai,
+    model="gpt-3.5-turbo",
     provider="openai"
 )
 ```
 
-### Persistent Conversations
+### `track_infinite_conversation()`
+
+For long conversations that might exceed token limits:
+
+```python
+# Start a conversation
+session_id = await track_infinite_conversation(
+    user_message="Tell me about the history of computing",
+    ai_response="Computing history begins with ancient calculating devices...",
+    model="gpt-4",
+    token_threshold=4000,  # Auto-segment after 4000 tokens
+    max_turns=20  # Or after 20 conversation turns
+)
+
+# Continue the conversation
+session_id = await track_infinite_conversation(
+    user_message="What about quantum computers?",
+    ai_response="Quantum computing represents a fundamental shift...",
+    session_id=session_id,  # Continue the same conversation
+    model="gpt-4"
+)
+```
+
+### `track_tool_use()`
+
+Track tool/function calls:
+
+```python
+session_id = await track_tool_use(
+    tool_name="calculator",
+    arguments={"operation": "add", "a": 5, "b": 3},
+    result={"result": 8},
+    session_id=session_id,
+    error=None  # Optional error message
+)
+```
+
+## SessionManager Class
+
+For more control and persistent conversations, use the `SessionManager` class directly:
+
 ```python
 from chuk_ai_session_manager import SessionManager
 
-# Create a conversation that remembers context
-sm = SessionManager()
-
-await sm.user_says("My name is Alice")
-await sm.ai_responds("Nice to meet you, Alice!")
-
-await sm.user_says("What's my name?")
-await sm.ai_responds("Your name is Alice!")
-
-# Get conversation stats
-stats = await sm.get_stats()
-print(f"Cost: ${stats['estimated_cost']:.6f}")
-print(f"Tokens: {stats['total_tokens']}")
-```
-
-### Infinite Context (Never Run Out of Space)
-```python
-# Automatically handles conversations of any length
+# Create a session manager
 sm = SessionManager(
-    infinite_context=True,          # 🔥 Magic happens here
-    token_threshold=4000           # When to create new segment
+    system_prompt="You are a helpful assistant specialized in Python programming.",
+    infinite_context=True,
+    token_threshold=4000,
+    max_turns_per_segment=20
 )
 
-# Keep chatting forever - context is preserved automatically
-for i in range(100):  # This would normally hit token limits
-    await sm.user_says(f"Question {i}: Tell me about AI")
-    await sm.ai_responds("AI is fascinating...")
+# Track conversations
+await sm.user_says("How do I create a list comprehension?")
+await sm.ai_responds(
+    "A list comprehension is a concise way to create lists in Python...",
+    model="gpt-4",
+    provider="openai"
+)
 
-# Still works! Automatic summarization keeps context alive
-conversation = await sm.get_conversation()
-print(f"Full conversation: {len(conversation)} exchanges")
-```
-
-### Cost Tracking (Know What You're Spending)
-```python
-# Automatic cost monitoring across all interactions
-sm = SessionManager()
-
-await sm.user_says("Write a long story about dragons")
-await sm.ai_responds("Once upon a time..." * 500)  # Long response
-
-stats = await sm.get_stats()
-print(f"💰 That story cost: ${stats['estimated_cost']:.6f}")
-print(f"📊 Used {stats['total_tokens']} tokens")
-print(f"📈 {stats['user_messages']} user messages, {stats['ai_messages']} AI responses")
-```
-
-### Multi-Provider Support
-```python
-# Works with any LLM provider
-import openai
-import anthropic
-
-sm = SessionManager()
-
-# OpenAI
-await sm.user_says("Hello!")
-openai_response = await openai.chat.completions.create(...)
-await sm.ai_responds(openai_response.choices[0].message.content, model="gpt-4", provider="openai")
-
-# Anthropic
-await sm.user_says("How are you?")
-anthropic_response = await anthropic.messages.create(...)
-await sm.ai_responds(anthropic_response.content[0].text, model="claude-3", provider="anthropic")
-
-# See costs across all providers
-stats = await sm.get_stats()
-print(f"Total cost across all providers: ${stats['estimated_cost']:.6f}")
-```
-
-## 🛠️ Advanced Features
-
-### Conversation Analytics
-```python
-# Get detailed insights into your conversations
-conversation = await sm.get_conversation()
-stats = await sm.get_stats()
-
-print(f"📊 Conversation Analytics:")
-print(f"   Messages: {stats['user_messages']} user, {stats['ai_messages']} AI")
-print(f"   Average response length: {stats['avg_response_length']}")
-print(f"   Most expensive response: ${stats['max_response_cost']:.6f}")
-print(f"   Session duration: {stats['duration_minutes']:.1f} minutes")
-```
-
-### Tool Integration
-```python
-# Track tool usage alongside conversations
+# Track tool usage
 await sm.tool_used(
-    tool_name="web_search",
-    arguments={"query": "latest AI news"},
-    result={"articles": ["AI breakthrough...", "New model released..."]},
-    cost=0.001
+    tool_name="code_executor",
+    arguments={"code": "print([x**2 for x in range(5)])"},
+    result={"output": "[0, 1, 4, 9, 16]"}
 )
 
+# Get session statistics
 stats = await sm.get_stats()
-print(f"Tool calls: {stats['tool_calls']}")
+print(f"Session {stats['session_id']}: {stats['total_messages']} messages, ${stats['estimated_cost']:.4f}")
 ```
 
-### Session Export/Import
-```python
-# Export conversations for analysis
-conversation_data = await sm.export_conversation()
-with open('conversation.json', 'w') as f:
-    json.dump(conversation_data, f)
+### Working with System Prompts
 
-# Import previous conversations
+```python
+# Set initial system prompt
+sm = SessionManager(system_prompt="You are a creative writing assistant.")
+
+# Update system prompt later
+await sm.update_system_prompt("You are now a technical documentation writer.")
+
+# Get messages including system prompt for your LLM calls
+messages = await sm.get_messages_for_llm(include_system=True)
+# [{"role": "system", "content": "You are now a technical documentation writer."}, ...]
+```
+
+### SessionManager Properties
+
+```python
 sm = SessionManager()
-await sm.import_conversation('conversation.json')
+
+# Access session information
+print(f"Session ID: {sm.session_id}")
+print(f"System Prompt: {sm.system_prompt}")
+print(f"Infinite Context: {sm.is_infinite}")
+
+# Check if this is a new session
+print(f"Is new session: {sm._is_new}")  # Useful for initialization logic
 ```
 
-## 🎨 Real-World Examples
-
-### Customer Support Bot
-```python
-async def handle_support_ticket(user_message: str, ticket_id: str):
-    # Each ticket gets its own session
-    sm = SessionManager(session_id=ticket_id)
-    
-    await sm.user_says(user_message)
-    
-    # Your AI logic here
-    ai_response = await your_ai_model(user_message)
-    await sm.ai_responds(ai_response, model="gpt-4", provider="openai")
-    
-    # Automatic cost tracking per ticket
-    stats = await sm.get_stats()
-    print(f"Ticket {ticket_id} cost: ${stats['estimated_cost']:.6f}")
-    
-    return ai_response
-```
-
-### AI Assistant with Memory
-```python
-async def ai_assistant():
-    sm = SessionManager(infinite_context=True)
-    
-    while True:
-        user_input = input("You: ")
-        if user_input.lower() == 'quit':
-            break
-            
-        await sm.user_says(user_input)
-        
-        # Get conversation context for AI
-        conversation = await sm.get_conversation()
-        context = "\n".join([f"{turn['role']}: {turn['content']}" for turn in conversation[-5:]])
-        
-        # Your AI call with context
-        ai_response = await your_ai_model(f"Context:\n{context}\n\nUser: {user_input}")
-        await sm.ai_responds(ai_response)
-        
-        print(f"AI: {ai_response}")
-    
-    # Show final stats
-    stats = await sm.get_stats()
-    print(f"\n💰 Total conversation cost: ${stats['estimated_cost']:.6f}")
-```
-
-### Multi-User Chat Application
-```python
-class ChatApplication:
-    def __init__(self):
-        self.user_sessions = {}
-    
-    async def handle_message(self, user_id: str, message: str):
-        # Each user gets their own session
-        if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = SessionManager(infinite_context=True)
-        
-        sm = self.user_sessions[user_id]
-        await sm.user_says(message)
-        
-        # AI processes with user's personal context
-        ai_response = await self.generate_response(sm, message)
-        await sm.ai_responds(ai_response)
-        
-        return ai_response
-    
-    async def get_user_stats(self, user_id: str):
-        if user_id in self.user_sessions:
-            return await self.user_sessions[user_id].get_stats()
-        return None
-```
-
-## 📊 Monitoring Dashboard
+### Managing Long Conversations
 
 ```python
-# Get comprehensive analytics across all sessions
-from chuk_ai_session_manager import get_global_stats
+# Enable infinite context with custom settings
+sm = SessionManager(
+    infinite_context=True,
+    token_threshold=3000,  # Segment at 3000 tokens
+    max_turns_per_segment=15  # Or 15 conversation turns
+)
 
-stats = await get_global_stats()
-print(f"""
-🚀 AI Application Dashboard
-==========================
-Total Sessions: {stats['total_sessions']}
-Total Messages: {stats['total_messages']}
-Total Cost: ${stats['total_cost']:.2f}
-Average Session Length: {stats['avg_session_length']:.1f} messages
-Most Active Hour: {stats['peak_hour']}
-Top Models Used: {', '.join(stats['top_models'])}
-""")
+# The session will auto-segment when limits are reached
+# You don't need to do anything - it happens automatically!
+
+# Get full conversation across all segments
+full_conversation = await sm.get_conversation(include_all_segments=True)
+
+# Get session chain (list of session IDs in the conversation)
+session_chain = await sm.get_session_chain()
+print(f"Conversation spans {len(session_chain)} sessions: {session_chain}")
 ```
 
-## 🔧 Installation Options
+## Core Models
 
-```bash
-# Basic installation
-uv add chuk-ai-session-manager
+### Session
 
-# With Redis support (for production)
-uv add chuk-ai-session-manager[redis]
+The main container for a conversation:
 
-# Full installation (all features)
-uv add chuk-ai-session-manager[full]
+```python
+from chuk_ai_session_manager import Session
 
-# Or with pip
-pip install chuk-ai-session-manager
+# Create a new session
+session = await Session.create(
+    parent_id=None,  # Optional parent session
+    metadata={"user_id": "user123", "topic": "programming"}
+)
+
+# Session properties
+print(f"Session ID: {session.id}")
+print(f"Created: {session.metadata.created_at}")
+print(f"Total tokens: {session.total_tokens}")
+print(f"Total cost: ${session.total_cost:.4f}")
+
+# Add events
+from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+
+event = await SessionEvent.create_with_tokens(
+    message="Hello world!",
+    prompt="Hello world!",
+    model="gpt-3.5-turbo",
+    source=EventSource.USER,
+    type=EventType.MESSAGE
+)
+
+await session.add_event_and_save(event)
+```
+
+### SessionEvent
+
+Individual events within a session:
+
+```python
+from chuk_ai_session_manager import SessionEvent, EventSource, EventType
+
+# Create an event with automatic token counting
+event = await SessionEvent.create_with_tokens(
+    message="What is machine learning?",
+    prompt="What is machine learning?",
+    completion=None,  # For user messages
+    model="gpt-3.5-turbo",
+    source=EventSource.USER,
+    type=EventType.MESSAGE
+)
+
+# Event properties
+print(f"Event ID: {event.id}")
+print(f"Tokens used: {event.token_usage.total_tokens}")
+print(f"Source: {event.source.value}")
+print(f"Type: {event.type.value}")
+
+# Update metadata
+await event.set_metadata("user_id", "user123")
+await event.set_metadata("intent", "question")
+
+# Check metadata
+user_id = await event.get_metadata("user_id")
+has_intent = await event.has_metadata("intent")
+```
+
+### TokenUsage
+
+Tracks token consumption and costs:
+
+```python
+from chuk_ai_session_manager import TokenUsage
+
+# Create from text
+usage = await TokenUsage.from_text(
+    prompt="What is the capital of France?",
+    completion="The capital of France is Paris.",
+    model="gpt-3.5-turbo"
+)
+
+print(f"Prompt tokens: {usage.prompt_tokens}")
+print(f"Completion tokens: {usage.completion_tokens}")
+print(f"Total tokens: {usage.total_tokens}")
+print(f"Estimated cost: ${usage.estimated_cost_usd:.6f}")
+
+# Update token usage
+await usage.update(prompt_tokens=10, completion_tokens=5)
+
+# Count tokens for any text
+token_count = await TokenUsage.count_tokens("Hello world!", "gpt-4")
+```
+
+### Event Source and Type Enums
+
+```python
+from chuk_ai_session_manager import EventSource, EventType
+
+# Event sources
+EventSource.USER     # User input
+EventSource.LLM      # AI model response  
+EventSource.SYSTEM   # System/tool events
+
+# Event types
+EventType.MESSAGE       # Conversation messages
+EventType.TOOL_CALL     # Tool/function calls
+EventType.SUMMARY       # Session summaries
+EventType.REFERENCE     # References to other content
+EventType.CONTEXT_BRIDGE # Context bridging events
+```
+
+## Infinite Context
+
+The infinite context system automatically handles conversations that exceed token limits by creating linked sessions with summaries.
+
+### InfiniteConversationManager
+
+```python
+from chuk_ai_session_manager import (
+    InfiniteConversationManager,
+    SummarizationStrategy,
+    EventSource
+)
+
+# Create manager with custom settings
+icm = InfiniteConversationManager(
+    token_threshold=3000,
+    max_turns_per_segment=15,
+    summarization_strategy=SummarizationStrategy.KEY_POINTS
+)
+
+# Process messages (automatically segments when needed)
+async def my_llm_callback(messages):
+    # Your LLM call here
+    return "Summary of the conversation..."
+
+current_session_id = await icm.process_message(
+    session_id="session-123",
+    message="Tell me about quantum computing",
+    source=EventSource.USER,
+    llm_callback=my_llm_callback,
+    model="gpt-4"
+)
+
+# Build context for LLM calls
+context = await icm.build_context_for_llm(
+    session_id=current_session_id,
+    max_messages=10,
+    include_summaries=True
+)
+
+# Get session chain
+chain = await icm.get_session_chain(current_session_id)
+print(f"Conversation chain: {[s.id for s in chain]}")
+```
+
+### Summarization Strategies
+
+```python
+from chuk_ai_session_manager import SummarizationStrategy
+
+# Different summarization approaches
+SummarizationStrategy.BASIC        # General overview
+SummarizationStrategy.KEY_POINTS   # Focus on key information
+SummarizationStrategy.TOPIC_BASED  # Organize by topics
+SummarizationStrategy.QUERY_FOCUSED # Focus on user questions
+```
+
+## Tool Integration
+
+### SessionAwareToolProcessor
+
+Integrates with `chuk_tool_processor` for automatic tool call tracking:
+
+```python
+from chuk_ai_session_manager import SessionAwareToolProcessor
+
+# Create processor for a session
+processor = await SessionAwareToolProcessor.create(
+    session_id="session-123",
+    enable_caching=True,
+    max_retries=2,
+    retry_delay=1.0
+)
+
+# Process LLM message with tool calls
+llm_response = {
+    "tool_calls": [
+        {
+            "function": {
+                "name": "calculator",
+                "arguments": '{"operation": "add", "a": 5, "b": 3}'
+            }
+        }
+    ]
+}
+
+results = await processor.process_llm_message(llm_response, None)
+for result in results:
+    print(f"Tool: {result.tool}, Result: {result.result}")
+```
+
+### Sample Tools
+
+```python
+# The package includes sample tools for demonstration
+from chuk_ai_session_manager.sample_tools import (
+    CalculatorTool,
+    WeatherTool, 
+    SearchTool
+)
+
+# These are registered with chuk_tool_processor
+# You can see how to structure your own tools
+```
+
+## Session Storage
+
+### CHUK Sessions Backend
+
+The storage is built on CHUK Sessions:
+
+```python
+from chuk_ai_session_manager import (
+    setup_chuk_sessions_storage,
+    SessionStorage,
+    ChukSessionsStore
+)
+
+# Setup storage (usually done automatically)
+backend = setup_chuk_sessions_storage(
+    sandbox_id="my-ai-app",
+    default_ttl_hours=48
+)
+
+# Get the store
+store = ChukSessionsStore(backend)
+
+# Manual session operations
+session = await store.get("session-123")
+await store.save(session)
+await store.delete("session-123")
+session_ids = await store.list_sessions(prefix="user-")
+```
+
+### Storage Configuration
+
+```python
+# Configure storage at import time
+from chuk_ai_session_manager import configure_storage
+
+success = configure_storage(
+    sandbox_id="my-application",
+    default_ttl_hours=72  # 3 day TTL
+)
+
+if success:
+    print("Storage configured successfully")
+else:
+    print("Storage configuration failed")
+```
+
+## Prompt Building
+
+### Building Prompts from Sessions
+
+```python
+from chuk_ai_session_manager import (
+    build_prompt_from_session,
+    PromptStrategy,
+    truncate_prompt_to_token_limit
+)
+
+# Build prompts with different strategies
+prompt = await build_prompt_from_session(
+    session,
+    strategy=PromptStrategy.CONVERSATION,  # Include conversation history
+    max_tokens=3000,
+    model="gpt-4",
+    include_parent_context=True,
+    max_history=10
+)
+
+# Prompt strategies
+PromptStrategy.MINIMAL      # Just task and latest context
+PromptStrategy.TASK_FOCUSED # Focus on the task
+PromptStrategy.TOOL_FOCUSED # Emphasize tool usage
+PromptStrategy.CONVERSATION # Include conversation history
+PromptStrategy.HIERARCHICAL # Include parent session context
+```
+
+### Token Limit Management
+
+```python
+from chuk_ai_session_manager import truncate_prompt_to_token_limit
+
+# Ensure prompt fits within token limits
+truncated_prompt = await truncate_prompt_to_token_limit(
+    prompt=messages,
+    max_tokens=3000,
+    model="gpt-3.5-turbo"
+)
+```
+
+## Configuration
+
+### Package Configuration
+
+```python
+import chuk_ai_session_manager as casm
+
+# Check what's available
+print("Package version:", casm.get_version())
+availability = casm.is_available()
+print("Available components:", availability)
+
+# Configure storage
+success = casm.configure_storage(
+    sandbox_id="my-app",
+    default_ttl_hours=24
+)
+```
+
+### Environment Setup
+
+The package depends on several components:
+
+1. **Required**: `chuk_sessions` - for storage backend
+2. **Required**: `pydantic` - for data models  
+3. **Optional**: `tiktoken` - for accurate token counting (falls back to approximation)
+4. **Optional**: `chuk_tool_processor` - for tool integration
+
+### Error Handling
+
+```python
+from chuk_ai_session_manager import (
+    SessionManagerError,
+    SessionNotFound,
+    TokenLimitExceeded,
+    StorageError
+)
+
+try:
+    session_id = await track_conversation("Hello", "Hi there")
+except SessionNotFound as e:
+    print(f"Session not found: {e}")
+except TokenLimitExceeded as e:
+    print(f"Token limit exceeded: {e}")
+except StorageError as e:
+    print(f"Storage error: {e}")
+except SessionManagerError as e:
+    print(f"General session error: {e}")
 ```
 
 ## 🌟 What Makes CHUK Special?
@@ -288,17 +763,8 @@ pip install chuk-ai-session-manager
 | **Multi-Provider** | Provider-specific code | Works with any LLM |
 | **Production Ready** | Requires additional work | Built for production |
 | **Learning Curve** | Steep | 5 minutes to productivity |
-
-## 📖 More Examples
-
-Check out the `/examples` directory for complete working examples:
-
-- `simple_tracking.py` - Basic conversation tracking
-- `openai_integration.py` - OpenAI API integration
-- `infinite_context.py` - Handling long conversations
-- `cost_monitoring.py` - Cost tracking and analytics
-- `multi_provider.py` - Using multiple LLM providers
-- `production_app.py` - Production-ready application
+| **Tool Integration** | Manual tracking | Automatic tool call logging |
+| **Session Management** | Build from scratch | Complete session hierarchy |
 
 ## 🎯 Quick Decision Guide
 
@@ -309,13 +775,88 @@ Check out the `/examples` directory for complete working examples:
 - ✅ Production-ready session management out of the box
 - ✅ Complete conversation analytics and observability
 - ✅ Framework-agnostic solution that works with any LLM library
+- ✅ Built-in tool call tracking and retry mechanisms
+- ✅ Hierarchical session relationships for complex workflows
+
+## 📊 Monitoring & Analytics
+
+```python
+# Get comprehensive session analytics
+stats = await sm.get_stats(include_all_segments=True)
+
+print(f"""
+🚀 Session Analytics Dashboard
+============================
+Session ID: {stats['session_id']}
+Total Messages: {stats['total_messages']}
+User Messages: {stats['user_messages']}
+AI Messages: {stats['ai_messages']}
+Tool Calls: {stats['tool_calls']}
+Total Tokens: {stats['total_tokens']}
+Total Cost: ${stats['estimated_cost']:.6f}
+Session Segments: {stats.get('session_segments', 1)}
+Created: {stats['created_at']}
+Last Update: {stats['last_update']}
+Infinite Context: {stats.get('infinite_context', False)}
+""")
+
+# Get conversation history
+conversation = await sm.get_conversation(include_all_segments=True)
+for i, turn in enumerate(conversation):
+    print(f"{i+1}. {turn['role']}: {turn['content'][:50]}...")
+```
+
+## 🛡️ Error Handling
+
+The package provides specific exceptions for different error conditions:
+
+```python
+from chuk_ai_session_manager import (
+    SessionManagerError,
+    SessionNotFound,
+    TokenLimitExceeded,
+    StorageError
+)
+
+try:
+    session_id = await track_conversation("Hello", "Hi there")
+except SessionNotFound as e:
+    print(f"Session not found: {e}")
+except TokenLimitExceeded as e:
+    print(f"Token limit exceeded: {e}")
+except StorageError as e:
+    print(f"Storage error: {e}")
+except SessionManagerError as e:
+    print(f"General session error: {e}")
+```
+
+## 🔧 Environment Setup
+
+The package requires several dependencies that should be automatically installed:
+
+1. **Required**: `chuk_sessions` - for storage backend
+2. **Required**: `pydantic` - for data models  
+3. **Optional**: `tiktoken` - for accurate token counting (falls back to approximation)
+4. **Optional**: `chuk_tool_processor` - for tool integration
+
+### Dependencies Check
+
+```python
+import chuk_ai_session_manager as casm
+
+# Check if all components are available
+availability = casm.is_available()
+for component, available in availability.items():
+    status = "✅" if available else "❌"
+    print(f"{status} {component}")
+```
 
 ## 🤝 Community & Support
 
-- 📖 **Documentation**: [Full docs with tutorials](link-to-docs)
-- 🐛 **Issues**: Report bugs on GitHub
-- 💡 **Feature Requests**: Suggest new features
-- 📧 **Support**: enterprise@chuk.dev for production support
+- 📖 **Full Documentation**: Complete API reference and tutorials
+- 🐛 **Issues**: Report bugs and request features on GitHub  
+- 💡 **Examples**: Check `/examples` directory for working code
+- 📧 **Support**: Enterprise support available
 
 ## 📝 License
 
