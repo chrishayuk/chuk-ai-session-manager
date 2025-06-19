@@ -10,13 +10,13 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
 
 # Import models directly to avoid circular import issues
+from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.token_usage import TokenUsage, TokenSummary
 from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
-
 
 class TestTokenUsage:
     """Test TokenUsage model and functionality."""
@@ -421,28 +421,45 @@ class TestSession:
         assert await session.has_state("key1") == False
     
     async def test_session_token_tracking(self):
-        """Test session token usage tracking."""
-        from chuk_ai_session_manager.models.session import Session
+        """Test token tracking in session."""
+        session = await Session.create()
         
-        session = Session()
+        # Add events with token usage
+        event1 = await SessionEvent.create_with_tokens(
+            message="Hello",
+            prompt="Hello",
+            model="gpt-3.5-turbo",
+            source=EventSource.USER,
+            type=EventType.MESSAGE
+        )
+        await session.add_event(event1)
         
-        # Add multiple events
-        for i in range(3):
-            event = await SessionEvent.create_with_tokens(
-                message=f"Message {i}",
-                prompt=f"Prompt {i}",
-                completion=f"Completion {i}",
-                model="gpt-3.5-turbo"
-            )
-            await session.add_event(event)
+        event2 = await SessionEvent.create_with_tokens(
+            message="Hi there!",
+            prompt="",
+            completion="Hi there!",
+            model="gpt-3.5-turbo",
+            source=EventSource.LLM,
+            type=EventType.MESSAGE
+        )
+        await session.add_event(event2)
         
-        assert session.total_tokens > 0
-        assert session.total_cost >= 0
+        # Check token summary
+        # The actual token count will be based on the real tokenizer
+        # "Hello" is about 1-2 tokens, "Hi there!" is about 2-3 tokens
+        # So total should be around 4-5 tokens, not 18
+        assert session.total_tokens > 0  # Should have some tokens
+        assert session.total_tokens < 10  # But not as many as 18
         
-        # Test token usage by source
+        # Check by source
         usage_by_source = await session.get_token_usage_by_source()
+        assert "user" in usage_by_source
         assert "llm" in usage_by_source
-    
+        
+        # Verify the token counts are reasonable
+        assert usage_by_source["user"].total_tokens > 0
+        assert usage_by_source["llm"].total_tokens > 0
+        
     async def test_session_properties(self):
         """Test session computed properties."""
         from chuk_ai_session_manager.models.session import Session

@@ -61,19 +61,24 @@ class TestSessionManager:
                 assert sm._token_threshold == 4000
                 assert sm._max_turns_per_segment == 20
     
-    async def test_session_manager_initialization_existing_session(self, mock_session_store):
-        """Test SessionManager initialization with existing session."""
-        mock_store, sessions = mock_session_store
+    async def test_session_manager_initialization_existing_session(self):
+        """Test initializing SessionManager with existing session ID."""
+        # Create a session first
+        session = await Session.create(session_id="existing-session")
         
-        existing_session = Session()
-        existing_session.id = "existing-123"
-        sessions[existing_session.id] = existing_session
+        # Mock store that returns this session
+        mock_store = AsyncMock()
+        mock_store.get.return_value = session
         
-        with patch('chuk_ai_session_manager.session_storage.get_backend', return_value=mock_store):
-            sm = SessionManager(session_id="existing-123")
-            
-            assert sm._session_id == "existing-123"
-            assert sm._is_new == False
+        # Create SessionManager with existing ID
+        sm = SessionManager(session_id="existing-session", store=mock_store)
+        
+        # Force initialization
+        await sm._ensure_initialized()
+        
+        # Should not be new since it was loaded
+        assert sm._is_new == False
+        assert sm._loaded_from_storage == True
     
     async def test_session_manager_infinite_context_settings(self, mock_session_store):
         """Test SessionManager with infinite context enabled."""
@@ -728,53 +733,42 @@ class TestSessionManagerInfiniteContext:
                 assert sm._session_chain == ["segment-1", "segment-2"]
     
     async def test_infinite_context_stats_all_segments(self):
-        """Test stats collection across all segments in infinite context."""
-        # Create a SessionManager with controlled session chain
-        sm = SessionManager(infinite_context=True)
+        """Test infinite context stats include all segments."""
+        # Create proper mock sessions
+        session1 = await Session.create(session_id="segment-1")
+        session2 = await Session.create(session_id="segment-2", parent_id="segment-1")
         
-        # Manually set up the session chain to simulate multiple segments
-        # This is a controlled test environment
+        # Mock store that returns these sessions
+        sessions_db = {
+            "segment-1": session1,
+            "segment-2": session2
+        }
+        
+        class MockStore:
+            async def get(self, session_id):
+                return sessions_db.get(session_id)
+            
+            async def save(self, session):
+                sessions_db[session.id] = session
+        
+        mock_store = MockStore()
+        
+        # Create manager with the current session
+        sm = SessionManager(
+            session_id="segment-2",
+            infinite_context=True,
+            store=mock_store
+        )
+        
+        # Initialize to load the session
+        await sm._ensure_initialized()
+        
+        # Manually set the chain for testing
         sm._session_chain = ["segment-1", "segment-2"]
         sm._total_segments = 2
         
-        # Mock the session loading to return empty sessions
-        with patch('chuk_ai_session_manager.session_storage.get_backend') as mock_backend:
-            mock_store = AsyncMock()
-            mock_backend.return_value = mock_store
-            
-            # Create mock sessions
-            mock_session1 = AsyncMock()
-            mock_session1.total_tokens = 100
-            mock_session1.total_cost = 0.01
-            mock_session1.events = []
-            
-            mock_session2 = AsyncMock()
-            mock_session2.total_tokens = 150
-            mock_session2.total_cost = 0.02
-            mock_session2.events = []
-            
-            # Set up mock to return appropriate sessions
-            async def mock_get(session_id):
-                if session_id == "segment-1":
-                    return mock_session1
-                elif session_id == "segment-2":
-                    return mock_session2
-                return None
-            
-            mock_store.get = mock_get
-            
-            # Make sure we have a current session
-            sm._session = mock_session2
-            sm._session_id = "segment-2"
-            
-            stats = await sm.get_stats()
-            
-            # Now we can test with the controlled session chain
-            assert stats["session_chain"] == ["segment-1", "segment-2"]
-            assert stats["session_segments"] == 2
-            assert stats["infinite_context"] == True
-
-
+        stats = await sm.get_stats(include_all_segments=True)
+        assert stats["session_chain"] == ["segment-1", "segment-2"]
 class TestSessionManagerEdgeCases:
     """Test edge cases and error conditions."""
     

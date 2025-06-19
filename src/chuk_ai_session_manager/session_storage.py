@@ -56,19 +56,21 @@ class SessionStorage:
             return self._cache[session_id]
         
         try:
-            if not await self.chuk.validate_session(session_id):
-                return None
-            
+            # Get session info from CHUK Sessions
             info = await self.chuk.get_session_info(session_id)
             if not info:
                 return None
             
+            # Check if it's an AI session manager session
             custom_metadata = info.get('custom_metadata', {})
-            ai_session_json = custom_metadata.get('ai_session_data')
+            if custom_metadata.get('session_type') != 'ai_session_manager':
+                return None
             
+            ai_session_json = custom_metadata.get('ai_session_data')
             if not ai_session_json:
                 return None
             
+            # Parse the JSON data
             session_data = json.loads(ai_session_json)
             ai_session = Session.model_validate(session_data)
             

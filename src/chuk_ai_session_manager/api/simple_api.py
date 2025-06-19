@@ -1,442 +1,80 @@
-# chuk_ai_session_manager/api/simple_api.py
+# src/chuk_ai_session_manager/api/simple_api.py
 """
-Unified SessionManager with built-in infinite context support.
+Simple API convenience functions for the CHUK AI Session Manager.
+
+This module provides easy-to-use functions for common session management tasks,
+building on top of the SessionManager class.
 
 Usage:
-    from chuk_ai_session_manager import SessionManager
+    from chuk_ai_session_manager import track_conversation
     
-    # Regular session
-    sm = SessionManager()
+    # Quick tracking
+    await track_conversation("Hello!", "Hi there!")
     
-    # Infinite context session  
-    sm = SessionManager(infinite_context=True)
+    # Track with model info
+    await track_conversation(
+        "What's the weather?",
+        "It's sunny and 72°F",
+        model="gpt-4",
+        provider="openai"
+    )
     
-    # Everything else is identical
-    await sm.user_says("Hello!")
-    await sm.ai_responds("Hi there!", model="gpt-4")
+    # Infinite context
+    await track_infinite_conversation(
+        "Tell me a long story",
+        "Once upon a time...",
+        token_threshold=4000
+    )
 """
 
-from __future__ import annotations
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Union, Callable
-from datetime import datetime
 
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
+from chuk_ai_session_manager.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
-class SessionManager:
-    """
-    Unified session manager with built-in infinite context support.
-    
-    Automatically handles session segmentation, summarization, and context
-    preservation when infinite_context=True is enabled.
-    """
-    
-    def __init__(
-        self, 
-        session_id: Optional[str] = None,
-        infinite_context: bool = False,
-        token_threshold: int = 4000,
-        max_turns_per_segment: int = 20
-    ):
-        """
-        Initialize a session manager.
-        
-        Args:
-            session_id: Use existing session or create new one
-            infinite_context: Enable automatic infinite context handling
-            token_threshold: Token limit before creating new session (infinite mode)
-            max_turns_per_segment: Turn limit before creating new session (infinite mode)
-        """
-        self._session: Optional[Session] = None
-        self._session_id = session_id
-        self._is_new = session_id is None
-        
-        # Infinite context settings
-        self._infinite_context = infinite_context
-        self._token_threshold = token_threshold
-        self._max_turns_per_segment = max_turns_per_segment
-        
-        # Infinite context state
-        self._session_chain: List[str] = []
-        self._full_conversation: List[Dict[str, Any]] = []
-        self._total_segments = 1
-    
-    @property
-    def session_id(self) -> str:
-        """Get the current session ID."""
-        if self._session:
-            return self._session.id
-        elif self._session_id:
-            return self._session_id
-        else:
-            import uuid
-            self._session_id = str(uuid.uuid4())
-            return self._session_id
-    
-    @property
-    def is_infinite(self) -> bool:
-        """Check if infinite context is enabled."""
-        return self._infinite_context
-    
-    async def _ensure_session(self) -> Session:
-        """Ensure we have a session, creating one if needed."""
-        if self._session is None:
-            backend = get_backend()
-            store = ChukSessionsStore(backend)
-            
-            if self._is_new:
-                self._session = await Session.create()
-                self._session_id = self._session.id
-                
-                # Always save new sessions immediately
-                await store.save(self._session)
-                
-                # Initialize session chain for infinite context
-                if self._infinite_context:
-                    self._session_chain = [self._session_id]
-            else:
-                self._session = await store.get(self._session_id)
-                if self._session is None:
-                    raise ValueError(f"Session {self._session_id} not found")
-        return self._session
-    
-    async def _should_create_new_segment(self) -> bool:
-        """Check if we should create a new session segment."""
-        if not self._infinite_context:
-            return False
-        
-        session = await self._ensure_session()
-        
-        # Check token threshold
-        if session.total_tokens >= self._token_threshold:
-            return True
-        
-        # Check turn threshold
-        message_events = [e for e in session.events if e.type == EventType.MESSAGE]
-        if len(message_events) >= self._max_turns_per_segment:
-            return True
-        
-        return False
-    
-    async def _create_summary(self) -> str:
-        """Create a summary of the current session."""
-        session = await self._ensure_session()
-        message_events = [e for e in session.events if e.type == EventType.MESSAGE]
-        
-        # Simple summary generation
-        user_messages = [e for e in message_events if e.source == EventSource.USER]
-        
-        topics = []
-        for event in user_messages:
-            content = str(event.message)
-            if "?" in content:
-                question = content.split("?")[0].strip()
-                if len(question) > 10:
-                    topics.append(question[:50])
-        
-        if topics:
-            summary = f"User discussed: {'; '.join(topics[:3])}"
-            if len(topics) > 3:
-                summary += f" and {len(topics) - 3} other topics"
-        else:
-            summary = f"Conversation with {len(user_messages)} user messages and {len(message_events) - len(user_messages)} responses"
-        
-        return summary
-    
-    async def _create_new_segment(self) -> str:
-        """Create a new session segment with summary."""
-        # Create summary of current session
-        summary = await self._create_summary()
-        
-        # Add summary to current session
-        summary_event = SessionEvent(
-            message=summary,
-            source=EventSource.SYSTEM,
-            type=EventType.SUMMARY
-        )
-        current_session = await self._ensure_session()
-        await current_session.add_event_and_save(summary_event)
-        
-        # Create new session with current as parent
-        new_session = await Session.create(parent_id=self._session_id)
-        
-        # Update our state
-        old_session_id = self._session_id
-        self._session_id = new_session.id
-        self._session = new_session
-        self._session_chain.append(self._session_id)
-        self._total_segments += 1
-        
-        logger.info(f"Created new session segment: {old_session_id} -> {self._session_id}")
-        return self._session_id
-    
-    async def user_says(self, message: str, **metadata) -> str:
-        """
-        Track a user message.
-        
-        Args:
-            message: What the user said
-            **metadata: Optional metadata to attach
-            
-        Returns:
-            The current session ID (may change in infinite mode)
-        """
-        # Check for segmentation before adding message
-        if await self._should_create_new_segment():
-            await self._create_new_segment()
-        
-        session = await self._ensure_session()
-        
-        # Create and add the event
-        event = await SessionEvent.create_with_tokens(
-            message=message,
-            prompt=message,
-            model="gpt-4o-mini",
-            source=EventSource.USER,
-            type=EventType.MESSAGE
-        )
-        
-        # Add metadata
-        for key, value in metadata.items():
-            await event.set_metadata(key, value)
-        
-        await session.add_event_and_save(event)
-        
-        # Track in full conversation for infinite context
-        if self._infinite_context:
-            self._full_conversation.append({
-                "role": "user",
-                "content": message,
-                "timestamp": event.timestamp.isoformat(),
-                "session_id": self._session_id
-            })
-        
-        return self._session_id
-    
-    async def ai_responds(
-        self, 
-        response: str,
-        model: str = "unknown",
-        provider: str = "unknown",
-        **metadata
-    ) -> str:
-        """
-        Track an AI response.
-        
-        Args:
-            response: The AI's response
-            model: Model name
-            provider: Provider name
-            **metadata: Optional metadata
-            
-        Returns:
-            The current session ID (may change in infinite mode)
-        """
-        # Check for segmentation before adding message
-        if await self._should_create_new_segment():
-            await self._create_new_segment()
-        
-        session = await self._ensure_session()
-        
-        # Create and add the event
-        event = await SessionEvent.create_with_tokens(
-            message=response,
-            prompt="",
-            completion=response,
-            model=model,
-            source=EventSource.LLM,
-            type=EventType.MESSAGE
-        )
-        
-        # Add metadata
-        full_metadata = {
-            "model": model,
-            "provider": provider,
-            "timestamp": datetime.now().isoformat(),
-            **metadata
-        }
-        
-        for key, value in full_metadata.items():
-            await event.set_metadata(key, value)
-        
-        await session.add_event_and_save(event)
-        
-        # Track in full conversation for infinite context
-        if self._infinite_context:
-            self._full_conversation.append({
-                "role": "assistant",
-                "content": response,
-                "timestamp": event.timestamp.isoformat(),
-                "session_id": self._session_id,
-                "model": model,
-                "provider": provider
-            })
-        
-        return self._session_id
-    
-    async def tool_used(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        result: Any,
-        error: Optional[str] = None,
-        **metadata
-    ) -> str:
-        """Track a tool call."""
-        session = await self._ensure_session()
-        
-        tool_message = {
-            "tool": tool_name,
-            "arguments": arguments,
-            "result": result,
-            "error": error,
-            "success": error is None
-        }
-        
-        event = SessionEvent(
-            message=tool_message,
-            source=EventSource.SYSTEM,
-            type=EventType.TOOL_CALL
-        )
-        
-        for key, value in metadata.items():
-            await event.set_metadata(key, value)
-        
-        await session.add_event_and_save(event)
-        return self._session_id
-    
-    async def get_conversation(self, include_all_segments: bool = None) -> List[Dict[str, Any]]:
-        """
-        Get conversation history.
-        
-        Args:
-            include_all_segments: Include all segments (defaults to infinite_context setting)
-            
-        Returns:
-            List of conversation turns
-        """
-        if include_all_segments is None:
-            include_all_segments = self._infinite_context
-        
-        if self._infinite_context and include_all_segments:
-            # Return full conversation across all segments
-            return self._full_conversation.copy()
-        else:
-            # Return current session only
-            session = await self._ensure_session()
-            conversation = []
-            for event in session.events:
-                if event.type == EventType.MESSAGE:
-                    turn = {
-                        "role": "user" if event.source == EventSource.USER else "assistant",
-                        "content": event.message,
-                        "timestamp": event.timestamp.isoformat()
-                    }
-                    conversation.append(turn)
-            
-            return conversation
-    
-    async def get_session_chain(self) -> List[str]:
-        """Get the chain of session IDs (infinite context only)."""
-        if self._infinite_context:
-            return self._session_chain.copy()
-        else:
-            return [self._session_id]
-    
-    async def get_stats(self, include_all_segments: bool = None) -> Dict[str, Any]:
-        """
-        Get conversation statistics.
-        
-        Args:
-            include_all_segments: Include all segments (defaults to infinite_context setting)
-            
-        Returns:
-            Dictionary with conversation stats
-        """
-        if include_all_segments is None:
-            include_all_segments = self._infinite_context
-        
-        session = await self._ensure_session()
-        
-        if self._infinite_context and include_all_segments:
-            # Calculate stats across all segments
-            user_messages = len([t for t in self._full_conversation if t["role"] == "user"])
-            ai_messages = len([t for t in self._full_conversation if t["role"] == "assistant"])
-            
-            # Get token/cost stats by loading all sessions in chain
-            total_tokens = 0
-            total_cost = 0.0
-            total_events = 0
-            
-            backend = get_backend()
-            store = ChukSessionsStore(backend)
-            
-            for session_id in self._session_chain:
-                try:
-                    sess = await store.get(session_id)
-                    if sess:
-                        total_tokens += sess.total_tokens
-                        total_cost += sess.total_cost
-                        total_events += len(sess.events)
-                except Exception:
-                    # Skip if can't load session
-                    pass
-            
-            return {
-                "session_id": self._session_id,
-                "session_segments": self._total_segments,
-                "session_chain": self._session_chain,
-                "total_events": total_events,
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": 0,  # TODO: Track tools in full conversation
-                "total_tokens": total_tokens,
-                "estimated_cost": total_cost,
-                "created_at": session.metadata.created_at.isoformat(),
-                "last_update": session.last_update_time.isoformat(),
-                "infinite_context": True
-            }
-        else:
-            # Current session stats only
-            user_messages = sum(1 for e in session.events 
-                               if e.type == EventType.MESSAGE and e.source == EventSource.USER)
-            ai_messages = sum(1 for e in session.events 
-                             if e.type == EventType.MESSAGE and e.source == EventSource.LLM)
-            tool_calls = sum(1 for e in session.events if e.type == EventType.TOOL_CALL)
-            
-            return {
-                "session_id": session.id,
-                "session_segments": 1,
-                "total_events": len(session.events),
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": tool_calls,
-                "total_tokens": session.total_tokens,
-                "estimated_cost": session.total_cost,
-                "created_at": session.metadata.created_at.isoformat(),
-                "last_update": session.last_update_time.isoformat(),
-                "infinite_context": self._infinite_context
-            }
 
-
-# Convenience functions remain the same but simpler
 async def track_conversation(
     user_message: str,
     ai_response: str,
     model: str = "unknown",
     provider: str = "unknown",
+    session_id: Optional[str] = None,
     infinite_context: bool = False,
     token_threshold: int = 4000
 ) -> str:
-    """Quick way to track a single conversation turn."""
+    """
+    Quick way to track a single conversation turn.
+    
+    This is the simplest way to track a conversation exchange between
+    a user and an AI assistant.
+    
+    Args:
+        user_message: What the user said.
+        ai_response: What the AI responded.
+        model: The model used (e.g., "gpt-4", "claude-3").
+        provider: The provider (e.g., "openai", "anthropic").
+        session_id: Optional existing session ID to continue.
+        infinite_context: Enable infinite context support.
+        token_threshold: Token limit for infinite context segmentation.
+        
+    Returns:
+        The session ID (useful for continuing the conversation).
+        
+    Example:
+        ```python
+        session_id = await track_conversation(
+            "What's the capital of France?",
+            "The capital of France is Paris.",
+            model="gpt-3.5-turbo",
+            provider="openai"
+        )
+        ```
+    """
     sm = SessionManager(
+        session_id=session_id,
         infinite_context=infinite_context,
         token_threshold=token_threshold
     )
@@ -444,24 +82,60 @@ async def track_conversation(
     session_id = await sm.ai_responds(ai_response, model=model, provider=provider)
     return session_id
 
+
 async def track_llm_call(
     user_input: str,
     llm_function: Callable[[str], Union[str, Any]],
     model: str = "unknown",
     provider: str = "unknown",
     session_manager: Optional[SessionManager] = None,
+    session_id: Optional[str] = None,
     infinite_context: bool = False,
     token_threshold: int = 4000
 ) -> tuple[str, str]:
-    """Track an LLM call automatically."""
+    """
+    Track an LLM call automatically.
+    
+    This function wraps your LLM call and automatically tracks both the
+    input and output in a session.
+    
+    Args:
+        user_input: The user's input to the LLM.
+        llm_function: Function that calls the LLM (sync or async).
+        model: The model being used.
+        provider: The provider being used.
+        session_manager: Optional existing SessionManager to use.
+        session_id: Optional session ID if not using session_manager.
+        infinite_context: Enable infinite context support.
+        token_threshold: Token limit for infinite context.
+        
+    Returns:
+        Tuple of (response_text, session_id).
+        
+    Example:
+        ```python
+        async def call_openai(prompt):
+            # Your OpenAI call here
+            return response.choices[0].message.content
+            
+        response, session_id = await track_llm_call(
+            "Explain quantum computing",
+            call_openai,
+            model="gpt-4",
+            provider="openai"
+        )
+        ```
+    """
     if session_manager is None:
         session_manager = SessionManager(
+            session_id=session_id,
             infinite_context=infinite_context,
             token_threshold=token_threshold
         )
     
     await session_manager.user_says(user_input)
     
+    # Call the LLM function
     if asyncio.iscoroutinefunction(llm_function):
         ai_response = await llm_function(user_input)
     else:
@@ -469,10 +143,13 @@ async def track_llm_call(
     
     # Handle different response formats
     if isinstance(ai_response, dict) and "choices" in ai_response:
+        # OpenAI format
         response_text = ai_response["choices"][0]["message"]["content"]
     elif hasattr(ai_response, "content"):
+        # Object with content attribute
         response_text = ai_response.content
     else:
+        # Plain string or other
         response_text = str(ai_response)
     
     session_id = await session_manager.ai_responds(
@@ -481,27 +158,201 @@ async def track_llm_call(
     
     return response_text, session_id
 
+
 async def quick_conversation(
     user_message: str,
     ai_response: str,
+    model: str = "unknown",
+    provider: str = "unknown",
     infinite_context: bool = False
 ) -> Dict[str, Any]:
-    """Quickest way to track a conversation and get basic stats."""
-    session_id = await track_conversation(
-        user_message, ai_response, infinite_context=infinite_context
-    )
-    sm = SessionManager(session_id, infinite_context=infinite_context)
+    """
+    Quickest way to track a conversation and get basic stats.
+    
+    This is perfect for one-off tracking where you want immediate
+    statistics about the conversation.
+    
+    Args:
+        user_message: What the user said.
+        ai_response: What the AI responded.
+        model: The model used.
+        provider: The provider used.
+        infinite_context: Enable infinite context support.
+        
+    Returns:
+        Dictionary with conversation statistics.
+        
+    Example:
+        ```python
+        stats = await quick_conversation(
+            "Hello!",
+            "Hi there! How can I help you today?",
+            model="gpt-3.5-turbo"
+        )
+        print(f"Tokens used: {stats['total_tokens']}")
+        print(f"Cost: ${stats['estimated_cost']:.4f}")
+        ```
+    """
+    # Create a new session manager
+    sm = SessionManager(infinite_context=infinite_context)
+    
+    # Track the conversation
+    await sm.user_says(user_message)
+    await sm.ai_responds(ai_response, model=model, provider=provider)
+    
+    # Return stats directly
     return await sm.get_stats()
+
 
 async def track_infinite_conversation(
     user_message: str,
     ai_response: str,
     model: str = "unknown",
     provider: str = "unknown",
-    token_threshold: int = 4000
+    session_id: Optional[str] = None,
+    token_threshold: int = 4000,
+    max_turns: int = 20
 ) -> str:
-    """Track a conversation with infinite context support."""
+    """
+    Track a conversation with infinite context support.
+    
+    This automatically handles long conversations by creating new
+    session segments when limits are reached, maintaining context
+    through summaries.
+    
+    Args:
+        user_message: What the user said.
+        ai_response: What the AI responded.
+        model: The model used.
+        provider: The provider used.
+        session_id: Optional existing session ID to continue.
+        token_threshold: Create new segment after this many tokens.
+        max_turns: Create new segment after this many turns.
+        
+    Returns:
+        The current session ID (may be different if segmented).
+        
+    Example:
+        ```python
+        # First message
+        session_id = await track_infinite_conversation(
+            "Tell me about the history of computing",
+            "Computing history begins with...",
+            model="gpt-4"
+        )
+        
+        # Continue the conversation
+        session_id = await track_infinite_conversation(
+            "What about quantum computers?",
+            "Quantum computing represents...",
+            session_id=session_id,
+            model="gpt-4"
+        )
+        ```
+    """
     return await track_conversation(
-        user_message, ai_response, model=model, provider=provider,
-        infinite_context=True, token_threshold=token_threshold
+        user_message, 
+        ai_response, 
+        model=model, 
+        provider=provider,
+        session_id=session_id,
+        infinite_context=True, 
+        token_threshold=token_threshold
     )
+
+
+async def track_tool_use(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    result: Any,
+    session_id: Optional[str] = None,
+    error: Optional[str] = None,
+    **metadata
+) -> str:
+    """
+    Track a tool/function call in a session.
+    
+    Args:
+        tool_name: Name of the tool that was called.
+        arguments: Arguments passed to the tool.
+        result: Result returned by the tool.
+        session_id: Optional existing session ID.
+        error: Optional error if the tool failed.
+        **metadata: Additional metadata to store.
+        
+    Returns:
+        The session ID.
+        
+    Example:
+        ```python
+        session_id = await track_tool_use(
+            "calculator",
+            {"operation": "add", "a": 5, "b": 3},
+            {"result": 8},
+            session_id=session_id
+        )
+        ```
+    """
+    sm = SessionManager(session_id=session_id)
+    return await sm.tool_used(
+        tool_name=tool_name,
+        arguments=arguments,
+        result=result,
+        error=error,
+        **metadata
+    )
+
+
+async def get_session_stats(
+    session_id: str,
+    include_all_segments: bool = False
+) -> Dict[str, Any]:
+    """
+    Get statistics for an existing session.
+    
+    Args:
+        session_id: The session ID to get stats for.
+        include_all_segments: For infinite context sessions, include all segments.
+        
+    Returns:
+        Dictionary with session statistics.
+        
+    Example:
+        ```python
+        stats = await get_session_stats("session-123")
+        print(f"Total messages: {stats['total_messages']}")
+        print(f"Total cost: ${stats['estimated_cost']:.4f}")
+        ```
+    """
+    sm = SessionManager(session_id=session_id)
+    return await sm.get_stats(include_all_segments=include_all_segments)
+
+
+async def get_conversation_history(
+    session_id: str,
+    include_all_segments: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Get the conversation history for a session.
+    
+    Args:
+        session_id: The session ID to get history for.
+        include_all_segments: For infinite context sessions, include all segments.
+        
+    Returns:
+        List of conversation turns.
+        
+    Example:
+        ```python
+        history = await get_conversation_history("session-123")
+        for turn in history:
+            print(f"{turn['role']}: {turn['content']}")
+        ```
+    """
+    sm = SessionManager(session_id=session_id)
+    return await sm.get_conversation(include_all_segments=include_all_segments)
+
+
+# Backwards compatibility aliases
+track_llm_interaction = track_llm_call
+quick_stats = quick_conversation

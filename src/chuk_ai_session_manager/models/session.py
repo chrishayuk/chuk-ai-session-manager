@@ -1,4 +1,4 @@
-# chuk_ai_session_manager/models/session.py
+# src/chuk_ai_session_manager/models/session.py
 """
 Session model for the chuk session manager with improved async support.
 """
@@ -186,7 +186,8 @@ class Session(BaseModel, Generic[MessageT]):
             if not event.token_usage:
                 continue
                 
-            source = event.source.value
+            # Use the string value of the enum for the key
+            source = event.source.value if hasattr(event.source, 'value') else str(event.source)
             if source not in result:
                 result[source] = TokenSummary()
                 
@@ -302,18 +303,24 @@ class Session(BaseModel, Generic[MessageT]):
             # await store.save(self)
 
     @classmethod
-    async def create(cls, parent_id: Optional[str] = None, **kwargs) -> Session:
+    async def create(cls, session_id: Optional[str] = None, parent_id: Optional[str] = None, **kwargs) -> Session:
         """
         Create a new session asynchronously, handling parent-child relationships.
         
         Args:
+            session_id: Optional session ID to use (if not provided, generates a new one)
             parent_id: Optional parent session ID
             **kwargs: Additional arguments for Session initialization
             
         Returns:
             A new Session instance with parent-child relationships set up
         """
-        session = cls(parent_id=parent_id, **kwargs)
+        # Allow passing a specific session ID
+        if session_id:
+            session = cls(id=session_id, parent_id=parent_id, **kwargs)
+        else:
+            session = cls(parent_id=parent_id, **kwargs)
+        
         await session.async_init()
         
         # Save the new session
