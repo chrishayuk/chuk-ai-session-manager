@@ -28,12 +28,25 @@ Infinite Context Example:
     await sm.user_says("Tell me about machine learning")
     await sm.ai_responds("Machine learning is...", model="gpt-4")
     # Session will auto-segment when limits are reached
+
+Storage Configuration:
+    # Default: Memory storage (no Redis required)
+    pip install chuk-ai-session-manager
+    
+    # Redis: For production persistence
+    pip install chuk-ai-session-manager[redis]
+    export SESSION_PROVIDER=redis
+    export SESSION_REDIS_URL=redis://localhost:6379/0
+    
+    # Environment variables:
+    SESSION_PROVIDER=memory (default - fast, no persistence)
+    SESSION_PROVIDER=redis  (persistent - requires [redis] extra)
 """
 
 import logging
 
 # Package version
-__version__ = "0.4"
+__version__ = "0.5"
 
 # Set up package-level logger
 logger = logging.getLogger(__name__)
@@ -103,6 +116,11 @@ def configure_storage(sandbox_id: str = "chuk-ai-session-manager",
         
     Returns:
         True if configuration was successful, False otherwise
+        
+    Note:
+        Storage provider is controlled by SESSION_PROVIDER environment variable:
+        - memory (default): Fast, no persistence, no extra dependencies
+        - redis: Persistent, requires pip install chuk-ai-session-manager[redis]
     """
     try:
         setup_chuk_sessions_storage(
@@ -128,6 +146,22 @@ def is_available() -> dict:
     Returns:
         Dictionary showing availability of each component
     """
+    # Check if Redis is available
+    redis_available = False
+    try:
+        import redis
+        redis_available = True
+    except ImportError:
+        pass
+    
+    # Check if tiktoken is available for enhanced token counting
+    tiktoken_available = False
+    try:
+        import tiktoken
+        tiktoken_available = True
+    except ImportError:
+        pass
+    
     return {
         "core_enums": True,
         "core_models": True,
@@ -139,7 +173,37 @@ def is_available() -> dict:
         "token_tracking": True,
         "exceptions": True,
         "session_manager": True,
+        "redis_support": redis_available,
+        "enhanced_token_counting": tiktoken_available,
     }
+
+
+def get_storage_info() -> dict:
+    """
+    Get information about the current storage configuration.
+    
+    Returns:
+        Dictionary with storage configuration details
+    """
+    import os
+    from chuk_ai_session_manager.session_storage import get_backend
+    
+    try:
+        backend = get_backend()
+        stats = backend.get_stats()
+        
+        return {
+            "provider": os.getenv("SESSION_PROVIDER", "memory"),
+            "backend": stats.get("backend", "unknown"),
+            "sandbox_id": stats.get("sandbox_id", "unknown"),
+            "redis_url": os.getenv("SESSION_REDIS_URL", "not_set"),
+            "stats": stats
+        }
+    except Exception as e:
+        return {
+            "provider": os.getenv("SESSION_PROVIDER", "memory"),
+            "error": str(e)
+        }
 
 
 # Main exports - everything should be available
@@ -149,6 +213,7 @@ __all__ = [
     "get_version", 
     "is_available",
     "configure_storage",
+    "get_storage_info",
     
     # Core enums
     "EventSource",
@@ -201,5 +266,10 @@ try:
 except Exception as e:
     logger.debug(f"Auto-setup skipped: {e}")
 
-# Log successful import
-logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully")
+# Log successful import with storage info
+try:
+    storage_info = get_storage_info()
+    provider = storage_info.get("provider", "unknown")
+    logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully (storage: {provider})")
+except Exception:
+    logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully")

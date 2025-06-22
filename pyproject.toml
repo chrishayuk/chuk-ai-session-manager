@@ -4,30 +4,45 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.5"
+version = "0.7"
 description = "Session manager for AI applications"
 readme = "README.md"
 requires-python = ">=3.11"
+
+# Core dependencies - only what's absolutely required
 dependencies = [
-    "chuk-sessions>=0.3",
-    "chuk-tool-processor>=0.4.1",
+    "chuk-sessions>=0.4.1",
+    "chuk-tool-processor>=0.4.1", 
     "pydantic>=2.11.3",
 ]
 
 # Optional dependencies
 [project.optional-dependencies]
+# Redis support (passes through to chuk-sessions)
+redis = [
+    "chuk-sessions[redis]>=0.4.1",
+    "redis>=4.0.0"
+]
+
+# Token counting for better accuracy
 tiktoken = ["tiktoken>=0.9.0"]
-redis = ["redis>=4.0.0"]
+
+# Development dependencies
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",  # Essential for async tests
-    "redis>=4.0.0",
+    "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
 ]
-full = []
+
+# All optional features
+all = [
+    "chuk-sessions[redis]>=0.4",
+    "redis>=4.0.0",
+    "tiktoken>=0.9.0",
+]
 
 # Configure setuptools for src/ layout
 [tool.setuptools.packages.find]
