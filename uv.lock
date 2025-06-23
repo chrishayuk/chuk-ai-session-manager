@@ -186,7 +186,7 @@ wheels = [
 
 [[package]]
 name = "chuk-ai-session-manager"
-version = "0.7"
+version = "0.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "chuk-sessions" },
@@ -231,7 +231,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
-    { name = "chuk-sessions", specifier = ">=0.4.1" },
+    { name = "chuk-sessions", specifier = ">=0.4.2" },
     { name = "chuk-sessions", extras = ["redis"], marker = "extra == 'all'", specifier = ">=0.4" },
     { name = "chuk-sessions", extras = ["redis"], marker = "extra == 'redis'", specifier = ">=0.4.1" },
     { name = "chuk-tool-processor", specifier = ">=0.4.1" },
@@ -299,14 +299,14 @@ wheels = [
 
 [[package]]
 name = "chuk-sessions"
-version = "0.4.1"
+version = "0.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/a2/f32790a996b7b25b527c2d237232ee3805b25d27da4af7e882b992606ccd/chuk_sessions-0.4.1-py3-none-any.whl", hash = "sha256:422a263d558177e1622aa9ac29e20403f76f57fce7e196da997ba738e7ff4857", size = 12768 },
+    { url = "https://files.pythonhosted.org/packages/69/5b/95d17807944c922671ac8538c03b1f334c8ce7e473d62ccf3d3bf3833c01/chuk_sessions-0.4.2-py3-none-any.whl", hash = "sha256:aaa49cbd59ec0cb22c9fbfaed99fa28f9fbfeac3c9f54d15242f5ec17deed740", size = 11895 },
 ]
 
 [package.optional-dependencies]

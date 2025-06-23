@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.7"
+version = "0.7.1"
 description = "Session manager for AI applications"
 readme = "README.md"
 requires-python = ">=3.11"
 
 # Core dependencies - only what's absolutely required
 dependencies = [
-    "chuk-sessions>=0.4.1",
+    "chuk-sessions>=0.4.2",
     "chuk-tool-processor>=0.4.1", 
     "pydantic>=2.11.3",
 ]
@@ -20,7 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 # Redis support (passes through to chuk-sessions)
 redis = [
-    "chuk-sessions[redis]>=0.4.1",
+    "chuk-sessions[redis]>=0.4.2",
     "redis>=4.0.0"
 ]
 
