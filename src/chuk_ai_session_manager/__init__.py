@@ -104,6 +104,32 @@ from chuk_ai_session_manager.session_prompt_builder import (
     truncate_prompt_to_token_limit
 )
 
+# Procedural memory
+from chuk_ai_session_manager.procedural_memory import (
+    ToolMemoryManager,
+    ToolOutcome,
+    ToolLogEntry,
+    ToolPattern,
+    ProceduralMemory,
+    ProceduralContextFormatter,
+    FormatterConfig,
+)
+
+# Guards and state management
+from chuk_ai_session_manager.guards import (
+    ToolStateManager,
+    get_tool_state,
+    reset_tool_state,
+    BindingManager,
+    ResultCache,
+    UngroundedGuard,
+    UngroundedGuardConfig,
+    RuntimeLimits,
+    RuntimeMode,
+    ValueBinding,
+    ToolClassification,
+)
+
 # Configuration functions
 def configure_storage(sandbox_id: str = "chuk-ai-session-manager", 
                      default_ttl_hours: int = 24) -> bool:
@@ -257,6 +283,28 @@ __all__ = [
     "build_prompt_from_session",
     "PromptStrategy",
     "truncate_prompt_to_token_limit",
+
+    # Procedural memory
+    "ToolMemoryManager",
+    "ToolOutcome",
+    "ToolLogEntry",
+    "ToolPattern",
+    "ProceduralMemory",
+    "ProceduralContextFormatter",
+    "FormatterConfig",
+
+    # Guards and state management
+    "ToolStateManager",
+    "get_tool_state",
+    "reset_tool_state",
+    "BindingManager",
+    "ResultCache",
+    "UngroundedGuard",
+    "UngroundedGuardConfig",
+    "RuntimeLimits",
+    "RuntimeMode",
+    "ValueBinding",
+    "ToolClassification",
 ]
 
 # Auto-setup storage on import

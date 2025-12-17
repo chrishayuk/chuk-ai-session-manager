@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 # Core dependencies - only what's absolutely required
 dependencies = [
     "chuk-sessions>=0.4.1",
-    "chuk-tool-processor>=0.4.1", 
+    "chuk-tool-processor>=0.18",
     "pydantic>=2.11.3",
 ]
 
