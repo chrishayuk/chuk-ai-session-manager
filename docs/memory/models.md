@@ -151,17 +151,51 @@ class Affinity(str, Enum):
 
 ### PageType
 
-Classification of page content.
+Classification of page content. Different page types have different eviction/compression rules.
 
 ```python
 from chuk_ai_session_manager.memory import PageType
 
 class PageType(str, Enum):
-    MESSAGE = "message"       # Conversation message
-    SUMMARY = "summary"       # Compressed summary
-    ARTIFACT = "artifact"     # Tool-created content
-    MEDIA = "media"           # Image/audio/video
-    CHECKPOINT = "checkpoint" # System checkpoint
+    TRANSCRIPT = "transcript"  # Raw turns, tool outputs (normal eviction)
+    SUMMARY = "summary"        # LLM-generated summaries (low priority - rebuildable)
+    ARTIFACT = "artifact"      # Tool-created content (normal eviction)
+    CLAIM = "claim"            # Decisions, facts, conclusions (very low - high value)
+    PROCEDURE = "procedure"    # Learned patterns like "when calling X, do Y"
+    INDEX = "index"            # Page metadata for search (never compressed)
+```
+
+**Eviction Priority by Type:**
+
+| Page Type | Eviction Priority | Why |
+|-----------|------------------|-----|
+| `transcript` | Normal | Raw content, can be summarized |
+| `summary` | Low | Derived, can be rebuilt from L2 |
+| `artifact` | Normal | Tool outputs, type-dependent |
+| `claim` | Very Low | High-value decisions, referenced constantly |
+| `procedure` | Low | Learned patterns, rarely compressed |
+| `index` | Very Low | Metadata for search, never compressed |
+
+**Usage:**
+```python
+from chuk_ai_session_manager.memory import MemoryPage, PageType
+
+# Claim page for a decision
+claim = MemoryPage(
+    page_id="claim_db_choice",
+    page_type=PageType.CLAIM,
+    content="Decision: Use PostgreSQL for the database",
+    provenance=["msg_042", "msg_043"],  # Messages where decided
+    importance=0.95,
+)
+
+# Summary page derived from transcripts
+summary = MemoryPage(
+    page_id="summary_seg_01",
+    page_type=PageType.SUMMARY,
+    content="Key points from turns 1-10...",
+    provenance=["msg_001", "msg_002", "msg_003"],
+)
 ```
 
 ### ToolType
@@ -631,4 +665,117 @@ class SearchResultEntry(BaseModel):
     levels: List[int] = []
     hint: str = ""
     relevance: float = 0.0
+```
+
+---
+
+## v0.8 Models
+
+### FaultReason
+
+Explicit intent for page faults - enables measuring *why* faults happen.
+
+```python
+from chuk_ai_session_manager.memory import FaultReason
+
+class FaultReason(str, Enum):
+    USER_REQUESTED_RECALL = "user_requested_recall"  # "What did we say about X?"
+    RESOLVE_REFERENCE = "resolve_reference"          # Model references page_id
+    TOOL_PREREQUISITE = "tool_prereq"                # Tool needs this page
+    SPECULATIVE = "speculative"                      # Might be relevant
+```
+
+**Fault Reason Breakdown (Expected Distribution):**
+
+| Reason | Expected % | Red Flag If |
+|--------|------------|-------------|
+| `user_requested_recall` | 40-60% | < 20% (model faulting too speculatively) |
+| `resolve_reference` | 20-40% | > 60% (poor working set selection) |
+| `tool_prereq` | 10-20% | > 40% (tools not getting needed pages) |
+| `speculative` | < 10% | > 20% (wasting budget on guesses) |
+
+### FaultPolicy
+
+Guardrails to prevent fault spirals and budget blowouts.
+
+```python
+from chuk_ai_session_manager.memory import FaultPolicy, FaultReason
+
+policy = FaultPolicy(
+    max_faults_per_turn=3,
+    max_fault_tokens_per_turn=8192,
+)
+
+# Check if fault is allowed
+if policy.can_fault():
+    policy.record_fault(
+        page_id="claim_001",
+        reason=FaultReason.USER_REQUESTED_RECALL,
+        tokens=50,
+    )
+
+# Start new turn (resets counters)
+policy.new_turn()
+
+# Get remaining budget
+print(f"Faults remaining: {policy.faults_remaining}")
+print(f"Token budget remaining: {policy.tokens_remaining}")
+```
+
+### MemoryABI
+
+Application Binary Interface - explicit contract between memory system and models.
+
+```python
+from chuk_ai_session_manager.memory import MemoryABI
+
+abi = MemoryABI(
+    max_context_tokens=128_000,
+    reserved_tokens=2_000,              # System prompt
+    tool_schema_tokens_reserved=4_500,  # 15 tools @ ~300 tokens each
+)
+
+# Available tokens for content
+print(f"Available: {abi.available_tokens}")  # 128000 - 2000 - 4500 = 121500
+```
+
+### UserExperienceMetrics
+
+Metrics that correlate with user satisfaction.
+
+```python
+from chuk_ai_session_manager.memory import UserExperienceMetrics, FaultReason
+
+metrics = UserExperienceMetrics()
+
+# Record faults
+metrics.record_fault(FaultReason.USER_REQUESTED_RECALL)
+metrics.record_fault(FaultReason.RESOLVE_REFERENCE)
+
+# Record recall attempts
+metrics.record_recall_attempt(success=True)
+metrics.record_recall_attempt(success=False)
+
+# Get UX metrics
+print(f"Recall success rate: {metrics.recall_success_rate():.2%}")
+print(f"Thrash index: {metrics.thrash_index():.2f}")
+print(f"Fault breakdown: {metrics.fault_breakdown()}")
+```
+
+### PageMutation
+
+Immutable record of a page change for the mutation log.
+
+```python
+from chuk_ai_session_manager.memory import PageMutation, MutationType, Actor
+
+mutation = PageMutation(
+    page_id="msg_001",
+    turn=5,
+    mutation_type=MutationType.EVICT,
+    tier_before="L0",
+    tier_after="L2",
+    actor=Actor.SYSTEM,
+    cause="eviction_pressure",
+)
 ```

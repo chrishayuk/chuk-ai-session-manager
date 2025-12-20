@@ -295,13 +295,13 @@ class ContextPackCache:
 This drastically reduces overhead for "small incremental turns" - user says something short, assistant responds, no pages changed, reuse the pack.
 
 ### 1.8 Deliverables
-- [ ] `MemoryPage` model with `page_type` and `provenance` in `memory/models.py`
-- [ ] `PageTableEntry` with dirty tracking
-- [ ] `PageTable` class in `memory/page_table.py`
-- [ ] `PageTLB` class in `memory/tlb.py`
-- [ ] `ContextPackCache` class in `memory/pack_cache.py`
-- [ ] `CompressionLevel` enum and per-modality schemas
-- [ ] Unit tests for page lifecycle
+- [x] `MemoryPage` model with `page_type` and `provenance` in `memory/models.py`
+- [x] `PageTableEntry` with dirty tracking
+- [x] `PageTable` class in `memory/page_table.py`
+- [x] `PageTLB` class in `memory/tlb.py`
+- [x] `ContextPackCache` class in `memory/pack_cache.py`
+- [x] `CompressionLevel` enum and per-modality schemas
+- [x] Unit tests for page lifecycle
 
 ---
 
@@ -476,14 +476,14 @@ class PageMutation(BaseModel):
 This is gold for debugging agent weirdness and supports the strict grounding story.
 
 ### 2.8 Deliverables
-- [ ] `WorkingSetManager` class with pinning support
-- [ ] `PinnedSet` management
-- [ ] `AntiThrashPolicy` implementation
-- [ ] `SimplePrefetcher` with basic heuristics
-- [ ] `MutationLogLite` for debugging/replay
-- [ ] `TokenBudget` model with modality breakdown
-- [ ] Access pattern tracking integration
-- [ ] Working set size configuration per model
+- [x] `WorkingSetManager` class with pinning support
+- [x] `PinnedSet` management
+- [x] `AntiThrashPolicy` implementation
+- [x] `SimplePrefetcher` with basic heuristics
+- [x] `MutationLogLite` for debugging/replay
+- [x] `TokenBudget` model with modality breakdown
+- [x] Access pattern tracking integration
+- [x] Working set size configuration per model
 
 ---
 

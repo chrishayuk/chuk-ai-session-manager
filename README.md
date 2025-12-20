@@ -48,6 +48,35 @@ That's it! Zero configuration required.
 
 ## ⚡ Major Features
 
+### 🧠 **AI Virtual Memory**
+OS-style memory management for AI context windows. Pages, working sets, faults, and eviction - giving conversations the illusion of infinite memory.
+
+```python
+from chuk_ai_session_manager.memory import (
+    MemoryPage, PageTable, WorkingSetManager,
+    ContextPacker, ManifestBuilder, PageType,
+)
+
+# Create pages with type classification
+claim = MemoryPage(
+    page_id="claim_auth",
+    page_type=PageType.CLAIM,  # High-value, low eviction priority
+    content="Decision: Use JWT for authentication",
+    provenance=["msg_042", "msg_043"],
+)
+
+# Track in page table and working set
+table = PageTable()
+table.register(claim)
+
+# Pack context for model with manifest
+packer = ContextPacker()
+packed = packer.pack([claim])
+# Model sees VM:CONTEXT with page citations
+```
+
+See [AI Virtual Memory docs](docs/memory/README.md) for full documentation.
+
 ### 🎯 **Zero-Configuration Tracking**
 ```python
 from chuk_ai_session_manager import SessionManager

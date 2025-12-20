@@ -488,6 +488,249 @@ manager.clear()
 
 ---
 
+## PinnedSet (v0.8)
+
+Pages that should never be evicted from working set. Pinning prevents thrash on critical context.
+
+### Basic Usage
+
+```python
+from chuk_ai_session_manager.memory import PinnedSet
+
+pinned = PinnedSet(
+    max_auto_pins=10,       # Max auto-pinned pages
+    pin_last_n_turns=3,     # Auto-pin recent turns
+)
+
+# Manually pin a page
+pinned.pin("system_prompt")
+pinned.pin("claim_db_choice")
+
+# Check if pinned
+if pinned.is_pinned("claim_db_choice"):
+    print("Page is pinned - won't be evicted")
+
+# Unpin
+pinned.unpin("claim_db_choice")
+```
+
+### Auto-Pinning
+
+```python
+# Auto-pin based on page characteristics
+pinned.auto_pin("msg_005")  # Recent turn
+
+# Clear auto-pins (keeps manual pins)
+pinned.clear_auto_pins()
+
+# Get all pinned page IDs
+all_pinned = pinned.get_all()
+```
+
+### Default Pinned Content
+
+The following are typically pinned by default:
+- System prompt
+- Active plan/goals
+- User preferences
+- Last N turns (configurable, typically 2-4)
+- Current tool schemas
+
+---
+
+## AntiThrashPolicy (v0.8)
+
+Prevents evicting pages that were just faulted in. This is the difference between "looks good on paper" and "feels stable in chat".
+
+### Basic Usage
+
+```python
+from chuk_ai_session_manager.memory import AntiThrashPolicy
+
+policy = AntiThrashPolicy(
+    eviction_cooldown_turns=3,    # Don't re-evict for 3 turns
+    fault_protection_turns=2,      # Protect faulted pages for 2 turns
+)
+
+# Record a fault
+policy.record_fault("msg_001", turn=5)
+
+# Check if page can be evicted
+if policy.can_evict("msg_001", current_turn=6):
+    print("Can evict")
+else:
+    print("Protected - recently faulted")
+
+# Get eviction penalty (higher = less likely to evict)
+penalty = policy.get_eviction_penalty("msg_001", current_turn=6)
+```
+
+### Why Anti-Thrash Matters
+
+Without anti-thrash protection:
+1. User asks about topic A → fault in pages about A
+2. User asks about topic B → evict A pages, fault in B pages
+3. User asks about topic A again → fault A pages back in (thrash!)
+
+With anti-thrash:
+- Recently faulted pages get temporary protection
+- Recently evicted pages get eviction cooldown
+- Result: stable working set that "feels good" to users
+
+---
+
+## MutationLogLite (v0.8)
+
+Append-only log of page operations for debugging and replay.
+
+### Basic Usage
+
+```python
+from chuk_ai_session_manager.memory import MutationLogLite, MutationType, Actor
+
+log = MutationLogLite(max_entries=1000)
+
+# Log a page creation
+log.log_create(
+    page_id="msg_001",
+    turn=1,
+    tier="L0",
+    actor=Actor.USER,
+)
+
+# Log an eviction
+log.log_evict(
+    page_id="msg_001",
+    turn=5,
+    tier_before="L0",
+    tier_after="L2",
+    cause="eviction_pressure",
+)
+
+# Log a fault
+log.log_fault(
+    page_id="msg_001",
+    turn=6,
+    tier_before="L2",
+    tier_after="L0",
+)
+```
+
+### Querying the Log
+
+```python
+# Get context at a specific turn
+context = log.get_context_at_turn(turn=5)
+print(f"Pages in L0 at turn 5: {context.l0_pages}")
+
+# Get history for a page
+history = log.get_page_history("msg_001")
+for mutation in history:
+    print(f"Turn {mutation.turn}: {mutation.mutation_type}")
+
+# Get statistics
+stats = log.get_stats()
+print(f"Total mutations: {stats['total']}")
+print(f"Creates: {stats['creates']}, Evictions: {stats['evictions']}")
+```
+
+---
+
+## SimplePrefetcher (v0.8)
+
+Heuristic-based prefetch that doesn't need prediction models.
+
+### Basic Usage
+
+```python
+from chuk_ai_session_manager.memory import SimplePrefetcher
+
+prefetcher = SimplePrefetcher(
+    max_claims_to_prefetch=3,
+    max_recent_tools=3,
+)
+
+# Record page accesses
+prefetcher.record_page_access("claim_001")
+prefetcher.record_page_access("claim_001")  # Frequently accessed
+
+# Record tool usage patterns
+prefetcher.record_tool_call(
+    tool_name="weather_tool",
+    turn=5,
+    pages_accessed_before=["claim_location", "claim_timezone"],
+)
+
+# Set last segment summary
+prefetcher.set_last_segment_summary("summary_seg_01")
+
+# Get pages to prefetch
+pages = await prefetcher.prefetch_on_turn_start(
+    session_id="session_123",
+    page_table=table,
+)
+```
+
+### Prefetch Strategy
+
+1. **Last segment summary** - Almost always needed for "what did we discuss?"
+2. **Most-referenced claim pages** - High access_count claims
+3. **Tool prereqs** - Pages accessed before common tool calls
+
+---
+
+## ContextPackCache (v0.8)
+
+Caches packed context to avoid re-packing on small incremental turns.
+
+### Basic Usage
+
+```python
+from chuk_ai_session_manager.memory import ContextPackCache
+
+cache = ContextPackCache(max_entries=32)
+
+# Compute working set hash
+ws_hash = ContextPackCache.compute_working_set_hash(
+    page_ids=["msg_001", "msg_002"],
+    versions={"msg_001": 1, "msg_002": 1},
+)
+
+# Try to get cached pack
+packed = cache.get(
+    session_id="session_123",
+    model_id="gpt-4",
+    token_budget=128000,
+    working_set_hash=ws_hash,
+)
+
+if packed:
+    print("Cache hit!")
+else:
+    # Pack context and cache it
+    packed = packer.pack(pages)
+    cache.put(
+        session_id="session_123",
+        model_id="gpt-4",
+        token_budget=128000,
+        working_set_hash=ws_hash,
+        packed=packed,
+    )
+```
+
+### Cache Invalidation
+
+```python
+# Invalidate when working set changes
+cache.invalidate_session("session_123")
+
+# Check stats
+print(f"Hit rate: {cache.hit_rate:.2%}")
+print(f"Size: {cache.size}/{cache.max_entries}")
+```
+
+---
+
 ## Eviction Scoring
 
 The WorkingSetManager uses a composite score for eviction decisions:

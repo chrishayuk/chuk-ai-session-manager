@@ -84,6 +84,10 @@ class PageTable(BaseModel):
             access_count=page.access_count,
             size_tokens=page.size_tokens or page.estimate_tokens(),
             modality=page.modality,
+            # v0.8 fields
+            page_type=page.page_type,
+            provenance=page.provenance,
+            pinned=page.pinned,
         )
 
         self._add_entry(entry)

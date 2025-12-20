@@ -122,12 +122,93 @@ print(packed.content)  # VM:CONTEXT format
 | `models.py` | Core models, enums, and type definitions |
 | `page_table.py` | Page metadata tracking and tier management |
 | `tlb.py` | Fast cache for page table lookups |
-| `working_set.py` | Token budget and L0/L1 capacity management |
+| `working_set.py` | Token budget, L0/L1 capacity, pinning, anti-thrash |
 | `context_packer.py` | Pack pages into VM:CONTEXT format |
 | `manifest.py` | Generate VM:MANIFEST_JSON for models |
 | `fault_handler.py` | Handle page_fault and search_pages tools |
 | `artifacts_bridge.py` | Persistent storage integration |
 | `vm_prompts.py` | Tool definitions and mode-specific prompts |
+| `pack_cache.py` | Cache packed context to avoid re-packing (v0.8) |
+| `mutation_log.py` | Append-only log for debugging/replay (v0.8) |
+| `prefetcher.py` | Heuristic-based page prefetch (v0.8) |
+
+## v0.8 Components
+
+The v0.8 release adds several components to make the VM system production-ready:
+
+### Page Type Taxonomy
+
+Not all pages are equal. Different types have different eviction/compression rules:
+
+| Page Type | Description | Eviction Priority |
+|-----------|-------------|-------------------|
+| `transcript` | Raw turns, tool outputs | Normal |
+| `summary` | LLM-generated summaries | Low (rebuildable) |
+| `claim` | Decisions, facts, conclusions | Very Low (high-value) |
+| `procedure` | Learned patterns | Low |
+
+### Provenance Tracking
+
+Pages can track their lineage via the `provenance` field:
+
+```python
+# Summary that derives from messages
+summary = MemoryPage(
+    page_id="summary_seg_01",
+    page_type=PageType.SUMMARY,
+    provenance=["msg_001", "msg_002", "msg_003"],  # Source messages
+    content="Key points from the discussion...",
+)
+```
+
+### Pinned Pages
+
+Some pages should never be evicted:
+
+```python
+from chuk_ai_session_manager.memory import PinnedSet
+
+pinned = PinnedSet(pin_last_n_turns=3)
+pinned.pin("system_prompt")
+pinned.pin("claim_auth_decision")
+```
+
+### Anti-Thrash Protection
+
+Prevents evicting recently-faulted pages:
+
+```python
+from chuk_ai_session_manager.memory import AntiThrashPolicy
+
+policy = AntiThrashPolicy(
+    eviction_cooldown_turns=3,
+    fault_protection_turns=2,
+)
+```
+
+### Mutation Log
+
+Debug and replay page operations:
+
+```python
+from chuk_ai_session_manager.memory import MutationLogLite
+
+log = MutationLogLite()
+# ... operations ...
+context = log.get_context_at_turn(turn=5)
+```
+
+### UX Metrics
+
+Track user experience metrics:
+
+```python
+from chuk_ai_session_manager.memory import UserExperienceMetrics
+
+metrics = UserExperienceMetrics()
+print(f"Recall success rate: {metrics.recall_success_rate():.2%}")
+print(f"Thrash index: {metrics.thrash_index():.2f}")
+```
 
 ## Documentation
 
