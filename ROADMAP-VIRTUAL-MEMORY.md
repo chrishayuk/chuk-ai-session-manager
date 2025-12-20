@@ -2007,6 +2007,300 @@ If this test passes, the VM system "feels good" in production.
 
 ---
 
+## Integration with chuk-sessions
+
+The VM system is designed to layer cleanly on top of the existing chuk-sessions infrastructure. This section details how the storage tiers map to existing components.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Application Layer                          │
+│               (Chat, Agents, Tool Calls)                     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│                    SessionManager                            │
+│  ├─ user_says() / ai_responds()                              │
+│  ├─ get_messages_for_llm() ◄─── VM context built here        │
+│  └─ memory: MemoryManager (NEW)                              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+         ┌─────────────────┴─────────────────┐
+         │                                   │
+┌────────▼────────────┐          ┌───────────▼───────────┐
+│  MemoryManager      │          │  Session (L2)         │
+│  ├─ PageTable       │          │  ├─ events[]          │◄── Source of truth
+│  ├─ WorkingSet      │ derives  │  ├─ state{}           │◄── L1 cache
+│  ├─ TLB             │  from    │  └─ parent/children   │◄── Chain links
+│  └─ ContextPacker   │──────────│                       │
+└─────────────────────┘          └───────────┬───────────┘
+                                             │
+                                 ┌───────────▼───────────┐
+                                 │  chuk-sessions        │
+                                 │  (Redis/Memory)       │
+                                 └───────────────────────┘
+```
+
+### Tier Mapping to Existing Infrastructure
+
+| VM Tier | Maps To | Already Exists | Description |
+|---------|---------|----------------|-------------|
+| **L0** | `WorkingSetManager` | New | In-memory, current context window |
+| **L1** | `Session.state{}` | ✅ Yes | Derived content (summaries, claims, cache) |
+| **L2** | `Session.events[]` | ✅ Yes | Append-only event log (source of truth) |
+| **L3** | `chuk-artifacts` | ✅ Yes | Artifact storage (vfs-filesystem) |
+| **L4** | `chuk-artifacts` | ✅ Yes | Cold storage (vfs-s3) |
+
+### L2: Session.events (Source of Truth)
+
+The existing `Session.events` list IS the L2 authoritative tier:
+
+```python
+class Session(BaseModel):
+    events: List[SessionEvent]  # Append-only, immutable
+
+    async def add_event(self, event: SessionEvent):
+        self.events.append(event)  # Never mutated
+```
+
+**Key properties:**
+- ✅ Append-only (no mutation)
+- ✅ Immutable once written
+- ✅ Persistent via chuk-sessions
+- ✅ Already tracks tokens, timestamps, source
+
+**VM Strategy:** Don't duplicate this. Reference it.
+
+### L1: Session.state (Derived Cache)
+
+The existing `Session.state` dict stores derived content:
+
+```python
+class Session(BaseModel):
+    state: Dict[str, Any]  # Mutable, derived from events
+
+# VM uses this for:
+session.state["vm:summaries"] = {
+    "summary_seg_01": {"content": "...", "provenance": ["msg_1", "msg_2"]},
+}
+session.state["vm:claims"] = {
+    "claim_db_choice": {"content": "Use PostgreSQL", "importance": 0.95},
+}
+session.state["vm:pack_cache"] = {
+    "hash_abc123": {"vm_context": "...", "tokens": 5000},
+}
+```
+
+**Key insight:** L1 can be rebuilt from L2 if lost.
+
+### L0: WorkingSetManager (New)
+
+Active context window, managed in-memory:
+
+```python
+# What goes into the LLM prompt
+l0_page_ids = working_set.get_l0_page_ids()
+
+# Maps to pages derived from Session.events
+# Plus summaries/claims from Session.state
+```
+
+### Session Chain = Page Hierarchy
+
+Parent-child relationships already support multi-segment conversations:
+
+```python
+# Session navigation (already exists)
+ancestors = await session.ancestors()      # Walk to root
+descendants = await session.descendants()  # Walk to leaves
+
+# VM interpretation:
+# - Root session = oldest content (L3/L4)
+# - Current session = hot content (L0/L1)
+# - Parent sessions = warm content (L2)
+```
+
+### SessionManager Integration
+
+```python
+class SessionManager:
+    def __init__(
+        self,
+        # ... existing params ...
+        enable_vm: bool = False,
+        vm_config: Optional[WorkingSetConfig] = None,
+    ):
+        # NEW: VM memory layer (optional)
+        self.memory: Optional[MemoryManager] = None
+        if enable_vm:
+            self.memory = MemoryManager(
+                session_id=self._session_id,
+                config=vm_config or WorkingSetConfig(max_l0_tokens=32_000),
+            )
+
+    async def user_says(self, content: str, **metadata):
+        # Existing: add event to session (L2)
+        event = await SessionEvent.create_with_tokens(...)
+        await self._session.add_event(event)
+
+        # NEW: Create page and add to working set (L0)
+        if self.memory:
+            page = MemoryPage(
+                page_id=f"msg_{event.id}",
+                page_type=PageType.TRANSCRIPT,
+                content=content,
+            )
+            self.memory.page_table.register(page)
+            self.memory.working_set.add_to_l0(page)
+
+    async def get_messages_for_llm(self, **kwargs):
+        if self.memory:
+            # Use VM context packer
+            return self.memory.build_llm_context()
+        else:
+            # Existing behavior (no VM)
+            return await self._build_traditional_prompt()
+```
+
+### Infinite Context Integration
+
+When a session segment is created:
+
+```python
+async def _create_new_segment(self):
+    # Existing: Create child session
+    new_session = await Session.create(parent_id=self._session.id)
+
+    # NEW: Evict old pages from L0 to L2
+    if self.memory:
+        for page_id in self.memory.working_set.get_l0_page_ids():
+            page = self.memory.get_page(page_id)
+            # Store to artifacts (L3)
+            artifact_id = await self.memory.storage.store_page(page)
+            # Update location in page table
+            self.memory.page_table.update_location(
+                page_id, tier=StorageTier.L2, artifact_id=artifact_id
+            )
+            # Remove from working set
+            self.memory.working_set.remove_from_l0(page_id, page)
+
+        # Create summary page for the segment
+        summary = MemoryPage(
+            page_id=f"summary_{self._session.id}",
+            page_type=PageType.SUMMARY,
+            content=await self._generate_summary(),
+            provenance=[p.page_id for p in old_pages],
+        )
+        self.memory.page_table.register(summary)
+        self.memory.working_set.add_to_l0(summary)
+```
+
+### Event-to-Page Mapping
+
+SessionEvents map directly to MemoryPages:
+
+```python
+def event_to_page(event: SessionEvent) -> MemoryPage:
+    """Convert a SessionEvent to a MemoryPage."""
+    return MemoryPage(
+        page_id=f"msg_{event.id}",
+        page_type=PageType.TRANSCRIPT,
+        modality=Modality.TEXT,
+        content=event.content,
+        storage_tier=StorageTier.L0,
+        size_tokens=event.token_usage.total_tokens if event.token_usage else None,
+        created_at=event.timestamp,
+        metadata={
+            "event_id": event.id,
+            "source": event.source.value,
+            "model": event.token_usage.model if event.token_usage else None,
+        },
+    )
+```
+
+### VM Metadata in Session
+
+Store VM configuration and state:
+
+```python
+# In Session.metadata.properties
+session.metadata.properties["vm:mode"] = "strict"
+session.metadata.properties["vm:max_l0_tokens"] = 32000
+session.metadata.properties["vm:fault_limit"] = 3
+
+# In Session.state (persisted, derived)
+session.state["vm:page_locations"] = {
+    "msg_001": {"tier": "L2", "artifact_id": "art_xyz"},
+    "claim_db": {"tier": "L1", "pinned": True},
+}
+```
+
+### What Already Works
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Session.events (L2) | ✅ Exists | Immutable event log |
+| Session.state (L1) | ✅ Exists | Derived content cache |
+| Parent-child chain | ✅ Exists | Segment navigation |
+| Token tracking | ✅ Exists | Per-event token counts |
+| ChukSessionsStore | ✅ Exists | Persistence layer |
+| MemoryPage, PageTable | ✅ Done | v0.8 implementation |
+| WorkingSetManager | ✅ Done | v0.8 implementation |
+| ContextPacker | ✅ Done | v0.8 implementation |
+| FaultHandler | ✅ Done | v0.8 implementation |
+
+### What Needs Building
+
+| Component | Description | Phase |
+|-----------|-------------|-------|
+| `MemoryManager` | Orchestrator tying all pieces together | v0.10 |
+| `SessionManager.memory` | Optional VM integration property | v0.10 |
+| Event↔Page mapper | Convert SessionEvents to MemoryPages | v0.10 |
+| Segmentation hook | Trigger eviction on new segment | v0.10 |
+| VM-aware prompt builder | Use `VM:CONTEXT` when enabled | v0.10 |
+
+### Configuration Example
+
+```python
+from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.memory import WorkingSetConfig, VMMode
+
+# Create session with VM enabled
+sm = SessionManager(
+    session_id="my_session",
+    system_prompt="You are a helpful assistant.",
+    infinite_context=True,
+    enable_vm=True,  # NEW
+    vm_config=WorkingSetConfig(
+        max_l0_tokens=32_000,
+        max_l1_pages=100,
+        eviction_threshold=0.85,
+    ),
+    vm_mode=VMMode.STRICT,  # Enforce grounding rules
+)
+
+# Use normally - VM handles context automatically
+await sm.user_says("Let's use PostgreSQL for the database")
+await sm.ai_responds("Great choice! PostgreSQL is excellent for...")
+
+# Later, when context pressure builds:
+# - Old transcripts evicted to L2/L3
+# - Claims stay pinned in L0/L1
+# - Model can fault in old content as needed
+```
+
+### Why This Architecture Works
+
+1. **L2 is immutable** - Session.events never mutates, so no coherency issues
+2. **L1 is derived** - Session.state can be rebuilt from L2 if lost
+3. **L0 is ephemeral** - WorkingSetManager is in-memory only
+4. **Existing chain navigation** - Parent-child already supports multi-segment
+5. **Token tracking exists** - Per-event counts feed directly into TokenBudget
+6. **Storage abstraction exists** - ChukSessionsStore handles Redis/memory
+
+---
+
 ## References
 
 - OS Virtual Memory: Page tables, TLB, working sets, page replacement algorithms
