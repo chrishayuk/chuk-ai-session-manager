@@ -38,11 +38,11 @@ logger = logging.getLogger(__name__)
 class SessionAwareToolProcessor:
     """
     Session tracking wrapper for chuk_tool_processor.
-    
+
     This class focuses solely on session tracking and caching while delegating
     all execution reliability (retries, timeouts, error handling) to the
     underlying chuk_tool_processor.
-    
+
     Features:
     - Complete session tracking and audit trail
     - Optional result caching with TTL
@@ -61,7 +61,7 @@ class SessionAwareToolProcessor:
     ) -> None:
         """
         Initialize the session-aware tool processor.
-        
+
         Args:
             session_id: ID of the session to track operations in
             enable_caching: Whether to cache tool results
@@ -72,10 +72,10 @@ class SessionAwareToolProcessor:
         self.enable_caching = enable_caching
         self.cache_ttl_seconds = cache_ttl_seconds
         self.enable_metrics = enable_metrics
-        
+
         # Simple cache with TTL
         self.cache: Dict[str, Dict[str, Any]] = {}  # key -> {result, timestamp}
-        
+
         # Basic metrics
         self.metrics = {
             "total_calls": 0,
@@ -97,14 +97,14 @@ class SessionAwareToolProcessor:
     async def create(cls, session_id: str, **kwargs) -> "SessionAwareToolProcessor":
         """
         Create a session-aware tool processor with session validation.
-        
+
         Args:
             session_id: ID of the session to track operations in
             **kwargs: Additional arguments passed to __init__
-            
+
         Returns:
             Initialized SessionAwareToolProcessor instance
-            
+
         Raises:
             ValueError: If the session doesn't exist
         """
@@ -113,8 +113,10 @@ class SessionAwareToolProcessor:
         session = await store.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
-        
-        logger.info(f"Created SessionAwareToolProcessor for session {session_id[:8]}...")
+
+        logger.info(
+            f"Created SessionAwareToolProcessor for session {session_id[:8]}..."
+        )
         return cls(session_id=session_id, **kwargs)
 
     def _get_cache_key(self, tool_name: str, arguments: Dict[str, Any]) -> str:
@@ -126,7 +128,7 @@ class SessionAwareToolProcessor:
         """Check if a cache entry is still valid based on TTL."""
         if not self.enable_caching:
             return False
-        
+
         timestamp = cache_entry.get("timestamp", 0)
         age = datetime.now().timestamp() - timestamp
         return age < self.cache_ttl_seconds
@@ -140,7 +142,7 @@ class SessionAwareToolProcessor:
     ) -> None:
         """
         Log a tool execution event to the session.
-        
+
         Args:
             session: Session object to log to
             parent_id: ID of the parent LLM message event
@@ -149,7 +151,7 @@ class SessionAwareToolProcessor:
         """
         # Convert result to string for session storage
         result_str = str(result.result) if result.result is not None else "null"
-        
+
         # Create the event message with all relevant information
         event_message = {
             "tool": result.tool,
@@ -169,42 +171,45 @@ class SessionAwareToolProcessor:
             source=EventSource.SYSTEM,
             type=EventType.TOOL_CALL,
         )
-        
+
         # Add comprehensive metadata
         await event.set_metadata("parent_event_id", parent_id)
         await event.set_metadata("tool_name", result.tool)
         await event.set_metadata("cached", cached)
         await event.set_metadata("success", result.error is None)
         await event.set_metadata("timestamp", datetime.now().isoformat())
-        
+
         if result.error:
-            await event.set_metadata("error_type", type(result.error).__name__ if hasattr(result.error, '__class__') else "unknown")
-        
+            await event.set_metadata(
+                "error_type",
+                type(result.error).__name__
+                if hasattr(result.error, "__class__")
+                else "unknown",
+            )
+
         # Save to session
         await session.add_event_and_save(event)
 
     async def process_llm_message(
-        self, 
-        llm_msg: Dict[str, Any], 
-        context: Optional[Dict[str, Any]] = None
+        self, llm_msg: Dict[str, Any], context: Optional[Dict[str, Any]] = None
     ) -> List[ToolResult]:
         """
         Process tool calls from an LLM message with session tracking.
-        
+
         This method:
         1. Logs the LLM message to the session
         2. Checks cache for each tool call
         3. Delegates execution to chuk_tool_processor (which handles retries/reliability)
         4. Logs all results to the session
         5. Updates cache and metrics
-        
+
         Args:
             llm_msg: OpenAI-style message with tool_calls
             context: Optional context information for logging
-            
+
         Returns:
             List of tool execution results from chuk_tool_processor
-            
+
         Raises:
             ValueError: If the session is not found
         """
@@ -224,12 +229,12 @@ class SessionAwareToolProcessor:
             source=EventSource.LLM,
             type=EventType.MESSAGE,
         )
-        
+
         # Add context metadata if provided
         if context:
             for key, value in context.items():
                 await parent_event.set_metadata(key, value)
-        
+
         await session.add_event_and_save(parent_event)
 
         # Extract tool calls
@@ -238,17 +243,19 @@ class SessionAwareToolProcessor:
             logger.debug("No tool calls found in LLM message")
             return []
 
-        logger.info(f"Processing {len(tool_calls)} tool calls for session {self.session_id[:8]}...")
-        
+        logger.info(
+            f"Processing {len(tool_calls)} tool calls for session {self.session_id[:8]}..."
+        )
+
         results: List[ToolResult] = []
         chuk_tool_calls: List[ToolCall] = []
         cache_info: List[Dict[str, Any]] = []  # Track which calls are cached
-        
+
         # Check cache for each tool call first
         for call in tool_calls:
             function = call.get("function", {})
             tool_name = function.get("name", "unknown_tool")
-            
+
             try:
                 arguments = json.loads(function.get("arguments", "{}"))
             except json.JSONDecodeError as e:
@@ -259,28 +266,32 @@ class SessionAwareToolProcessor:
                 self.metrics["total_calls"] += 1
 
             # Check cache
-            cache_key = self._get_cache_key(tool_name, arguments) if self.enable_caching else None
-            
+            cache_key = (
+                self._get_cache_key(tool_name, arguments)
+                if self.enable_caching
+                else None
+            )
+
             if cache_key and cache_key in self.cache:
                 cache_entry = self.cache[cache_key]
                 if self._is_cache_valid(cache_entry):
                     # Cache hit!
                     cached_result = cache_entry["result"]
                     logger.debug(f"Cache hit for {tool_name}")
-                    
+
                     if self.enable_metrics:
                         self.metrics["cache_hits"] += 1
                         if cached_result.error is None:
                             self.metrics["successful_calls"] += 1
                         else:
                             self.metrics["failed_calls"] += 1
-                    
+
                     # Log the cached result
                     await self._log_tool_call_event(
                         session, parent_event.id, cached_result, cached=True
                     )
                     results.append(cached_result)
-                    
+
                     # Mark this call as cached
                     cache_info.append({"cached": True, "result": cached_result})
                     continue
@@ -291,15 +302,17 @@ class SessionAwareToolProcessor:
             # Cache miss - prepare for execution
             if self.enable_metrics:
                 self.metrics["cache_misses"] += 1
-            
+
             chuk_tool_calls.append(ToolCall(tool=tool_name, arguments=arguments))
             cache_info.append({"cached": False, "cache_key": cache_key})
 
         # Execute non-cached calls with chuk_tool_processor
         # This handles ALL reliability concerns (retries, timeouts, error recovery)
         if chuk_tool_calls:
-            logger.debug(f"Executing {len(chuk_tool_calls)} tools via chuk_tool_processor")
-            
+            logger.debug(
+                f"Executing {len(chuk_tool_calls)} tools via chuk_tool_processor"
+            )
+
             try:
                 execution_results = await self._tp.executor.execute(chuk_tool_calls)
             except Exception as e:
@@ -309,32 +322,36 @@ class SessionAwareToolProcessor:
                     ToolResult(tool=tc.tool, result=None, error=str(e))
                     for tc in chuk_tool_calls
                 ]
-            
+
             # Process execution results
             exec_index = 0
             for i, info in enumerate(cache_info):
                 if info["cached"]:
                     continue  # Already handled above
-                
+
                 if exec_index < len(execution_results):
                     result = execution_results[exec_index]
                     exec_index += 1
-                    
+
                     # Update metrics
                     if self.enable_metrics:
                         if result.error is None:
                             self.metrics["successful_calls"] += 1
                         else:
                             self.metrics["failed_calls"] += 1
-                    
+
                     # Cache successful results (if caching enabled)
-                    if self.enable_caching and result.error is None and "cache_key" in info:
+                    if (
+                        self.enable_caching
+                        and result.error is None
+                        and "cache_key" in info
+                    ):
                         self.cache[info["cache_key"]] = {
                             "result": result,
-                            "timestamp": datetime.now().timestamp()
+                            "timestamp": datetime.now().timestamp(),
                         }
                         logger.debug(f"Cached result for {result.tool}")
-                    
+
                     # Log the execution result
                     await self._log_tool_call_event(
                         session, parent_event.id, result, cached=False
@@ -348,18 +365,20 @@ class SessionAwareToolProcessor:
         """Get performance metrics for this processor."""
         if not self.enable_metrics:
             return {"metrics_disabled": True}
-        
+
         total_non_cached = self.metrics["cache_hits"] + self.metrics["cache_misses"]
         cache_hit_rate = (
             self.metrics["cache_hits"] / total_non_cached
-            if total_non_cached > 0 else 0.0
+            if total_non_cached > 0
+            else 0.0
         )
-        
+
         success_rate = (
             self.metrics["successful_calls"] / self.metrics["total_calls"]
-            if self.metrics["total_calls"] > 0 else 0.0
+            if self.metrics["total_calls"] > 0
+            else 0.0
         )
-        
+
         return {
             **self.metrics,
             "cache_hit_rate": cache_hit_rate,
@@ -387,18 +406,16 @@ class SessionAwareToolProcessor:
 
 # Convenience function for quick usage
 async def process_tools_for_session(
-    session_id: str,
-    llm_message: Dict[str, Any],
-    **processor_kwargs
+    session_id: str, llm_message: Dict[str, Any], **processor_kwargs
 ) -> List[ToolResult]:
     """
     Convenience function to process tools for a session.
-    
+
     Args:
         session_id: ID of the session
         llm_message: OpenAI-style message with tool_calls
         **processor_kwargs: Additional arguments for the processor
-        
+
     Returns:
         List of tool execution results
     """

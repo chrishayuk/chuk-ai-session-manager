@@ -8,8 +8,10 @@ from typing import Any, List, Optional
 # imports
 from a2a_accounts.models.access_control import AccessControlled
 
+
 class Project(AccessControlled):
     """A project that contains Sessions and is owned by an Account."""
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     description: Optional[str] = None
@@ -27,6 +29,7 @@ class Project(AccessControlled):
         """Disassociate a Session from this Project."""
         if session.id in self.session_ids:
             self.session_ids.remove(session.id)
+
 
 class ProjectStatus(str, Enum):
     ACTIVE = "active"

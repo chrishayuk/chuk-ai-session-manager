@@ -3,7 +3,25 @@
 Virtual Memory system prompts for Chat Completions integration.
 
 These prompts enforce VM semantics when injected into the developer message.
+
+Design principles:
+- Pydantic-native: Tool definitions as proper models
+- No magic strings: Uses enums for modes and types
 """
+
+from typing import List
+
+
+from .models import (
+    Modality,
+    ToolDefinition,
+    ToolFunction,
+    ToolParameter,
+    ToolParameters,
+    ToolType,
+    VMMode,
+)
+
 
 # Strict mode: No hallucinated memory, citations required
 VM_STRICT_PROMPT = """You are operating under STRICT Virtual Memory grounding rules.
@@ -71,8 +89,21 @@ The conversation context provided represents what you know about this session.
 Respond based on the information available to you."""
 
 
+# Map of VMMode to prompt text
+VM_PROMPTS = {
+    VMMode.STRICT: VM_STRICT_PROMPT,
+    VMMode.RELAXED: VM_RELAXED_PROMPT,
+    VMMode.PASSIVE: VM_PASSIVE_PROMPT,
+}
+
+
+def get_prompt_for_mode(mode: VMMode) -> str:
+    """Get the prompt text for a given VM mode."""
+    return VM_PROMPTS.get(mode, VM_PASSIVE_PROMPT)
+
+
 def build_vm_developer_message(
-    mode: str,
+    mode: VMMode,
     manifest_json: str,
     context: str,
     system_prompt: str = "",
@@ -82,7 +113,7 @@ def build_vm_developer_message(
     Build the complete developer message with VM rules, manifest, and context.
 
     Args:
-        mode: "strict", "relaxed", or "passive"
+        mode: VMMode enum value (STRICT, RELAXED, or PASSIVE)
         manifest_json: JSON string of the VM manifest
         context: The VM:CONTEXT block content
         system_prompt: Optional additional system instructions
@@ -91,22 +122,22 @@ def build_vm_developer_message(
     Returns:
         Complete developer message string
     """
-    if mode == "strict":
+    if mode == VMMode.STRICT:
         rules = VM_STRICT_PROMPT.replace(
             "max_faults_per_turn from the manifest policies",
-            f"max_faults_per_turn ({max_faults_per_turn}) from the manifest policies"
+            f"max_faults_per_turn ({max_faults_per_turn}) from the manifest policies",
         )
-    elif mode == "relaxed":
+    elif mode == VMMode.RELAXED:
         rules = VM_RELAXED_PROMPT
     else:
         rules = VM_PASSIVE_PROMPT
 
-    parts = []
+    parts: List[str] = []
 
     if system_prompt:
         parts.append(system_prompt)
 
-    if mode != "passive":
+    if mode != VMMode.PASSIVE:
         parts.append(f"<VM:RULES>\n{rules}\n</VM:RULES>")
         parts.append(f"<VM:MANIFEST_JSON>\n{manifest_json}\n</VM:MANIFEST_JSON>")
 
@@ -115,72 +146,93 @@ def build_vm_developer_message(
     return "\n\n".join(parts)
 
 
-# Tool definitions for VM syscalls
-VM_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "page_fault",
-            "description": "Load a memory page into context at specified compression level. Use when you need content from a known page_id.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "page_id": {
-                        "type": "string",
-                        "description": "ID of the page to load"
-                    },
-                    "target_level": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 3,
-                        "default": 2,
-                        "description": "0=full, 1=reduced, 2=abstract/summary, 3=reference only"
-                    }
-                },
-                "required": ["page_id"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_pages",
-            "description": "Search for pages matching a query. Use when you need to find relevant pages but don't know their IDs.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query (semantic or keyword)"
-                    },
-                    "modality": {
-                        "type": "string",
-                        "enum": ["text", "image", "audio", "video", "structured"],
-                        "description": "Filter by content type"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 5,
-                        "description": "Maximum results to return"
-                    }
-                },
-                "required": ["query"]
-            }
-        }
-    }
-]
+# Tool definitions as Pydantic models
+PAGE_FAULT_TOOL = ToolDefinition(
+    type=ToolType.FUNCTION,
+    function=ToolFunction(
+        name="page_fault",
+        description="Load a memory page into context at specified compression level. Use when you need content from a known page_id.",
+        parameters=ToolParameters(
+            type="object",
+            properties={
+                "page_id": ToolParameter(
+                    type="string",
+                    description="ID of the page to load",
+                ),
+                "target_level": ToolParameter(
+                    type="integer",
+                    minimum=0,
+                    maximum=3,
+                    default=2,
+                    description="0=full, 1=reduced, 2=abstract/summary, 3=reference only",
+                ),
+            },
+            required=["page_id"],
+        ),
+    ),
+)
+
+SEARCH_PAGES_TOOL = ToolDefinition(
+    type=ToolType.FUNCTION,
+    function=ToolFunction(
+        name="search_pages",
+        description="Search for pages matching a query. Use when you need to find relevant pages but don't know their IDs.",
+        parameters=ToolParameters(
+            type="object",
+            properties={
+                "query": ToolParameter(
+                    type="string",
+                    description="Search query (semantic or keyword)",
+                ),
+                "modality": ToolParameter(
+                    type="string",
+                    enum=[m.value for m in Modality],
+                    description="Filter by content type",
+                ),
+                "limit": ToolParameter(
+                    type="integer",
+                    default=5,
+                    description="Maximum results to return",
+                ),
+            },
+            required=["query"],
+        ),
+    ),
+)
 
 
-def get_vm_tools(include_search: bool = True) -> list:
+# List of all VM tools as Pydantic models
+VM_TOOL_DEFINITIONS: List[ToolDefinition] = [PAGE_FAULT_TOOL, SEARCH_PAGES_TOOL]
+
+
+def get_vm_tools(include_search: bool = True) -> List[ToolDefinition]:
     """
-    Get the VM tool definitions for Chat Completions.
+    Get the VM tool definitions as Pydantic models.
 
     Args:
         include_search: Whether to include search_pages tool
 
     Returns:
-        List of tool definitions
+        List of ToolDefinition models
     """
     if include_search:
-        return VM_TOOLS
-    return [VM_TOOLS[0]]  # Just page_fault
+        return VM_TOOL_DEFINITIONS
+    return [PAGE_FAULT_TOOL]
+
+
+def get_vm_tools_as_dicts(include_search: bool = True) -> List[dict]:
+    """
+    Get the VM tool definitions as dicts (for Chat Completions API).
+
+    Args:
+        include_search: Whether to include search_pages tool
+
+    Returns:
+        List of tool definition dicts
+    """
+    tools = get_vm_tools(include_search)
+    return [tool.model_dump(exclude_none=True) for tool in tools]
+
+
+# Legacy: Keep VM_TOOLS as dicts for backward compatibility
+VM_TOOLS = get_vm_tools_as_dicts(include_search=True)

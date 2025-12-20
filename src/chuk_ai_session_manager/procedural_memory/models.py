@@ -54,9 +54,7 @@ class ToolLogEntry(BaseModel):
 
     # Identity
     id: str  # call-001, call-002, ...
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Tool call details
     tool_name: str
@@ -112,9 +110,7 @@ class ToolLogEntry(BaseModel):
 
         if include_args and self.arguments:
             # Show abbreviated args
-            args_str = ", ".join(
-                f"{k}={_abbrev(v)}" for k, v in self.arguments.items()
-            )
+            args_str = ", ".join(f"{k}={_abbrev(v)}" for k, v in self.arguments.items())
             lines.append(f"    args: {args_str}")
 
         if self.is_fix() and self.delta_args:
@@ -186,9 +182,7 @@ class ToolPattern(BaseModel):
 
     # Timing
     avg_execution_ms: Optional[float] = None
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = {"frozen": False}
 
@@ -328,12 +322,8 @@ class ProceduralMemory(BaseModel):
     fix_relations: list[ToolFixRelation] = Field(default_factory=list)
 
     # Metadata
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = {"frozen": False}
 

@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.guards.models import (
     ValueBinding,
-    ValueType,
     classify_value_type,
     compute_args_hash,
 )

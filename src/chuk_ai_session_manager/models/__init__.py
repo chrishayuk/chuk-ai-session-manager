@@ -2,35 +2,40 @@
 """
 Core models for the chuk session manager.
 """
+
 # Import each model separately to avoid circular imports
+# These are re-exported as part of the public API
 try:
-    from chuk_ai_session_manager.models.event_source import EventSource
+    from chuk_ai_session_manager.models.event_source import EventSource  # noqa: F401
 except ImportError:
     pass
 
 try:
-    from chuk_ai_session_manager.models.event_type import EventType
+    from chuk_ai_session_manager.models.event_type import EventType  # noqa: F401
 except ImportError:
     pass
 
 try:
-    from chuk_ai_session_manager.models.session_event import SessionEvent
+    from chuk_ai_session_manager.models.session_event import SessionEvent  # noqa: F401
 except ImportError:
     pass
 
 try:
-    from chuk_ai_session_manager.models.session_metadata import SessionMetadata
+    from chuk_ai_session_manager.models.session_metadata import SessionMetadata  # noqa: F401
 except ImportError:
     pass
 
 try:
-    from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
+    from chuk_ai_session_manager.models.session_run import (  # noqa: F401
+        RunStatus,
+        SessionRun,
+    )
 except ImportError:
     pass
 
 # Import Session last since it might depend on the above
 try:
-    from chuk_ai_session_manager.models.session import Session
+    from chuk_ai_session_manager.models.session import Session  # noqa: F401
 except ImportError:
     pass
 
@@ -38,7 +43,14 @@ except ImportError:
 __all__ = []
 
 # Check which imports succeeded and add them to __all__
-for name in ['EventSource', 'EventType', 'SessionEvent', 'SessionMetadata', 
-             'SessionRun', 'RunStatus', 'Session']:
+for name in [
+    "EventSource",
+    "EventType",
+    "SessionEvent",
+    "SessionMetadata",
+    "SessionRun",
+    "RunStatus",
+    "Session",
+]:
     if name in globals():
         __all__.append(name)

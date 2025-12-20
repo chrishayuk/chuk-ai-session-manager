@@ -83,8 +83,8 @@ class ToolStateManager(BaseModel):
     # Runtime limits
     limits: RuntimeLimits = Field(default_factory=RuntimeLimits)
 
-    # Per-tool call tracking
-    per_tool_limit: int = Field(default=3)
+    # Per-tool call tracking (0 = unlimited)
+    per_tool_limit: int = Field(default=0)
     tool_call_counts: dict[str, int] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
@@ -571,11 +571,16 @@ class ToolStateManager(BaseModel):
         base_name = tool_name.split(".")[-1] if "." in tool_name else tool_name
         count = self.get_tool_call_count(tool_name)
 
+        # If per_tool_limit is 0 or negative, limits are disabled
+        requires_justification = (
+            self.per_tool_limit > 0 and count >= self.per_tool_limit
+        )
+
         return PerToolCallStatus(
             tool_name=base_name,
             call_count=count,
             max_calls=self.per_tool_limit,
-            requires_justification=count >= self.per_tool_limit,
+            requires_justification=requires_justification,
         )
 
     def format_tool_limit_warning(self, tool_name: str) -> str:

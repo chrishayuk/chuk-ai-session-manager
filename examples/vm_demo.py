@@ -28,10 +28,9 @@ import argparse
 import asyncio
 import json
 import os
-import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
+
 
 # Load .env file if it exists
 def load_env():
@@ -56,6 +55,7 @@ def load_env():
                             os.environ[key] = value
             return True
     return False
+
 
 load_env()
 
@@ -100,7 +100,7 @@ PAGE_STORE = {
     "code_snippet_001": {
         "modality": "text",
         "levels": {
-            0: '''```python
+            0: """```python
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -114,13 +114,12 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-```''',
+```""",
             2: "FastAPI JWT verification code snippet with OAuth2 bearer scheme.",
         },
         "tier": "L3",
         "meta": {"language": "python", "lines": 14},
     },
-
     # === IMAGE PAGES ===
     "img_architecture": {
         "modality": "image",
@@ -168,7 +167,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             "data_points": 288,
         },
     },
-
     # === AUDIO PAGES ===
     "audio_meeting_001": {
         "modality": "audio",
@@ -184,14 +182,46 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 [05:15] Alex: Yes, with a TTL matching the refresh token expiry.
 [06:00] Jordan: I'll draft the implementation. Meeting adjourned.""",
                 "timestamps": [
-                    {"time": 0, "speaker": "Alex", "text": "Let's discuss the authentication implementation."},
-                    {"time": 15, "speaker": "Jordan", "text": "I've been looking at JWT vs session-based auth."},
-                    {"time": 90, "speaker": "Alex", "text": "What are the trade-offs you've found?"},
-                    {"time": 120, "speaker": "Jordan", "text": "JWT is stateless, great for microservices, but token revocation is tricky."},
-                    {"time": 225, "speaker": "Alex", "text": "We could use short-lived tokens with refresh rotation."},
-                    {"time": 270, "speaker": "Jordan", "text": "That's what I was thinking. Redis for the refresh token blacklist?"},
-                    {"time": 315, "speaker": "Alex", "text": "Yes, with a TTL matching the refresh token expiry."},
-                    {"time": 360, "speaker": "Jordan", "text": "I'll draft the implementation. Meeting adjourned."},
+                    {
+                        "time": 0,
+                        "speaker": "Alex",
+                        "text": "Let's discuss the authentication implementation.",
+                    },
+                    {
+                        "time": 15,
+                        "speaker": "Jordan",
+                        "text": "I've been looking at JWT vs session-based auth.",
+                    },
+                    {
+                        "time": 90,
+                        "speaker": "Alex",
+                        "text": "What are the trade-offs you've found?",
+                    },
+                    {
+                        "time": 120,
+                        "speaker": "Jordan",
+                        "text": "JWT is stateless, great for microservices, but token revocation is tricky.",
+                    },
+                    {
+                        "time": 225,
+                        "speaker": "Alex",
+                        "text": "We could use short-lived tokens with refresh rotation.",
+                    },
+                    {
+                        "time": 270,
+                        "speaker": "Jordan",
+                        "text": "That's what I was thinking. Redis for the refresh token blacklist?",
+                    },
+                    {
+                        "time": 315,
+                        "speaker": "Alex",
+                        "text": "Yes, with a TTL matching the refresh token expiry.",
+                    },
+                    {
+                        "time": 360,
+                        "speaker": "Jordan",
+                        "text": "I'll draft the implementation. Meeting adjourned.",
+                    },
                 ],
             },
             2: "Team meeting (6 min): Alex and Jordan discussed JWT vs session auth. Decided on short-lived JWT + refresh tokens with Redis blacklist for revocation.",
@@ -215,10 +245,26 @@ def verify_token(token: str = Depends(oauth2_scheme)):
 [00:45] Alex: I can help with that after this call.
 [01:00] Jordan: Great, should be done by EOD then.""",
                 "timestamps": [
-                    {"time": 0, "speaker": "Jordan", "text": "Quick update - JWT implementation is 80% done."},
-                    {"time": 20, "speaker": "Jordan", "text": "Blocked on the Redis connection pooling config."},
-                    {"time": 45, "speaker": "Alex", "text": "I can help with that after this call."},
-                    {"time": 60, "speaker": "Jordan", "text": "Great, should be done by EOD then."},
+                    {
+                        "time": 0,
+                        "speaker": "Jordan",
+                        "text": "Quick update - JWT implementation is 80% done.",
+                    },
+                    {
+                        "time": 20,
+                        "speaker": "Jordan",
+                        "text": "Blocked on the Redis connection pooling config.",
+                    },
+                    {
+                        "time": 45,
+                        "speaker": "Alex",
+                        "text": "I can help with that after this call.",
+                    },
+                    {
+                        "time": 60,
+                        "speaker": "Jordan",
+                        "text": "Great, should be done by EOD then.",
+                    },
                 ],
             },
             2: "Standup (1 min): Jordan reports JWT 80% done, blocked on Redis config. Alex to assist.",
@@ -232,7 +278,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             "recorded_at": "2024-01-16T09:00:00Z",
         },
     },
-
     # === VIDEO PAGES ===
     "video_demo_001": {
         "modality": "video",
@@ -240,14 +285,46 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             0: "https://example.com/video/auth_demo_full.mp4",  # Full video
             1: {  # Keyframes + transcript
                 "scenes": [
-                    {"timestamp": 0, "description": "Title screen: 'JWT Authentication Demo'", "keyframe_url": "https://example.com/video/auth_demo/frame_0.jpg"},
-                    {"timestamp": 15, "description": "Browser showing login form with email/password fields", "keyframe_url": "https://example.com/video/auth_demo/frame_15.jpg"},
-                    {"timestamp": 45, "description": "Network tab showing POST /auth/login request", "keyframe_url": "https://example.com/video/auth_demo/frame_45.jpg"},
-                    {"timestamp": 60, "description": "Response payload with access_token and refresh_token visible", "keyframe_url": "https://example.com/video/auth_demo/frame_60.jpg"},
-                    {"timestamp": 90, "description": "Subsequent API call with Authorization: Bearer header", "keyframe_url": "https://example.com/video/auth_demo/frame_90.jpg"},
-                    {"timestamp": 120, "description": "Token expiry simulation - 401 response shown", "keyframe_url": "https://example.com/video/auth_demo/frame_120.jpg"},
-                    {"timestamp": 150, "description": "Automatic token refresh via /auth/refresh endpoint", "keyframe_url": "https://example.com/video/auth_demo/frame_150.jpg"},
-                    {"timestamp": 180, "description": "End screen with 'Implementation Complete' message", "keyframe_url": "https://example.com/video/auth_demo/frame_180.jpg"},
+                    {
+                        "timestamp": 0,
+                        "description": "Title screen: 'JWT Authentication Demo'",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_0.jpg",
+                    },
+                    {
+                        "timestamp": 15,
+                        "description": "Browser showing login form with email/password fields",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_15.jpg",
+                    },
+                    {
+                        "timestamp": 45,
+                        "description": "Network tab showing POST /auth/login request",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_45.jpg",
+                    },
+                    {
+                        "timestamp": 60,
+                        "description": "Response payload with access_token and refresh_token visible",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_60.jpg",
+                    },
+                    {
+                        "timestamp": 90,
+                        "description": "Subsequent API call with Authorization: Bearer header",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_90.jpg",
+                    },
+                    {
+                        "timestamp": 120,
+                        "description": "Token expiry simulation - 401 response shown",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_120.jpg",
+                    },
+                    {
+                        "timestamp": 150,
+                        "description": "Automatic token refresh via /auth/refresh endpoint",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_150.jpg",
+                    },
+                    {
+                        "timestamp": 180,
+                        "description": "End screen with 'Implementation Complete' message",
+                        "keyframe_url": "https://example.com/video/auth_demo/frame_180.jpg",
+                    },
                 ],
                 "transcript": "This demo shows our JWT authentication flow. First, user logs in... token is returned... used in subsequent requests... automatic refresh when expired...",
             },
@@ -269,12 +346,36 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             0: "https://example.com/video/arch_walkthrough_full.mp4",
             1: {
                 "scenes": [
-                    {"timestamp": 0, "description": "Whiteboard with system overview diagram", "keyframe_url": "https://example.com/video/arch/frame_0.jpg"},
-                    {"timestamp": 60, "description": "Zoomed in on API Gateway component", "keyframe_url": "https://example.com/video/arch/frame_60.jpg"},
-                    {"timestamp": 180, "description": "Auth service microservice details", "keyframe_url": "https://example.com/video/arch/frame_180.jpg"},
-                    {"timestamp": 300, "description": "Database layer and Redis cache", "keyframe_url": "https://example.com/video/arch/frame_300.jpg"},
-                    {"timestamp": 420, "description": "Request flow animation", "keyframe_url": "https://example.com/video/arch/frame_420.jpg"},
-                    {"timestamp": 540, "description": "Scaling considerations diagram", "keyframe_url": "https://example.com/video/arch/frame_540.jpg"},
+                    {
+                        "timestamp": 0,
+                        "description": "Whiteboard with system overview diagram",
+                        "keyframe_url": "https://example.com/video/arch/frame_0.jpg",
+                    },
+                    {
+                        "timestamp": 60,
+                        "description": "Zoomed in on API Gateway component",
+                        "keyframe_url": "https://example.com/video/arch/frame_60.jpg",
+                    },
+                    {
+                        "timestamp": 180,
+                        "description": "Auth service microservice details",
+                        "keyframe_url": "https://example.com/video/arch/frame_180.jpg",
+                    },
+                    {
+                        "timestamp": 300,
+                        "description": "Database layer and Redis cache",
+                        "keyframe_url": "https://example.com/video/arch/frame_300.jpg",
+                    },
+                    {
+                        "timestamp": 420,
+                        "description": "Request flow animation",
+                        "keyframe_url": "https://example.com/video/arch/frame_420.jpg",
+                    },
+                    {
+                        "timestamp": 540,
+                        "description": "Scaling considerations diagram",
+                        "keyframe_url": "https://example.com/video/arch/frame_540.jpg",
+                    },
                 ],
                 "transcript": "Let me walk through our architecture... starting with the API gateway... auth service handles all token operations... Redis for caching and blacklists... here's how a request flows through...",
             },
@@ -290,7 +391,6 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             "recorded_at": "2024-01-18T11:00:00Z",
         },
     },
-
     # === STRUCTURED DATA PAGES ===
     "data_api_metrics": {
         "modality": "structured",
@@ -298,10 +398,34 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             0: {
                 "period": "2024-01-15 to 2024-01-21",
                 "endpoints": {
-                    "/auth/login": {"requests": 45230, "p50_ms": 120, "p95_ms": 340, "p99_ms": 890, "error_rate": 0.02},
-                    "/auth/refresh": {"requests": 12450, "p50_ms": 45, "p95_ms": 95, "p99_ms": 210, "error_rate": 0.001},
-                    "/api/users": {"requests": 89340, "p50_ms": 35, "p95_ms": 80, "p99_ms": 150, "error_rate": 0.005},
-                    "/api/orders": {"requests": 156780, "p50_ms": 55, "p95_ms": 120, "p99_ms": 280, "error_rate": 0.008},
+                    "/auth/login": {
+                        "requests": 45230,
+                        "p50_ms": 120,
+                        "p95_ms": 340,
+                        "p99_ms": 890,
+                        "error_rate": 0.02,
+                    },
+                    "/auth/refresh": {
+                        "requests": 12450,
+                        "p50_ms": 45,
+                        "p95_ms": 95,
+                        "p99_ms": 210,
+                        "error_rate": 0.001,
+                    },
+                    "/api/users": {
+                        "requests": 89340,
+                        "p50_ms": 35,
+                        "p95_ms": 80,
+                        "p99_ms": 150,
+                        "error_rate": 0.005,
+                    },
+                    "/api/orders": {
+                        "requests": 156780,
+                        "p50_ms": 55,
+                        "p95_ms": 120,
+                        "p99_ms": 280,
+                        "error_rate": 0.008,
+                    },
                 },
                 "total_requests": 303800,
                 "availability": 99.94,
@@ -365,13 +489,15 @@ def build_manifest(working_set_ids: list[str], all_page_ids: list[str]) -> dict:
                 tokens_est = len(content) // 4
             else:
                 tokens_est = len(str(content)) // 4
-            working_set.append({
-                "page_id": page_id,
-                "modality": page["modality"],
-                "level": 0 if 0 in page["levels"] else 2,
-                "tokens_est": tokens_est,
-                "importance": 0.8,
-            })
+            working_set.append(
+                {
+                    "page_id": page_id,
+                    "modality": page["modality"],
+                    "level": 0 if 0 in page["levels"] else 2,
+                    "tokens_est": tokens_est,
+                    "importance": 0.8,
+                }
+            )
 
     available_pages = []
     for page_id in all_page_ids:
@@ -383,14 +509,20 @@ def build_manifest(working_set_ids: list[str], all_page_ids: list[str]) -> dict:
             # Get summary-level content for hint
             hint_content = page["levels"].get(2, page["levels"].get(0, ""))
             if isinstance(hint_content, str):
-                hint = hint_content[:80] + "..." if len(hint_content) > 80 else hint_content
+                hint = (
+                    hint_content[:80] + "..."
+                    if len(hint_content) > 80
+                    else hint_content
+                )
             else:
                 hint = str(hint_content)[:80]
 
             # Build level descriptions for this page
             level_hints = get_level_hints(modality)
             levels_available = sorted(page["levels"].keys())
-            level_info = {lvl: level_hints.get(lvl, f"level {lvl}") for lvl in levels_available}
+            level_info = {
+                lvl: level_hints.get(lvl, f"level {lvl}") for lvl in levels_available
+            }
 
             # Add modality-specific metadata hints
             extra_info = {}
@@ -412,14 +544,16 @@ def build_manifest(working_set_ids: list[str], all_page_ids: list[str]) -> dict:
                 if "schema" in meta:
                     extra_info["schema"] = meta["schema"]
 
-            available_pages.append({
-                "page_id": page_id,
-                "modality": modality,
-                "tier": page["tier"],
-                "levels": level_info,  # Now includes what each level provides
-                "hint": hint,
-                **extra_info,
-            })
+            available_pages.append(
+                {
+                    "page_id": page_id,
+                    "modality": modality,
+                    "tier": page["tier"],
+                    "levels": level_info,  # Now includes what each level provides
+                    "hint": hint,
+                    **extra_info,
+                }
+            )
 
     return {
         "session_id": "demo_session_001",
@@ -476,7 +610,9 @@ def build_context(working_set_ids: list[str]) -> str:
             elif modality == "image":
                 caption = page["levels"].get(2, "No caption")
                 dims = meta.get("dimensions", [0, 0])
-                lines.append(f'{prefix} ({page_id}): [IMAGE: {dims[0]}x{dims[1]}, "{caption[:100]}..."]')
+                lines.append(
+                    f'{prefix} ({page_id}): [IMAGE: {dims[0]}x{dims[1]}, "{caption[:100]}..."]'
+                )
 
             elif modality == "audio":
                 summary = page["levels"].get(2, "No summary")
@@ -484,7 +620,9 @@ def build_context(working_set_ids: list[str]) -> str:
                 speakers = meta.get("speakers", [])
                 mins = duration // 60
                 secs = duration % 60
-                lines.append(f'{prefix} ({page_id}): [AUDIO: {mins}:{secs:02d}, speakers: {", ".join(speakers)}, "{summary[:80]}..."]')
+                lines.append(
+                    f'{prefix} ({page_id}): [AUDIO: {mins}:{secs:02d}, speakers: {", ".join(speakers)}, "{summary[:80]}..."]'
+                )
 
             elif modality == "video":
                 summary = page["levels"].get(2, "No summary")
@@ -492,15 +630,19 @@ def build_context(working_set_ids: list[str]) -> str:
                 dims = meta.get("dimensions", [0, 0])
                 mins = duration // 60
                 secs = duration % 60
-                lines.append(f'{prefix} ({page_id}): [VIDEO: {mins}:{secs:02d}, {dims[0]}x{dims[1]}, "{summary[:80]}..."]')
+                lines.append(
+                    f'{prefix} ({page_id}): [VIDEO: {mins}:{secs:02d}, {dims[0]}x{dims[1]}, "{summary[:80]}..."]'
+                )
 
             elif modality == "structured":
                 summary = page["levels"].get(2, "No summary")
                 schema = meta.get("schema", "unknown")
-                lines.append(f'{prefix} ({page_id}): [DATA: schema={schema}, "{summary[:100]}..."]')
+                lines.append(
+                    f'{prefix} ({page_id}): [DATA: schema={schema}, "{summary[:100]}..."]'
+                )
 
             else:
-                lines.append(f'{prefix} ({page_id}): [UNKNOWN MODALITY: {modality}]')
+                lines.append(f"{prefix} ({page_id}): [UNKNOWN MODALITY: {modality}]")
 
     return "\n".join(lines)
 
@@ -618,7 +760,9 @@ def handle_page_fault(page_id: str, target_level: int) -> dict:
             content_obj = {
                 "summary": content,
                 "duration_seconds": meta.get("duration_seconds"),
-                "scene_count": len(page["levels"].get(1, {}).get("scenes", [])) if isinstance(page["levels"].get(1), dict) else 0,
+                "scene_count": len(page["levels"].get(1, {}).get("scenes", []))
+                if isinstance(page["levels"].get(1), dict)
+                else 0,
             }
 
     elif modality == "structured":
@@ -648,7 +792,11 @@ def handle_page_fault(page_id: str, target_level: int) -> dict:
             "meta": {
                 "source_tier": page["tier"],
                 "available_levels": available_levels,
-                **{k: v for k, v in meta.items() if k not in ["source_tier", "available_levels"]},
+                **{
+                    k: v
+                    for k, v in meta.items()
+                    if k not in ["source_tier", "available_levels"]
+                },
             },
         },
         "effects": {
@@ -659,7 +807,9 @@ def handle_page_fault(page_id: str, target_level: int) -> dict:
     }
 
 
-def handle_search_pages(query: str, modality: Optional[str] = None, limit: int = 5) -> dict:
+def handle_search_pages(
+    query: str, modality: Optional[str] = None, limit: int = 5
+) -> dict:
     """Handle a search_pages tool call."""
     results = []
     query_lower = query.lower()
@@ -672,14 +822,16 @@ def handle_search_pages(query: str, modality: Optional[str] = None, limit: int =
         content = page["levels"].get(2, page["levels"].get(0, ""))
         if query_lower in content.lower() or query_lower in page_id.lower():
             hint = content[:50] + "..." if len(content) > 50 else content
-            results.append({
-                "page_id": page_id,
-                "modality": page["modality"],
-                "tier": page["tier"],
-                "levels": list(page["levels"].keys()),
-                "hint": hint,
-                "relevance": 0.8,  # Simplified
-            })
+            results.append(
+                {
+                    "page_id": page_id,
+                    "modality": page["modality"],
+                    "tier": page["tier"],
+                    "levels": list(page["levels"].keys()),
+                    "hint": hint,
+                    "relevance": 0.8,  # Simplified
+                }
+            )
 
     # Sort by relevance and limit
     results = sorted(results, key=lambda x: x["relevance"], reverse=True)[:limit]
@@ -711,10 +863,12 @@ def process_tool_calls(tool_calls: list) -> list[dict]:
         else:
             result = {"error": f"Unknown tool: {func_name}"}
 
-        results.append({
-            "tool_call_id": tool_call.id,
-            "content": json.dumps(result),
-        })
+        results.append(
+            {
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result),
+            }
+        )
 
     return results
 
@@ -767,7 +921,10 @@ VM_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "page_id": {"type": "string", "description": "ID of the page to load"},
+                    "page_id": {
+                        "type": "string",
+                        "description": "ID of the page to load",
+                    },
                     "target_level": {
                         "type": "integer",
                         "minimum": 0,
@@ -844,9 +1001,9 @@ async def run_openai_demo(user_query: str, model: str = "gpt-4o"):
         {"role": "user", "content": user_query},
     ]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"USER: {user_query}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\nWorking set: {working_set}")
     print(f"Available pages: {[p for p in all_pages if p not in working_set]}")
 
@@ -862,7 +1019,9 @@ async def run_openai_demo(user_query: str, model: str = "gpt-4o"):
 
     # Handle tool calls loop
     while message.tool_calls:
-        print(f"\n--- Turn {turn}: Model requested {len(message.tool_calls)} page fault(s) ---")
+        print(
+            f"\n--- Turn {turn}: Model requested {len(message.tool_calls)} page fault(s) ---"
+        )
 
         for tc in message.tool_calls:
             args = json.loads(tc.function.arguments)
@@ -872,30 +1031,39 @@ async def run_openai_demo(user_query: str, model: str = "gpt-4o"):
         tool_results = process_tool_calls(message.tool_calls)
 
         # Add assistant message with tool calls
-        messages.append({
-            "role": "assistant",
-            "content": message.content,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                }
-                for tc in message.tool_calls
-            ],
-        })
+        messages.append(
+            {
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in message.tool_calls
+                ],
+            }
+        )
 
         # Add tool results
         for result in tool_results:
-            messages.append({
-                "role": "tool",
-                "tool_call_id": result["tool_call_id"],
-                "content": result["content"],
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": result["tool_call_id"],
+                    "content": result["content"],
+                }
+            )
             # Show what was loaded
             loaded = json.loads(result["content"])
             if "page" in loaded:
-                print(f"  ← Loaded {loaded['page']['page_id']} at level {loaded['page']['level']}")
+                print(
+                    f"  ← Loaded {loaded['page']['page_id']} at level {loaded['page']['level']}"
+                )
 
         # Next API call
         response = client.chat.completions.create(
@@ -912,9 +1080,9 @@ async def run_openai_demo(user_query: str, model: str = "gpt-4o"):
             break
 
     # Final response
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"ASSISTANT:\n{message.content}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Show metrics
     fault_count = sum(1 for m in messages if m.get("role") == "tool")
@@ -969,9 +1137,9 @@ async def run_anthropic_demo(user_query: str, model: str = "claude-sonnet-4-2025
 
     messages = [{"role": "user", "content": user_query}]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"USER: {user_query}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     response = client.messages.create(
         model=model,
@@ -998,7 +1166,9 @@ async def run_anthropic_demo(user_query: str, model: str = "claude-sonnet-4-2025
             print(f"  → {tu.name}({tu.input})")
 
             if tu.name == "page_fault":
-                result = handle_page_fault(tu.input["page_id"], tu.input.get("target_level", 2))
+                result = handle_page_fault(
+                    tu.input["page_id"], tu.input.get("target_level", 2)
+                )
             elif tu.name == "search_pages":
                 result = handle_search_pages(
                     tu.input["query"],
@@ -1008,14 +1178,18 @@ async def run_anthropic_demo(user_query: str, model: str = "claude-sonnet-4-2025
             else:
                 result = {"error": f"Unknown tool: {tu.name}"}
 
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tu.id,
-                "content": json.dumps(result),
-            })
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tu.id,
+                    "content": json.dumps(result),
+                }
+            )
 
             if "page" in result:
-                print(f"  ← Loaded {result['page']['page_id']} at level {result['page']['level']}")
+                print(
+                    f"  ← Loaded {result['page']['page_id']} at level {result['page']['level']}"
+                )
 
         messages.append({"role": "user", "content": tool_results})
 
@@ -1036,9 +1210,9 @@ async def run_anthropic_demo(user_query: str, model: str = "claude-sonnet-4-2025
         block.text for block in response.content if hasattr(block, "text")
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"ASSISTANT:\n{final_text}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 async def run_ollama_demo(user_query: str, model: str = "llama3.2"):
@@ -1080,9 +1254,9 @@ async def run_ollama_demo(user_query: str, model: str = "llama3.2"):
         {"role": "user", "content": user_query},
     ]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"USER: {user_query}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\nNote: Ollama tool support varies by model. Using {model}.")
 
     try:
@@ -1093,9 +1267,9 @@ async def run_ollama_demo(user_query: str, model: str = "llama3.2"):
         )
 
         message = response.choices[0].message
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"ASSISTANT:\n{message.content}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     except Exception as e:
         print(f"Error: {e}")

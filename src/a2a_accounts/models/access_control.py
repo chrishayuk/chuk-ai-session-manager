@@ -1,14 +1,15 @@
 # a2a_accounts/models/access_control.py
 from __future__ import annotations
-from typing import Any, Dict, Set
-from uuid import uuid4
+from typing import Set
 from pydantic import BaseModel, Field
 
 # session mananager imports
 from a2a_accounts.models.access_levels import AccessLevel
 
+
 class AccessControlled(BaseModel):
     """Mixin for access control."""
+
     account_id: str
     access_level: AccessLevel = AccessLevel.PRIVATE
     shared_with: Set[str] = Field(default_factory=set)

@@ -456,7 +456,8 @@ class RuntimeLimits(BaseModel):
     tool_budget_total: int = Field(default=15)
 
     # Per-tool caps (anti-thrash)
-    per_tool_cap: int = Field(default=3)
+    # Set to 0 or negative to disable per-tool limits
+    per_tool_cap: int = Field(default=0)
 
     # Cache behavior
     cache_scope: CacheScope = Field(default=CacheScope.TURN)
@@ -475,7 +476,7 @@ class RuntimeLimits(BaseModel):
             discovery_budget=6,
             execution_budget=15,
             tool_budget_total=20,
-            per_tool_cap=5,
+            per_tool_cap=0,  # Unlimited per-tool calls
             cache_scope=CacheScope.TURN,
             require_bindings=EnforcementLevel.WARN,
             ungrounded_grace_calls=2,
@@ -489,7 +490,7 @@ class RuntimeLimits(BaseModel):
             discovery_budget=4,
             execution_budget=10,
             tool_budget_total=12,
-            per_tool_cap=3,
+            per_tool_cap=0,  # Unlimited per-tool calls
             cache_scope=CacheScope.TURN,
             require_bindings=EnforcementLevel.BLOCK,
             ungrounded_grace_calls=0,

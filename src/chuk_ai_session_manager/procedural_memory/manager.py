@@ -67,7 +67,9 @@ class ToolMemoryManager(BaseModel):
         return cls(memory=memory, **kwargs)
 
     @classmethod
-    async def from_session(cls, session: "Session", **kwargs: Any) -> "ToolMemoryManager":
+    async def from_session(
+        cls, session: "Session", **kwargs: Any
+    ) -> "ToolMemoryManager":
         """
         Load procedural memory from a session's state.
 

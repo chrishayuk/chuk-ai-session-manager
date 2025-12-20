@@ -16,6 +16,8 @@
 | Checkpoint consistency | ❌ None | ✅ Point-in-time snapshots |
 | Tools as memory writers | ❌ External | ✅ First-class page creators/mutators |
 | Streaming fault handling | ❌ Block or fail | ✅ Speculative placeholders, async upgrade |
+| Distinct content types | ❌ Everything is chunks | ✅ Transcript vs derived vs claims |
+| Provenance tracking | ❌ Lost on retrieval | ✅ Claims cite source pages |
 
 **Core difference in one sentence:**
 > RAG optimizes *retrieval*. AI Virtual Memory *virtualizes memory*.
@@ -65,16 +67,45 @@ Just as operating systems virtualize physical memory to give processes the illus
 | Tier | Name | Latency | Capacity | Content | Implementation |
 |------|------|---------|----------|---------|----------------|
 | L0 | Registers | 0ms | ~128K tokens | Active prompt window | In-memory list |
-| L1 | Cache | <10ms | ~1M tokens | Recent messages, hot pages | Session.state |
-| L2 | RAM | <100ms | ~100M tokens | Full session events | chuk-sessions |
+| L1 | Cache | <10ms | ~1M tokens | **Derived materializations** (summaries, claims, packed context) | Session.state |
+| L2 | RAM | <100ms | ~100M tokens | **Authoritative event store** (append-only session events, tool results) | chuk-sessions |
 | L3 | Disk | <1s | ~10GB | Artifacts, media, checkpoints | chuk-artifacts (vfs-filesystem) |
 | L4 | Cold | 1-10s | Unlimited | Archives, old sessions | chuk-artifacts (vfs-s3) |
+
+### L1/L2 Contract (Critical)
+
+**L2 is source-of-truth.** Append-only event log of everything that happened:
+- User messages, assistant responses, tool calls/results
+- Never mutated, only appended
+- Coherency is guaranteed because it's immutable
+
+**L1 is derived.** Materialized views that can be rebuilt from L2:
+- Summaries, extracted claims, packed context
+- Dirty tracking is about L1 pages that haven't been persisted yet
+- If L1 is lost, rebuild from L2
+
+This makes coherency tractable: L2 is the log, L1 is the cache.
 
 ---
 
 ## Phase 1: Foundations (v0.8)
 
-### 1.1 MemoryPage Model
+### 1.1 Page Type Taxonomy
+
+Not all pages are equal. Different page types have different eviction/compression rules:
+
+| Page Type | Description | Eviction Priority | Compression |
+|-----------|-------------|-------------------|-------------|
+| `transcript` | Raw turns, tool outputs | Normal | Full → Summary → Reference |
+| `summary` | LLM-generated summaries | Low (derived, rebuildable) | Already compressed |
+| `artifact` | Tool-created content | Normal | Type-dependent |
+| `claim` | Decisions, facts, conclusions | **Very Low** (high-value, referenced constantly) | Rarely compressed |
+| `procedure` | "When calling tool X, we do Y" | Low | Rarely compressed |
+| `index` | Page metadata for search | Very Low | Never compressed |
+
+**Why `claim` pages matter**: Without first-class claims, high-value decisions get buried in summaries and you pay fault/compression costs repeatedly. Claims are token-cheap, high-importance, and have explicit provenance back to source pages.
+
+### 1.2 MemoryPage Model
 Core abstraction representing any piece of content across modalities.
 
 ```python
@@ -83,12 +114,22 @@ class MemoryPage(BaseModel):
     modality: Literal["text", "image", "audio", "video", "structured"]
     storage_tier: Literal["L0", "L1", "L2", "L3", "L4"]
 
+    # Page type (critical for eviction/compression decisions)
+    page_type: Literal["transcript", "summary", "artifact", "claim", "procedure", "index"]
+
+    # Provenance: what pages justify this one (for claims, summaries)
+    provenance: List[str] = []  # page_ids that this page derives from
+
+    # Representation linking (for compression chain)
+    represents: Optional[str] = None  # page_id this is a compressed version of
+    representation_level: int = 0     # 0=full, 1=reduced, 2=abstract, 3=reference
+
     # Content or reference
     content: Optional[Any] = None
     artifact_id: Optional[str] = None
 
-    # Multi-resolution representations
-    representations: Dict[CompressionLevel, str] = {}
+    # Multi-resolution representations (artifact_ids for each level)
+    representations: Dict[int, str] = {}  # level -> artifact_id
 
     # Access tracking
     size_bytes: int
@@ -104,7 +145,40 @@ class MemoryPage(BaseModel):
     dimensions: Optional[Tuple[int, int]] = None  # image/video
 ```
 
-### 1.2 PageTableEntry (with dirty tracking)
+#### Claim Page Example
+
+```python
+# When user says "Let's use PostgreSQL for the database"
+claim_page = MemoryPage(
+    page_id="claim_db_choice_001",
+    page_type="claim",
+    modality="text",
+    content="Decision: Use PostgreSQL for the database",
+    provenance=["msg_042", "msg_043"],  # The messages where this was decided
+    importance=0.95,  # High importance = low eviction priority
+    size_tokens=12,   # Token-cheap
+)
+```
+
+#### Procedure Page Example
+
+```python
+# Learned pattern: "When calling weather_tool, we usually load location claims first"
+procedure_page = MemoryPage(
+    page_id="proc_weather_pattern_001",
+    page_type="procedure",
+    modality="structured",
+    content={
+        "tool": "weather_tool",
+        "prereqs": ["claim_location_*"],
+        "typical_pages_read": ["msg_user_location", "claim_timezone"],
+    },
+    provenance=["tool_trace_087", "tool_trace_092"],
+    importance=0.8,
+)
+```
+
+### 1.3 PageTableEntry (with dirty tracking)
 Core metadata for each page - includes dirty bit from day one.
 
 ```python
@@ -126,7 +200,7 @@ class PageTableEntry(BaseModel):
     affinity: Literal["local", "remote", "shared"] = "local"
 ```
 
-### 1.3 PageTable
+### 1.4 PageTable
 Maps page IDs to their current location and state.
 
 ```python
@@ -142,7 +216,7 @@ class PageTable:
     async def get_by_tier(self, tier: str) -> List[PageTableEntry]
 ```
 
-### 1.4 TLB (Translation Lookaside Buffer)
+### 1.5 TLB (Translation Lookaside Buffer)
 Fast cache for recent page lookups - avoids PageTable + storage hops.
 
 ```python
@@ -168,7 +242,7 @@ class PageTLB:
         """Clear entire TLB (on checkpoint/context switch)"""
 ```
 
-### 1.5 Compression Levels
+### 1.6 Compression Levels
 Define standard compression levels per modality.
 
 | Level | Text | Image | Audio | Video |
@@ -178,11 +252,54 @@ Define standard compression levels per modality.
 | 2 (Abstract) | Key points only | Caption + embedding | Summary + key quotes | Scene descriptions |
 | 3 (Reference) | Topic tags | "image:{id}" | Duration + topic | "video:{id}" |
 
-### 1.6 Deliverables
-- [ ] `MemoryPage` model in `memory/models.py`
+### 1.7 Context Pack Cache
+
+The TLB caches address translations. But in LLM terms, the expensive part is often:
+- Selecting pages
+- Choosing compression levels
+- Rendering into `VM:CONTEXT`
+
+Add a cache for the *packed context output*:
+
+```python
+class ContextPackCache:
+    """
+    Cache packed context to avoid re-packing on small incremental turns.
+    Invalidate on working set changes.
+    """
+    max_entries: int = 32
+
+    def get(
+        self,
+        session_id: str,
+        model_id: str,
+        token_budget: int,
+        working_set_hash: str,  # Hash of page_ids + versions in working set
+    ) -> Optional[PackedContext]:
+        """O(1) lookup for cached pack"""
+
+    def put(
+        self,
+        session_id: str,
+        model_id: str,
+        token_budget: int,
+        working_set_hash: str,
+        packed: PackedContext,
+    ) -> None:
+        """Store packed context, evict LRU if full"""
+
+    def invalidate_session(self, session_id: str) -> None:
+        """Invalidate all cached packs for session (on working set change)"""
+```
+
+This drastically reduces overhead for "small incremental turns" - user says something short, assistant responds, no pages changed, reuse the pack.
+
+### 1.8 Deliverables
+- [ ] `MemoryPage` model with `page_type` and `provenance` in `memory/models.py`
 - [ ] `PageTableEntry` with dirty tracking
 - [ ] `PageTable` class in `memory/page_table.py`
 - [ ] `PageTLB` class in `memory/tlb.py`
+- [ ] `ContextPackCache` class in `memory/pack_cache.py`
 - [ ] `CompressionLevel` enum and per-modality schemas
 - [ ] Unit tests for page lifecycle
 
@@ -218,13 +335,152 @@ class TokenBudget:
     available: int
 ```
 
-### 2.3 Access Pattern Tracking
+### 2.3 Pinned Pages
+
+Some pages should never be evicted. These form the "stable context" the model relies on.
+
+```python
+class PinnedSet:
+    """
+    Pages that are never evicted from working set.
+    Pinning prevents thrash on critical context.
+    """
+    pinned: Set[str]  # page_ids
+
+    # Auto-pinned by default:
+    # - System prompt page
+    # - Active goal/plan page
+    # - User preferences page
+    # - Current tool schemas (see ABI)
+    # - Last N turns (configurable, typically 2-4)
+
+    def pin(self, page_id: str) -> None
+    def unpin(self, page_id: str) -> None
+    def is_pinned(self, page_id: str) -> bool
+```
+
+Default pinned set (configurable):
+- System prompt
+- Active plan/goals
+- User preferences
+- Last 3 turns (user + assistant pairs)
+- Current tool schemas
+
+### 2.4 Anti-Thrash Protection
+
+OS working sets fail when you thrash. LLM working sets thrash when user toggles between topics.
+
+```python
+class AntiThrashPolicy:
+    """
+    Prevent evicting pages that were just faulted in.
+    """
+    # Recently-evicted pages get a "do not evict again" window
+    eviction_cooldown_turns: int = 3
+
+    # Recently-faulted pages get temporary protection
+    fault_protection_turns: int = 2
+
+    # Track eviction/fault history
+    eviction_history: Dict[str, int]  # page_id -> turn_evicted
+    fault_history: Dict[str, int]     # page_id -> turn_faulted
+
+    def can_evict(self, page_id: str, current_turn: int) -> bool:
+        """Check if page is in cooldown period"""
+        if page_id in self.fault_history:
+            if current_turn - self.fault_history[page_id] < self.fault_protection_turns:
+                return False
+        return True
+
+    def get_eviction_penalty(self, page_id: str, current_turn: int) -> float:
+        """Higher penalty = less likely to evict"""
+        # Recently faulted = high penalty
+        # Recently evicted = high penalty (avoid re-evicting)
+```
+
+This is the difference between "looks good on paper" and "feels stable in chat".
+
+### 2.5 Access Pattern Tracking
 - LRU tracking per page
 - Frequency counting (LFU hybrid)
 - Importance scoring (user-marked, referenced by tools)
+- **Topic affinity**: Pages accessed together get co-eviction bonus
 
-### 2.4 Deliverables
-- [ ] `WorkingSetManager` class
+### 2.6 Simple Prefetch Heuristics (v0.9)
+
+Don't wait for ML prediction. Start with dumb heuristics that work:
+
+```python
+class SimplePrefetcher:
+    """
+    Basic prefetch that doesn't need prediction models.
+    Good enough for v0.9.
+    """
+    async def prefetch_on_turn_start(self, session_id: str) -> List[str]:
+        pages_to_prefetch = []
+
+        # 1. Last segment summary (almost always needed for "what did we discuss")
+        pages_to_prefetch.append(await self.get_last_segment_summary(session_id))
+
+        # 2. Most-referenced claim pages (high access_count claims)
+        pages_to_prefetch.extend(await self.get_top_claims(session_id, limit=3))
+
+        # 3. Tool traces for likely tools (based on recent tool usage)
+        likely_tools = await self.get_likely_tools(session_id)
+        for tool in likely_tools:
+            pages_to_prefetch.extend(await self.get_tool_prereq_pages(tool))
+
+        return pages_to_prefetch
+```
+
+### 2.7 Lite Mutation Log (v0.9)
+
+Start event-sourcing early (not full time-travel, but enough to debug and replay):
+
+```python
+class MutationLogLite:
+    """
+    Append-only log of page operations.
+    Not full event-sourcing, but enough for:
+    - Debugging: "what was in context for turn T?"
+    - Replay: Reconstruct state for testing
+    - Grounding story: Prove what the model saw
+    """
+
+    async def append(self, mutation: PageMutation) -> None:
+        """Append mutation to log"""
+
+    async def get_context_at_turn(self, session_id: str, turn: int) -> List[str]:
+        """Replay: what page_ids were in L0 at turn T?"""
+
+    async def get_history(self, page_id: str) -> List[PageMutation]:
+        """All mutations for a page"""
+
+class PageMutation(BaseModel):
+    """Immutable record of a page change"""
+    mutation_id: str
+    page_id: str
+    timestamp: datetime
+    turn: int
+    mutation_type: Literal["create", "fault_in", "evict", "compress", "pin", "unpin"]
+
+    # Context at mutation time
+    tier_before: Optional[str]
+    tier_after: str
+
+    # Who caused it
+    actor: Literal["user", "model", "tool", "system"]
+    cause: Optional[str]  # "eviction_pressure", "page_fault", "explicit_request"
+```
+
+This is gold for debugging agent weirdness and supports the strict grounding story.
+
+### 2.8 Deliverables
+- [ ] `WorkingSetManager` class with pinning support
+- [ ] `PinnedSet` management
+- [ ] `AntiThrashPolicy` implementation
+- [ ] `SimplePrefetcher` with basic heuristics
+- [ ] `MutationLogLite` for debugging/replay
 - [ ] `TokenBudget` model with modality breakdown
 - [ ] Access pattern tracking integration
 - [ ] Working set size configuration per model
@@ -282,13 +538,72 @@ class StreamingFaultHandler:
         """
 ```
 
-### 3.3 Lazy Loading Strategies
+### 3.3 Fault Policies
+
+The real failure mode isn't "can't load a page" - it's the model spiraling into repeated faults because it's unsure.
+
+```python
+class FaultPolicy:
+    """
+    Guardrails to prevent fault spirals and budget blowouts.
+    """
+    # Existing
+    max_faults_per_turn: int = 3
+
+    # NEW: Token budget for fault resolution
+    max_fault_tokens_per_turn: int = 8192  # Don't let faults blow the budget
+
+    # NEW: Confidence threshold - only fault if explicitly needed
+    fault_confidence_threshold: Literal["explicit", "referenced", "speculative"] = "referenced"
+    # explicit: Only fault when page_id is directly requested
+    # referenced: Fault if page content is referenced/needed
+    # speculative: Fault on potential relevance (aggressive)
+
+    # NEW: Track fault intent for metrics
+    def validate_fault(
+        self,
+        page_id: str,
+        reason: FaultReason,
+        tokens_used_this_turn: int,
+    ) -> bool:
+        """Check if fault is allowed under current policy"""
+        if tokens_used_this_turn + estimated_tokens > self.max_fault_tokens_per_turn:
+            return False
+        if self.fault_confidence_threshold == "explicit" and reason != "user_requested":
+            return False
+        return True
+
+class FaultReason(str, Enum):
+    """Make fault intent explicit for measurement"""
+    USER_REQUESTED_RECALL = "user_requested_recall"  # "What did we say about X?"
+    RESOLVE_REFERENCE = "resolve_reference"          # Model references page_id
+    TOOL_PREREQUISITE = "tool_prereq"                # Tool needs this page
+    SPECULATIVE = "speculative"                      # Might be relevant
+```
+
+#### Fault Request with Intent
+
+```python
+# Updated page_fault tool call
+page_fault(
+    page_id: str,
+    target_level: int = 2,
+    reason: FaultReason = "resolve_reference"  # NEW: explicit intent
+)
+```
+
+This enables:
+- Measuring *why* faults happen, not just *how many*
+- Distinguishing good faults (user asked) from bad faults (model guessing)
+- Tuning policies based on fault reason success rates
+
+### 3.4 Lazy Loading Strategies
 - **On-demand**: Load when explicitly referenced
 - **Predictive**: Prefetch based on access patterns
 - **Contextual**: Load related pages (same session segment)
 - **Speculative**: Start loading on reference detection, use placeholder if not ready
 
-### 3.4 ArtifactsBridge
+### 3.5 ArtifactsBridge
 Integration layer with chuk-artifacts.
 
 ```python
@@ -301,12 +616,14 @@ class ArtifactsBridge:
     async def checkpoint_pages(self, page_ids: List[str], name: str) -> str
 ```
 
-### 3.5 Deliverables
+### 3.6 Deliverables
 - [ ] `PageFaultHandler` class
+- [ ] `FaultPolicy` with token budget and confidence threshold
+- [ ] `FaultReason` enum for intent tracking
 - [ ] `StreamingFaultHandler` with `DeferredPage`
 - [ ] `ArtifactsBridge` integration
 - [ ] Lazy loading configuration
-- [ ] Fault metrics and logging
+- [ ] Fault metrics and logging (with reason breakdown)
 
 ---
 
@@ -436,8 +753,12 @@ class MemoryABI(BaseModel):
 
     # Constraints
     max_context_tokens: int
-    reserved_tokens: int  # System prompt, tools, etc.
+    reserved_tokens: int  # System prompt, etc.
     available_tokens: int
+
+    # NEW: Tool schema budget (often the hidden token hog)
+    tool_schema_tokens_reserved: int = 0  # Tokens consumed by tool definitions
+    active_toolset_hash: Optional[str] = None  # For cache invalidation when tools change
 
     # Preferences
     modality_weights: Dict[str, float] = {
@@ -450,11 +771,33 @@ class MemoryABI(BaseModel):
 class PageManifestEntry(BaseModel):
     page_id: str
     modality: str
+    page_type: str  # NEW: transcript, summary, artifact, claim, procedure, index
     compression_level: int
     tokens: int
     importance: float
+    provenance: List[str] = []  # NEW: source page_ids (for claims/summaries)
     can_evict: bool = True
     can_compress: bool = True
+```
+
+#### Tool Schema as Pinned Pages
+
+In real agent loops, tool schemas are often the hidden token hog. The ABI makes this explicit:
+
+```python
+# Tool schemas should be treated as quasi-pinned pages
+# They're implicitly in context but consume budget
+
+abi = MemoryABI(
+    max_context_tokens=128_000,
+    tool_schema_tokens_reserved=4_500,  # 15 tools @ ~300 tokens each
+    reserved_tokens=2_000,              # System prompt
+    # available_tokens = 128_000 - 4_500 - 2_000 = 121_500 for content
+)
+
+# When tools change, invalidate context pack cache
+if new_toolset_hash != abi.active_toolset_hash:
+    context_pack_cache.invalidate_session(session_id)
 ```
 
 This enables:
@@ -566,34 +909,36 @@ class PageVersion:
 - Version vectors for distributed scenarios
 - User-resolvable conflicts for important content
 
-### 8.4 Event-Sourced Mutations
-All page changes as append-only events for replay and debugging.
+### 8.4 Full Event-Sourced Mutations
+
+Extends `MutationLogLite` from v0.9 with full time-travel capabilities.
 
 ```python
-class PageMutation(BaseModel):
-    """Immutable record of a page change"""
-    mutation_id: str
-    page_id: str
-    timestamp: datetime
-    mutation_type: Literal["create", "update", "compress", "evict", "restore", "delete"]
+class PageMutationFull(PageMutation):
+    """Extended mutation with version tracking"""
 
-    # What changed
+    # What changed (extends lite version)
     previous_version: Optional[str]
     new_version: str
     delta: Optional[Dict[str, Any]]  # For partial updates
 
-    # Who/what caused it
-    actor: Literal["user", "model", "tool", "system"]
+    # Extended actor info
     actor_id: Optional[str]  # tool_name, model_id, etc.
-    cause: Optional[str]  # "eviction_pressure", "explicit_request", etc.
 
-class MutationLog:
-    """Append-only log of all page mutations"""
+class MutationLog(MutationLogLite):
+    """
+    Full mutation log with time-travel.
+    Extends MutationLogLite from v0.9.
+    """
 
-    async def append(self, mutation: PageMutation) -> None
-    async def get_history(self, page_id: str) -> List[PageMutation]
-    async def replay_to(self, page_id: str, timestamp: datetime) -> MemoryPage
-    async def get_mutations_by_actor(self, actor_id: str) -> List[PageMutation]
+    async def replay_to(self, page_id: str, timestamp: datetime) -> MemoryPage:
+        """Reconstruct page state at any point in time"""
+
+    async def get_mutations_by_actor(self, actor_id: str) -> List[PageMutationFull]:
+        """All mutations by a specific tool/model"""
+
+    async def get_context_diff(self, turn_a: int, turn_b: int) -> ContextDiff:
+        """What changed in context between turns?"""
 ```
 
 This enables:
@@ -1315,6 +1660,8 @@ class MemoryConfig:
 
 ## Success Metrics
 
+### Core Performance Metrics
+
 | Metric | Target | Description |
 |--------|--------|-------------|
 | Fault rate | < 5% | Percentage of accesses requiring tier promotion |
@@ -1323,6 +1670,70 @@ class MemoryConfig:
 | Prefetch hit rate | > 60% | Prefetched pages actually used |
 | P95 fault latency | < 500ms | Time to resolve page fault |
 | Memory overhead | < 10% | Metadata vs. content size |
+
+### User Experience Metrics (Most Important)
+
+These tell you whether the system "feels good" to users:
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| **Recall success rate** | > 95% | When user asks "what did we say about X?", answer correctly without correction |
+| **Thrash index** | < 0.5 | Faults per turn *after the first fault* in same topic window |
+| **Effective tokens delivered** | > 60% | Tokens in context that are actually referenced in the answer |
+
+```python
+class UserExperienceMetrics:
+    """
+    Metrics that correlate with user satisfaction.
+    """
+
+    def recall_success_rate(self, session_id: str) -> float:
+        """
+        Track: user asks recall question → assistant answers → user confirms/corrects
+        Success = no correction needed
+        """
+        recall_attempts = self.get_recall_attempts(session_id)
+        successes = sum(1 for r in recall_attempts if not r.user_corrected)
+        return successes / len(recall_attempts) if recall_attempts else 1.0
+
+    def thrash_index(self, session_id: str, window_turns: int = 5) -> float:
+        """
+        Faults after first fault in a topic window.
+        Low = stable working set. High = constantly missing what we need.
+
+        Thrash index = (total_faults - unique_first_faults) / turns
+        """
+        faults = self.get_faults_in_window(session_id, window_turns)
+        first_faults = set()
+        thrash_faults = 0
+        for fault in faults:
+            topic = self.get_topic(fault.page_id)
+            if topic not in first_faults:
+                first_faults.add(topic)
+            else:
+                thrash_faults += 1
+        return thrash_faults / window_turns
+
+    def effective_tokens_ratio(self, turn_id: str) -> float:
+        """
+        What fraction of context tokens actually contributed to the answer?
+        Track by seeing which page_ids are cited or clearly used.
+        """
+        context_tokens = self.get_context_tokens(turn_id)
+        referenced_tokens = self.get_referenced_tokens(turn_id)
+        return referenced_tokens / context_tokens if context_tokens else 0.0
+```
+
+### Fault Reason Breakdown
+
+Track *why* faults happen to tune policies:
+
+| Reason | Expected % | Red Flag If |
+|--------|------------|-------------|
+| `user_requested_recall` | 40-60% | < 20% (model faulting too speculatively) |
+| `resolve_reference` | 20-40% | > 60% (poor working set selection) |
+| `tool_prereq` | 10-20% | > 40% (tools not getting needed pages) |
+| `speculative` | < 10% | > 20% (wasting budget on guesses) |
 
 ---
 
@@ -1369,6 +1780,14 @@ class MemoryPage(BaseModel):
     modality: Literal["text"] = "text"  # v0.8: text only
     storage_tier: Literal["L0", "L1", "L2", "L3"]
     compression_level: int = 0
+
+    # Page type from day one (critical for eviction/compression)
+    page_type: Literal["transcript", "summary", "artifact", "claim"] = "transcript"
+
+    # Provenance from day one (linked representations)
+    provenance: List[str] = []  # page_ids this derives from
+    represents: Optional[str] = None  # page_id this is a compressed version of
+
     content: Optional[str] = None
     artifact_id: Optional[str] = None
     size_bytes: int
@@ -1382,6 +1801,7 @@ class MemoryPage(BaseModel):
 class PageTableEntry(BaseModel):
     page_id: str
     tier: str
+    page_type: str  # NEW: for eviction decisions
     artifact_id: Optional[str]
     compression_level: int
     dirty: bool = False
@@ -1437,8 +1857,8 @@ class SessionManager:
 | NUMA / locality | Only matters at scale with distributed storage |
 | Copy-on-write | Optimization, not core functionality |
 | Garbage collection | Can manually clean up initially |
-| Event sourcing / mutations | Nice for debugging, not blocking |
-| Prefetch / prediction | Optimization, measure fault rate first |
+| Full event sourcing | Lite version in v0.9, full time-travel in v0.15 |
+| ML-based prefetch | Simple heuristics in v0.9, ML prediction in v0.13 |
 
 ### v0.8 Success Criteria
 
@@ -1492,6 +1912,98 @@ class SessionManager:
    - "This tool needs 10K tokens of context"
    - "This tool creates large pages"
    - Memory budgeting in tool selection
+
+---
+
+## North Star Acceptance Test
+
+One direct acceptance test that proves the whole system works:
+
+> **A 200+ turn conversation where the user repeatedly says "as we decided earlier…" across 5 topics, and the assistant reliably recalls the *right* decision with page_id citations, while keeping L0 under budget and faulting <2 pages per turn.**
+
+This test instantly reveals whether working-set logic, pinning, anti-thrash, and claim extraction are doing their job.
+
+### Test Scenario
+
+```python
+async def test_north_star_vm_acceptance():
+    """
+    200+ turn conversation across 5 topics with reliable recall.
+    """
+    sm = SessionManager(
+        system_prompt="You are a project planning assistant.",
+        vm_config=VMConfig(
+            max_l0_tokens=32_000,  # Tight budget to force paging
+            faults_allowed=True,
+            max_faults_per_turn=2,
+        )
+    )
+
+    topics = [
+        "database_choice",      # "Let's use PostgreSQL"
+        "api_framework",        # "We'll go with FastAPI"
+        "frontend_stack",       # "React with TypeScript"
+        "deployment_strategy",  # "Kubernetes on GCP"
+        "testing_approach",     # "Pytest with 80% coverage"
+    ]
+
+    # Phase 1: Make decisions (turns 1-50)
+    for i, topic in enumerate(topics):
+        await sm.user_says(f"For {topic}, what should we use?")
+        await sm.ai_responds(f"I recommend X for {topic}...")
+        await sm.user_says(f"Agreed, let's go with X for {topic}")
+        # This should create a claim page
+
+    # Phase 2: Extended discussion (turns 51-150)
+    # Talk about unrelated things to push decisions out of L0
+    for i in range(100):
+        await sm.user_says(f"Tell me about implementation detail {i}")
+        await sm.ai_responds(f"Here's detail {i}...")
+
+    # Phase 3: Recall challenges (turns 151-200)
+    recall_successes = 0
+    total_faults = 0
+
+    for topic in topics:
+        await sm.user_says(f"As we decided earlier, what's our {topic}?")
+        response = await sm.get_last_response()
+
+        # Check: correct recall with citation
+        assert f"[ref: claim_{topic}" in response.content or correct_decision in response.content
+        recall_successes += 1
+
+        # Check: fault count for this turn
+        turn_faults = sm.memory.get_faults_this_turn()
+        assert turn_faults <= 2, f"Too many faults: {turn_faults}"
+        total_faults += turn_faults
+
+    # Assertions
+    assert recall_successes == 5, "Should recall all 5 decisions"
+    assert total_faults <= 10, f"Should fault <= 2 per recall turn, got {total_faults}"
+    assert sm.memory.get_l0_tokens() <= 32_000, "L0 budget exceeded"
+
+    # Thrash index should be low
+    thrash = sm.memory.metrics.thrash_index()
+    assert thrash < 0.5, f"Thrash index too high: {thrash}"
+
+    # Recall success rate should be high
+    recall_rate = sm.memory.metrics.recall_success_rate()
+    assert recall_rate >= 0.95, f"Recall rate too low: {recall_rate}"
+```
+
+### What This Tests
+
+| Capability | How It's Tested |
+|------------|-----------------|
+| Claim extraction | Decisions become token-cheap claim pages |
+| Pinning | Claims stay accessible despite 100 turns of other content |
+| Anti-thrash | Same topics don't repeatedly fault |
+| Working set | L0 stays under budget across 200 turns |
+| Fault budget | Never exceeds 2 faults per turn |
+| Provenance | Citations link back to source pages |
+| UX metrics | Recall success and thrash index within targets |
+
+If this test passes, the VM system "feels good" in production.
 
 ---
 

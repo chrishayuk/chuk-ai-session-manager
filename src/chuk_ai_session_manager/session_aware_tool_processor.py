@@ -40,15 +40,17 @@ class SessionAwareToolProcessor:
         max_retries: int = 2,
         retry_delay: float = 1.0,
     ) -> None:
-        self.session_id     = session_id
+        self.session_id = session_id
         self.enable_caching = enable_caching
-        self.max_retries    = max_retries
-        self.retry_delay    = retry_delay
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         self.cache: Dict[str, ToolResult] = {}
 
         self._tp = ToolProcessor()
         if not hasattr(self._tp, "executor"):
-            raise AttributeError("Installed chuk_tool_processor is too old - missing `.executor`")
+            raise AttributeError(
+                "Installed chuk_tool_processor is too old - missing `.executor`"
+            )
 
     @classmethod
     async def create(cls, session_id: str, **kwargs):
@@ -66,7 +68,7 @@ class SessionAwareToolProcessor:
         """Convert dicts → ToolCall and drive the executor."""
         tool_calls: list[ToolCall] = []
         for c in calls:
-            fn   = c.get("function", {})
+            fn = c.get("function", {})
             name = fn.get("name", "tool")
             try:
                 args = json.loads(fn.get("arguments", "{}"))
@@ -94,11 +96,11 @@ class SessionAwareToolProcessor:
 
         ev = await SessionEvent.create_with_tokens(
             message={
-                "tool":      res.tool,
+                "tool": res.tool,
                 "arguments": getattr(res, "arguments", None),
-                "result":    result_str,
-                "error":     res.error,
-                "cached":    cached,
+                "result": result_str,
+                "error": res.error,
+                "cached": cached,
             },
             prompt=f"{res.tool}({json.dumps(getattr(res, 'arguments', None), default=str)})",
             completion=result_str,
@@ -137,7 +139,7 @@ class SessionAwareToolProcessor:
 
         out: list[ToolResult] = []
         for call in calls:
-            fn   = call.get("function", {})
+            fn = call.get("function", {})
             name = fn.get("name", "tool")
             try:
                 args = json.loads(fn.get("arguments", "{}"))
@@ -145,8 +147,11 @@ class SessionAwareToolProcessor:
                 args = {"raw": fn.get("arguments")}
 
             cache_key = (
-                hashlib.md5(f"{name}:{json.dumps(args, sort_keys=True)}".encode()).hexdigest()
-                if self.enable_caching else None
+                hashlib.md5(
+                    f"{name}:{json.dumps(args, sort_keys=True)}".encode()
+                ).hexdigest()
+                if self.enable_caching
+                else None
             )
 
             # 1) cache hit --------------------------------------------------
@@ -162,7 +167,9 @@ class SessionAwareToolProcessor:
                     res = (await self._exec_calls([call]))[0]
                     if cache_key:
                         self.cache[cache_key] = res
-                    await self._log_event(session, parent_evt.id, res, attempt, cached=False)
+                    await self._log_event(
+                        session, parent_evt.id, res, attempt, cached=False
+                    )
                     out.append(res)
                     break
                 except Exception as exc:  # noqa: BLE001
@@ -172,8 +179,12 @@ class SessionAwareToolProcessor:
                         continue
                     err_res = ToolResult(tool=name, result=None, error=last_err)  # type: ignore[arg-type]
                     await self._log_event(
-                        session, parent_evt.id, err_res, attempt,
-                        cached=False, failed=True
+                        session,
+                        parent_evt.id,
+                        err_res,
+                        attempt,
+                        cached=False,
+                        failed=True,
                     )
                     out.append(err_res)
 
