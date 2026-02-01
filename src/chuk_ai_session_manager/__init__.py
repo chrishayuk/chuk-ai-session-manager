@@ -46,7 +46,7 @@ Storage Configuration:
 import logging
 
 # Package version
-__version__ = "0.5"
+__version__ = "0.8"
 
 # Set up package-level logger
 logger = logging.getLogger(__name__)
