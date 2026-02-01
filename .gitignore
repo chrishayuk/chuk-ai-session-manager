@@ -13,3 +13,6 @@ wheels/
 # environment
 .env
 .DS_Store
+.claude
+.mypy_cache
+.ruff_cache

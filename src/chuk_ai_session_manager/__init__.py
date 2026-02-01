@@ -4,7 +4,7 @@ CHUK AI Session Manager - Simple Developer API
 
 A powerful session management system for AI applications that provides:
 - Automatic conversation tracking
-- Token usage monitoring  
+- Token usage monitoring
 - Tool call logging
 - Infinite context support with automatic summarization
 - Hierarchical session relationships
@@ -32,12 +32,12 @@ Infinite Context Example:
 Storage Configuration:
     # Default: Memory storage (no Redis required)
     pip install chuk-ai-session-manager
-    
+
     # Redis: For production persistence
     pip install chuk-ai-session-manager[redis]
     export SESSION_PROVIDER=redis
     export SESSION_REDIS_URL=redis://localhost:6379/0
-    
+
     # Environment variables:
     SESSION_PROVIDER=memory (default - fast, no persistence)
     SESSION_PROVIDER=redis  (persistent - requires [redis] extra)
@@ -46,7 +46,7 @@ Storage Configuration:
 import logging
 
 # Package version
-__version__ = "0.5"
+__version__ = "0.8"
 
 # Set up package-level logger
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ from chuk_ai_session_manager.exceptions import (
     InvalidSessionOperation,
     TokenLimitExceeded,
     StorageError,
-    ToolProcessingError
+    ToolProcessingError,
 )
 
 # Core models
@@ -87,36 +87,66 @@ from chuk_ai_session_manager.api.simple_api import (
     track_infinite_conversation,
     track_tool_use,
     get_session_stats,
-    get_conversation_history
+    get_conversation_history,
 )
 
 # Advanced components
 from chuk_ai_session_manager.infinite_conversation import (
     InfiniteConversationManager,
-    SummarizationStrategy
+    SummarizationStrategy,
 )
 
-from chuk_ai_session_manager.session_aware_tool_processor import SessionAwareToolProcessor
+from chuk_ai_session_manager.session_aware_tool_processor import (
+    SessionAwareToolProcessor,
+)
 
 from chuk_ai_session_manager.session_prompt_builder import (
     build_prompt_from_session,
     PromptStrategy,
-    truncate_prompt_to_token_limit
+    truncate_prompt_to_token_limit,
 )
 
+# Procedural memory
+from chuk_ai_session_manager.procedural_memory import (
+    ToolMemoryManager,
+    ToolOutcome,
+    ToolLogEntry,
+    ToolPattern,
+    ProceduralMemory,
+    ProceduralContextFormatter,
+    FormatterConfig,
+)
+
+# Guards and state management
+from chuk_ai_session_manager.guards import (
+    ToolStateManager,
+    get_tool_state,
+    reset_tool_state,
+    BindingManager,
+    ResultCache,
+    UngroundedGuard,
+    UngroundedGuardConfig,
+    RuntimeLimits,
+    RuntimeMode,
+    ValueBinding,
+    ToolClassification,
+)
+
+
 # Configuration functions
-def configure_storage(sandbox_id: str = "chuk-ai-session-manager", 
-                     default_ttl_hours: int = 24) -> bool:
+def configure_storage(
+    sandbox_id: str = "chuk-ai-session-manager", default_ttl_hours: int = 24
+) -> bool:
     """
     Configure the storage backend.
-    
+
     Args:
         sandbox_id: CHUK Sessions sandbox ID to use
         default_ttl_hours: Default TTL for sessions
-        
+
     Returns:
         True if configuration was successful, False otherwise
-        
+
     Note:
         Storage provider is controlled by SESSION_PROVIDER environment variable:
         - memory (default): Fast, no persistence, no extra dependencies
@@ -124,8 +154,7 @@ def configure_storage(sandbox_id: str = "chuk-ai-session-manager",
     """
     try:
         setup_chuk_sessions_storage(
-            sandbox_id=sandbox_id,
-            default_ttl_hours=default_ttl_hours
+            sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours
         )
         logger.info(f"Storage configured with sandbox_id='{sandbox_id}'")
         return True
@@ -142,26 +171,28 @@ def get_version() -> str:
 def is_available() -> dict:
     """
     Check which components are available.
-    
+
     Returns:
         Dictionary showing availability of each component
     """
     # Check if Redis is available
     redis_available = False
     try:
-        import redis
+        import redis  # noqa: F401
+
         redis_available = True
     except ImportError:
         pass
-    
+
     # Check if tiktoken is available for enhanced token counting
     tiktoken_available = False
     try:
-        import tiktoken
+        import tiktoken  # noqa: F401
+
         tiktoken_available = True
     except ImportError:
         pass
-    
+
     return {
         "core_enums": True,
         "core_models": True,
@@ -181,53 +212,47 @@ def is_available() -> dict:
 def get_storage_info() -> dict:
     """
     Get information about the current storage configuration.
-    
+
     Returns:
         Dictionary with storage configuration details
     """
     import os
     from chuk_ai_session_manager.session_storage import get_backend
-    
+
     try:
         backend = get_backend()
         stats = backend.get_stats()
-        
+
         return {
             "provider": os.getenv("SESSION_PROVIDER", "memory"),
             "backend": stats.get("backend", "unknown"),
             "sandbox_id": stats.get("sandbox_id", "unknown"),
             "redis_url": os.getenv("SESSION_REDIS_URL", "not_set"),
-            "stats": stats
+            "stats": stats,
         }
     except Exception as e:
-        return {
-            "provider": os.getenv("SESSION_PROVIDER", "memory"),
-            "error": str(e)
-        }
+        return {"provider": os.getenv("SESSION_PROVIDER", "memory"), "error": str(e)}
 
 
 # Main exports - everything should be available
 __all__ = [
     # Version and utilities
     "__version__",
-    "get_version", 
+    "get_version",
     "is_available",
     "configure_storage",
     "get_storage_info",
-    
     # Core enums
     "EventSource",
     "EventType",
-    
     # Exception classes
     "SessionManagerError",
-    "SessionNotFound", 
+    "SessionNotFound",
     "SessionAlreadyExists",
     "InvalidSessionOperation",
     "TokenLimitExceeded",
     "StorageError",
     "ToolProcessingError",
-    
     # Core models
     "Session",
     "SessionEvent",
@@ -236,20 +261,17 @@ __all__ = [
     "RunStatus",
     "TokenUsage",
     "TokenSummary",
-    
     # Storage
     "setup_chuk_sessions_storage",
-    
     # Primary interfaces - what most users will use
     "SessionManager",
-    "track_conversation", 
+    "track_conversation",
     "track_llm_call",
     "quick_conversation",
     "track_infinite_conversation",
     "track_tool_use",
     "get_session_stats",
     "get_conversation_history",
-    
     # Advanced components
     "InfiniteConversationManager",
     "SummarizationStrategy",
@@ -257,6 +279,26 @@ __all__ = [
     "build_prompt_from_session",
     "PromptStrategy",
     "truncate_prompt_to_token_limit",
+    # Procedural memory
+    "ToolMemoryManager",
+    "ToolOutcome",
+    "ToolLogEntry",
+    "ToolPattern",
+    "ProceduralMemory",
+    "ProceduralContextFormatter",
+    "FormatterConfig",
+    # Guards and state management
+    "ToolStateManager",
+    "get_tool_state",
+    "reset_tool_state",
+    "BindingManager",
+    "ResultCache",
+    "UngroundedGuard",
+    "UngroundedGuardConfig",
+    "RuntimeLimits",
+    "RuntimeMode",
+    "ValueBinding",
+    "ToolClassification",
 ]
 
 # Auto-setup storage on import
@@ -270,6 +312,8 @@ except Exception as e:
 try:
     storage_info = get_storage_info()
     provider = storage_info.get("provider", "unknown")
-    logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully (storage: {provider})")
+    logger.debug(
+        f"CHUK AI Session Manager v{__version__} imported successfully (storage: {provider})"
+    )
 except Exception:
     logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully")

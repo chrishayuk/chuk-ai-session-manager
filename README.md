@@ -48,6 +48,35 @@ That's it! Zero configuration required.
 
 ## ⚡ Major Features
 
+### 🧠 **AI Virtual Memory**
+OS-style memory management for AI context windows. Pages, working sets, faults, and eviction - giving conversations the illusion of infinite memory.
+
+```python
+from chuk_ai_session_manager.memory import (
+    MemoryPage, PageTable, WorkingSetManager,
+    ContextPacker, ManifestBuilder, PageType,
+)
+
+# Create pages with type classification
+claim = MemoryPage(
+    page_id="claim_auth",
+    page_type=PageType.CLAIM,  # High-value, low eviction priority
+    content="Decision: Use JWT for authentication",
+    provenance=["msg_042", "msg_043"],
+)
+
+# Track in page table and working set
+table = PageTable()
+table.register(claim)
+
+# Pack context for model with manifest
+packer = ContextPacker()
+packed = packer.pack([claim])
+# Model sees VM:CONTEXT with page citations
+```
+
+See [AI Virtual Memory docs](docs/memory/README.md) for full documentation.
+
 ### 🎯 **Zero-Configuration Tracking**
 ```python
 from chuk_ai_session_manager import SessionManager
@@ -77,6 +106,51 @@ await sm.ai_responds("Computing history begins with...", model="gpt-4")
 |-------------|---------|----------|-------------|
 | `pip install chuk-ai-session-manager` | Memory | Development, testing | 1.8M ops/sec |
 | `pip install chuk-ai-session-manager[redis]` | Redis | Production, persistence | 20K ops/sec |
+
+### 🛡️ **Conversation Guards and Tool State**
+Runtime guardrails that prevent runaway tool loops, track value bindings, and enforce grounded tool calls.
+
+```python
+from chuk_ai_session_manager.guards import get_tool_state, ToolStateManager
+
+# Get the singleton tool state manager
+tool_state = get_tool_state()
+
+# Track tool calls and bind results as $v0, $v1, ...
+binding = tool_state.bind_value("sqrt", {"x": 16}, 4.0)
+# LLM can now reference $v0 in subsequent calls
+
+# Check for runaway tool loops
+status = tool_state.check_runaway()
+
+# Detect ungrounded calls (missing $vN references)
+check = tool_state.check_ungrounded_call("normal_cdf", {"mean": 0, "std": 1, "x": 1.5})
+
+# Reset state for a new prompt
+tool_state.reset_for_new_prompt()
+```
+
+**Guard components:**
+- `ToolStateManager` - Coordinator for all guards, bindings, and cache
+- `BindingManager` - `$vN` reference system for tracking tool results
+- `ResultCache` - Tool result caching for deduplication
+- `UngroundedGuard` - Detects calls with missing computed-value references
+- Runtime guards (budget, runaway, per-tool limits) from `chuk-tool-processor`
+
+### 🧩 **Procedural Memory**
+Learn from tool call history to improve future tool use.
+
+```python
+from chuk_ai_session_manager import ToolMemoryManager, ProceduralContextFormatter
+
+# Record tool outcomes
+memory = ToolMemoryManager()
+await memory.record("calculator", {"op": "add", "a": 5, "b": 3}, result=8, success=True)
+
+# Format learned patterns for the model's context
+formatter = ProceduralContextFormatter()
+context = formatter.format(memory.get_patterns())
+```
 
 ### 🛠️ **Tool Integration**
 ```python
@@ -196,6 +270,8 @@ Session Segments: {stats.get('session_segments', 1)}
 - **Production Ready**: Built-in persistence, monitoring, and error handling
 - **Token Aware**: Automatic cost tracking across all providers
 - **Tool Friendly**: Seamless tool call logging and retry mechanisms
+- **Guardrails**: Runtime guards prevent runaway tool loops and ungrounded calls
+- **Procedural Memory**: Learn from tool call history to improve future use
 
 ## 🛡️ Error Handling
 

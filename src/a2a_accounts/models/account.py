@@ -2,10 +2,12 @@
 from __future__ import annotations
 from uuid import uuid4
 from pydantic import BaseModel, Field
-from typing import List
+from typing import Any, List
+
 
 class Account(BaseModel):
     """Represents an Account which owns Projects."""
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     owner_user_id: str
