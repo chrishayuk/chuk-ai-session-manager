@@ -142,27 +142,23 @@ class TestSessionManager:
 
         # Test creating session manager with specific ID
         sm3 = SessionManager(session_id="test-specific-id")
-        # For non-existent session, it should handle gracefully
-        try:
-            await sm3.user_says("Test message")
-            # If it succeeds, it created a new session which is fine
-            assert sm3.session_id is not None
-        except ValueError:
-            # If it fails with "not found", that's also acceptable behavior
-            assert True
+        # For non-existent session, a new session is created
+        await sm3.user_says("Test message")
+        assert sm3.session_id is not None
 
-    async def test_session_manager_ensure_session_not_found(self, mock_session_store):
-        """Test _ensure_session with nonexistent session."""
+    async def test_session_manager_ensure_session_creates_new(self, mock_session_store):
+        """Test _ensure_session creates a new session when ID not found."""
         mock_store, sessions = mock_session_store
 
         with patch(
             "chuk_ai_session_manager.session_storage.get_backend",
             return_value=mock_store,
         ):
-            sm = SessionManager(session_id="nonexistent")
+            sm = SessionManager(session_id="brand-new-id")
 
-            with pytest.raises(ValueError, match="Session nonexistent not found"):
-                await sm._ensure_session()
+            session = await sm._ensure_session()
+            assert session is not None
+            assert sm._initialized is True
 
     async def test_user_says_basic(self, mock_session_store):
         """Test basic user_says functionality."""

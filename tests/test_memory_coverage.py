@@ -29,7 +29,6 @@ from chuk_ai_session_manager.memory.working_set import (
 from chuk_ai_session_manager.memory.context_packer import (
     ContextPacker,
     ContextPackerConfig,
-    PackedContext,
 )
 from chuk_ai_session_manager.memory.vm_prompts import (
     VM_STRICT_PROMPT,
@@ -58,14 +57,9 @@ from chuk_ai_session_manager.memory.manifest import (
 from chuk_ai_session_manager.memory.artifacts_bridge import (
     ArtifactsBridge,
     InMemoryBackend,
-    CheckpointManifest,
-    CheckpointEntry,
-    PageMetadata,
-    CheckpointMetadata,
 )
 from chuk_ai_session_manager.memory.prefetcher import (
     SimplePrefetcher,
-    ToolUsagePattern,
 )
 
 
@@ -1157,9 +1151,7 @@ class TestContextPacker:
         assert "p1" in result.pages_included
 
     def test_pack_with_budget_omit(self):
-        packer = ContextPacker(
-            config=ContextPackerConfig(max_text_length=100)
-        )
+        packer = ContextPacker(config=ContextPackerConfig(max_text_length=100))
         pages = [
             make_page("p1", content="A" * 50, size_tokens=100),
             make_page("p2", content="B" * 50, size_tokens=100),
@@ -1626,9 +1618,7 @@ class TestVMManifest:
         assert "</VM:MANIFEST_JSON>" in wrapped
 
     def test_manifest_with_working_set(self):
-        ws = WorkingSetEntry(
-            page_id="p1", modality="text", level=0, tokens_est=100
-        )
+        ws = WorkingSetEntry(page_id="p1", modality="text", level=0, tokens_est=100)
         manifest = VMManifest(session_id="sess_1", working_set=[ws])
         assert len(manifest.working_set) == 1
 
@@ -2094,7 +2084,9 @@ class TestSimplePrefetcher:
     def test_get_tool_prereq_pages(self):
         pf = SimplePrefetcher()
         pf.record_tool_call("weather", turn=1, pages_accessed_before=["loc_1"])
-        pf.record_tool_call("weather", turn=2, pages_accessed_before=["loc_1", "pref_1"])
+        pf.record_tool_call(
+            "weather", turn=2, pages_accessed_before=["loc_1", "pref_1"]
+        )
         prereqs = pf.get_tool_prereq_pages("weather")
         assert "loc_1" in prereqs
 
@@ -2445,6 +2437,7 @@ class MockArtifactStore:
 
 class MockStorageScope:
     """Mock for chuk_artifacts.models.StorageScope."""
+
     SESSION = "session"
     SANDBOX = "sandbox"
 
@@ -2475,9 +2468,13 @@ class TestArtifactsBridgeWithArtifacts:
         ab_module.StorageScope = orig_scope
 
     async def test_configure_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             assert bridge._using_artifacts is True
             assert bridge._artifact_store is mock_store
@@ -2486,9 +2483,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_store_page_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             page = make_page("p1", content="hello world")
             artifact_id = await bridge.store_page(page, StorageTier.L3)
@@ -2499,9 +2500,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_store_page_l4_scope(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             page = make_page("p1", content="archive data")
             artifact_id = await bridge.store_page(page, StorageTier.L4)
@@ -2510,9 +2515,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_load_page_with_artifacts_bytes(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             page = make_page("p1", content="load me")
             artifact_id = await bridge.store_page(page, StorageTier.L3)
@@ -2525,9 +2534,13 @@ class TestArtifactsBridgeWithArtifacts:
 
     async def test_load_page_with_artifacts_string(self):
         """Test _load_with_artifacts when retrieve returns a string."""
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             page = make_page("p1", content="string data")
             # Store normally first to get the serialized form
@@ -2542,9 +2555,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_load_page_with_artifacts_not_found(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             loaded = await bridge.load_page("nonexistent")
             assert loaded is None
@@ -2553,9 +2570,13 @@ class TestArtifactsBridgeWithArtifacts:
 
     async def test_load_page_with_artifacts_bad_data(self):
         """Test _load_with_artifacts when data is not deserializable."""
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             # Store non-page data
             mock_store._store["bad_id"] = 12345  # Not bytes or str
@@ -2566,9 +2587,13 @@ class TestArtifactsBridgeWithArtifacts:
 
     async def test_load_page_with_artifacts_exception(self):
         """Test _load_with_artifacts when exception occurs during deserialize."""
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             mock_store._store["corrupt"] = b"not valid json"
             loaded = await bridge.load_page("corrupt")
@@ -2577,9 +2602,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_delete_page_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             page = make_page("p1", content="delete me")
             artifact_id = await bridge.store_page(page, StorageTier.L3)
@@ -2589,9 +2618,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_delete_page_with_artifacts_not_found(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             result = await bridge.delete_page("nonexistent")
             # delete raises KeyError in mock, caught by except -> False
@@ -2600,17 +2633,19 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_store_checkpoint_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             pages = [
                 make_page("p1", content="page one"),
                 make_page("p2", content="page two"),
             ]
-            checkpoint_id = await bridge.store_checkpoint(
-                pages, "test_checkpoint"
-            )
+            checkpoint_id = await bridge.store_checkpoint(pages, "test_checkpoint")
             assert checkpoint_id.startswith("art_")
             # Verify checkpoint manifest was stored
             assert checkpoint_id in mock_store._store
@@ -2618,17 +2653,19 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_load_checkpoint_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             pages = [
                 make_page("p1", content="page one"),
                 make_page("p2", content="page two"),
             ]
-            checkpoint_id = await bridge.store_checkpoint(
-                pages, "test_checkpoint"
-            )
+            checkpoint_id = await bridge.store_checkpoint(pages, "test_checkpoint")
             loaded_pages = await bridge.load_checkpoint(checkpoint_id)
             assert len(loaded_pages) == 2
             page_ids = {p.page_id for p in loaded_pages}
@@ -2638,9 +2675,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_load_checkpoint_with_artifacts_not_found(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             loaded = await bridge.load_checkpoint("nonexistent")
             assert loaded == []
@@ -2649,14 +2690,16 @@ class TestArtifactsBridgeWithArtifacts:
 
     async def test_load_checkpoint_manifest_as_string(self):
         """Test load_checkpoint when manifest data comes back as string."""
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             pages = [make_page("p1", content="page one")]
-            checkpoint_id = await bridge.store_checkpoint(
-                pages, "test_checkpoint"
-            )
+            checkpoint_id = await bridge.store_checkpoint(pages, "test_checkpoint")
             # Replace stored bytes with string
             stored_bytes = mock_store._store[checkpoint_id]
             mock_store._store[checkpoint_id] = stored_bytes.decode("utf-8")
@@ -2667,9 +2710,13 @@ class TestArtifactsBridgeWithArtifacts:
             self._restore(ab_module, orig_available, orig_scope)
 
     async def test_get_stats_with_artifacts(self):
-        bridge, mock_store, ab_module, orig_available, orig_scope = (
-            await self._make_bridge_with_artifacts()
-        )
+        (
+            bridge,
+            mock_store,
+            ab_module,
+            orig_available,
+            orig_scope,
+        ) = await self._make_bridge_with_artifacts()
         try:
             stats = bridge.get_stats()
             assert stats.backend == "chuk-artifacts"
@@ -2691,9 +2738,7 @@ class TestArtifactsBridgeWithArtifacts:
         try:
             bridge = ArtifactsBridge()
             mock_store = MockArtifactStore()
-            await bridge.configure(
-                artifact_store=mock_store, session_id="test-session"
-            )
+            await bridge.configure(artifact_store=mock_store, session_id="test-session")
             page = make_page("p1", content="no scope test")
             artifact_id = await bridge.store_page(page, StorageTier.L3)
             assert artifact_id.startswith("art_")
@@ -2714,13 +2759,9 @@ class TestArtifactsBridgeWithArtifacts:
         try:
             bridge = ArtifactsBridge()
             mock_store = MockArtifactStore()
-            await bridge.configure(
-                artifact_store=mock_store, session_id="test-session"
-            )
+            await bridge.configure(artifact_store=mock_store, session_id="test-session")
             pages = [make_page("p1", content="page one")]
-            checkpoint_id = await bridge.store_checkpoint(
-                pages, "test_checkpoint"
-            )
+            checkpoint_id = await bridge.store_checkpoint(pages, "test_checkpoint")
             assert checkpoint_id.startswith("art_")
         finally:
             ab_module.ARTIFACTS_AVAILABLE = orig_available

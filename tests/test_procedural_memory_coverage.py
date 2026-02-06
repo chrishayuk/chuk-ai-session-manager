@@ -12,9 +12,7 @@ Covers:
 
 from __future__ import annotations
 
-import json
 import pytest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from chuk_ai_session_manager.procedural_memory.models import (
@@ -188,9 +186,7 @@ class TestToolLogEntry:
         assert "fixed prior failure" in text
 
     def test_format_for_context_was_fixed(self):
-        e = self._make_entry(
-            outcome=ToolOutcome.FAILURE, fixed_by="call-0002"
-        )
+        e = self._make_entry(outcome=ToolOutcome.FAILURE, fixed_by="call-0002")
         text = e.format_for_context()
         assert "later fixed by" in text
         assert "call-0002" in text
@@ -582,8 +578,12 @@ class TestToolMemoryManagerRecordCall:
     async def test_record_failure(self):
         mgr = ToolMemoryManager.create("s")
         entry = await mgr.record_call(
-            "t", {}, None, ToolOutcome.FAILURE,
-            error_type="unsat", error_message="no solution"
+            "t",
+            {},
+            None,
+            ToolOutcome.FAILURE,
+            error_type="unsat",
+            error_message="no solution",
         )
         assert entry.is_failure()
         pat = mgr.get_pattern("t")
@@ -627,8 +627,7 @@ class TestToolMemoryManagerRecordCall:
         """A success after a failure with changed args is detected as a fix."""
         mgr = ToolMemoryManager.create("s")
         await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE,
-            error_type="unsat"
+            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
         )
         entry = await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         assert entry.is_fix()
@@ -644,9 +643,7 @@ class TestToolMemoryManagerRecordCall:
 
     async def test_fix_adds_success_pattern(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e")
         await mgr.record_call(
             "t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="goal"
         )
@@ -927,16 +924,18 @@ class TestSearchCalls:
     async def _setup_mgr(self):
         mgr = ToolMemoryManager.create("s")
         await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE,
-            error_type="unsat", context_goal="find flights"
+            "t",
+            {"x": 1},
+            None,
+            ToolOutcome.FAILURE,
+            error_type="unsat",
+            context_goal="find flights",
         )
         await mgr.record_call(
-            "t", {"x": 2}, "ok", ToolOutcome.SUCCESS,
-            context_goal="find flights"
+            "t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="find flights"
         )
         await mgr.record_call(
-            "u", {}, "ok", ToolOutcome.SUCCESS,
-            context_goal="book hotel"
+            "u", {}, "ok", ToolOutcome.SUCCESS, context_goal="book hotel"
         )
         return mgr
 
@@ -1249,33 +1248,25 @@ class TestFormatRecentCalls:
         assert "fixed prior" not in text
 
     def test_include_args(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(include_args=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(include_args=True))
         e = self._entry(arguments={"x": 1, "y": 2})
         text = fmt._format_recent_calls([e])
         assert "args:" in text
 
     def test_include_args_empty(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(include_args=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(include_args=True))
         e = self._entry(arguments={})
         text = fmt._format_recent_calls([e])
         assert "args:" not in text
 
     def test_include_timing(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(include_timing=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(include_timing=True))
         e = self._entry(execution_time_ms=123)
         text = fmt._format_recent_calls([e])
         assert "123ms" in text
 
     def test_timing_none_omitted(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(include_timing=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(include_timing=True))
         e = self._entry(execution_time_ms=None)
         text = fmt._format_recent_calls([e])
         assert "ms]" not in text
@@ -1423,9 +1414,7 @@ class TestFormatDelta:
         assert "-3 args" in result
 
     def test_changed_few(self):
-        result = self._fmt()._format_delta(
-            {"changed": {"x": {"from": 1, "to": 2}}}
-        )
+        result = self._fmt()._format_delta({"changed": {"x": {"from": 1, "to": 2}}})
         assert "x:" in result
         assert "->" in result
 
@@ -1475,9 +1464,7 @@ class TestFormatFullSummary:
 
     async def test_with_tools(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fmt = ProceduralContextFormatter()
         text = fmt.format_full_summary(mgr)
@@ -1556,9 +1543,7 @@ class TestFormatErrorGuidance:
 
     async def test_no_fixes(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {}, None, ToolOutcome.FAILURE, error_type="unsat")
         fmt = ProceduralContextFormatter()
         text = fmt.format_error_guidance(mgr, "t", "timeout")
         assert "No previous fixes found" in text

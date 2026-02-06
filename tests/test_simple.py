@@ -415,23 +415,12 @@ class TestErrorHandling:
         """Test handling of invalid session ID gracefully."""
         from chuk_ai_session_manager import SessionManager
 
-        # This should not crash, even with invalid session ID
-        sm = SessionManager(session_id="nonexistent-session")
+        # When a session ID is not found, a new session is created
+        sm = SessionManager(session_id="missing-session")
 
-        # The session manager should handle this gracefully
-        # when we try to use it - it should either create a new session
-        # or give a clear error
-        try:
-            session_id = await sm.user_says("Test message")
-            # If it doesn't error, that's fine - it means it created a new session
-            assert isinstance(session_id, str)
-            assert len(session_id) > 0
-        except ValueError as e:
-            # If it does error, make sure it's a reasonable error
-            assert "not found" in str(e).lower()
-        except Exception as e:
-            # Any other exception should be informative
-            assert len(str(e)) > 0
+        session_id = await sm.user_says("Test message")
+        assert isinstance(session_id, str)
+        assert len(session_id) > 0
 
     async def test_empty_messages_handled(self):
         """Test handling of empty messages."""

@@ -26,6 +26,8 @@ from chuk_ai_session_manager.session_storage import ChukSessionsStore
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TOKEN_MODEL = "gpt-4o-mini"
+
 
 class SessionManager:
     """
@@ -65,6 +67,7 @@ class SessionManager:
         infinite_context: bool = False,
         token_threshold: int = 4000,
         max_turns_per_segment: int = 20,
+        default_model: str = DEFAULT_TOKEN_MODEL,
     ):
         """
         Initialize a SessionManager.
@@ -78,17 +81,20 @@ class SessionManager:
             infinite_context: Enable automatic infinite context handling.
             token_threshold: Token limit before creating new session (infinite mode).
             max_turns_per_segment: Turn limit before creating new session (infinite mode).
+            default_model: Model name used for token counting (default: gpt-4o-mini).
         """
         # Core session management
         self._session_id = session_id
         self._system_prompt = system_prompt
         self._parent_id = parent_id
         self._metadata = metadata or {}
-        self._store = store
+        self._store = store or ChukSessionsStore()
         self._session: Optional[Session] = None
         self._initialized = False
         self._lock = asyncio.Lock()
         self._loaded_from_storage = False  # Track if loaded from storage
+        self._default_model = default_model
+        self._summary_callback: Optional[Callable] = None
 
         # Infinite context settings
         self._infinite_context = infinite_context
@@ -124,19 +130,13 @@ class SessionManager:
 
     @property
     def _is_new(self) -> bool:
-        """Check if this is a new session (for test compatibility)."""
-        # If we have a session_id but haven't initialized yet, we don't know
+        """Check if this is a new session."""
         if not self._initialized:
             return True
-        # If we loaded from storage, it's not new
         return not self._loaded_from_storage
 
     async def _ensure_session(self) -> Optional[Session]:
-        """Ensure session is initialized (test compatibility alias)."""
-        # Special handling for test cases expecting errors
-        if self._session_id and "nonexistent" in self._session_id:
-            raise ValueError(f"Session {self._session_id} not found")
-
+        """Ensure session is initialized and return it."""
         await self._ensure_initialized()
         return self._session
 
@@ -169,7 +169,7 @@ class SessionManager:
             if self._initialized:  # Double-check after acquiring lock
                 return
 
-            store = self._store or ChukSessionsStore()
+            store = self._store
 
             if self._session_id:
                 # Try to load existing session
@@ -192,19 +192,8 @@ class SessionManager:
                         # Initialize session chain for infinite context
                         if self._infinite_context:
                             self._session_chain = [self._session_id]
-                            # TODO: Load full chain from session metadata
                     else:
-                        # Session not found - behavior depends on context
-                        # For some tests, we should raise an error
-                        # For others, we should create a new session
-                        # Check if this looks like a test expecting an error
-                        if (
-                            "nonexistent" in self._session_id
-                            or "not-found" in self._session_id
-                        ):
-                            raise ValueError(f"Session {self._session_id} not found")
-
-                        # Otherwise create a new session with the provided ID
+                        # Session not found - create a new session with the provided ID
                         session_metadata = {}
                         if self._metadata:
                             session_metadata.update(self._metadata)
@@ -226,11 +215,8 @@ class SessionManager:
 
                         if self._infinite_context:
                             self._session_chain = [self._session_id]
-                except ValueError:
-                    # Re-raise ValueError for tests expecting it
-                    raise
                 except Exception as e:
-                    # For other errors, create new session
+                    # For errors, create new session
                     logger.debug(f"Error loading session {self._session_id}: {e}")
                     session_metadata = {}
                     if self._metadata:
@@ -279,8 +265,7 @@ class SessionManager:
     async def _save_session(self) -> None:
         """Save the current session."""
         if self._session:
-            store = self._store or ChukSessionsStore()
-            await store.save(self._session)
+            await self._store.save(self._session)
 
     async def _should_create_new_segment(self) -> bool:
         """Check if we should create a new session segment."""
@@ -350,8 +335,11 @@ class SessionManager:
         Returns:
             The new session ID.
         """
+        # Use the instance callback if no explicit callback provided
+        callback = llm_callback or self._summary_callback
+
         # Create summary of current session
-        summary = await self._create_summary(llm_callback)
+        summary = await self._create_summary(callback)
 
         # Add summary to current session
         summary_event = SessionEvent(
@@ -368,8 +356,7 @@ class SessionManager:
             new_session.metadata.properties["system_prompt"] = self._system_prompt
 
         # Save new session
-        store = self._store or ChukSessionsStore()
-        await store.save(new_session)
+        await self._store.save(new_session)
 
         # Update our state
         old_session_id = self._session_id
@@ -404,7 +391,7 @@ class SessionManager:
         event = await SessionEvent.create_with_tokens(
             message=message,
             prompt=message,
-            model="gpt-4o-mini",  # Default model for token counting
+            model=self._default_model,
             source=EventSource.USER,
             type=EventType.MESSAGE,
         )
@@ -526,16 +513,14 @@ class SessionManager:
         event = SessionEvent(
             message=tool_message,
             source=EventSource.SYSTEM,
-            type=EventType.TOOL_CALL,  # This is correct
+            type=EventType.TOOL_CALL,
         )
 
         for key, value in metadata.items():
             await event.set_metadata(key, value)
 
-        # This should add the event to the session
         await self._session.add_event_and_save(event)
 
-        # Verify the event was added (debug)
         tool_events = [e for e in self._session.events if e.type == EventType.TOOL_CALL]
         logger.debug(f"Tool events after adding: {len(tool_events)}")
 
@@ -574,7 +559,7 @@ class SessionManager:
         return messages
 
     async def get_conversation(
-        self, include_all_segments: bool = None
+        self, include_all_segments: Optional[bool] = None
     ) -> List[Dict[str, Any]]:
         """
         Get conversation history.
@@ -615,7 +600,9 @@ class SessionManager:
         else:
             return [self.session_id]
 
-    async def get_stats(self, include_all_segments: bool = None) -> Dict[str, Any]:
+    async def get_stats(
+        self, include_all_segments: Optional[bool] = None
+    ) -> Dict[str, Any]:
         """
         Get conversation statistics.
 
@@ -645,7 +632,7 @@ class SessionManager:
             # For infinite context, build the complete chain if needed
             if len(self._session_chain) < self._total_segments:
                 # Need to reconstruct the chain
-                store = self._store or ChukSessionsStore()
+                store = self._store
                 chain = []
                 current_id = self._session_id
 
@@ -675,7 +662,7 @@ class SessionManager:
             total_events = 0
             tool_calls = 0
 
-            store = self._store or ChukSessionsStore()
+            store = self._store
 
             for session_id in self._session_chain:
                 try:
@@ -693,9 +680,8 @@ class SessionManager:
                         tool_calls += sum(
                             1 for e in sess.events if e.type == EventType.TOOL_CALL
                         )
-                except Exception:
-                    # Skip if can't load session
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to load session {session_id} in chain: {e}")
 
             return {
                 "session_id": self._session_id,
@@ -762,7 +748,7 @@ class SessionManager:
             return
 
         await self._ensure_initialized()
-        store = self._store or ChukSessionsStore()
+        store = self._store
 
         # Start from current session and work backwards
         current_id = self._session_id

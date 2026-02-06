@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.8"
+version = "0.8.1"
 description = "Session manager for AI applications"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -31,7 +31,7 @@ tiktoken = ["tiktoken>=0.9.0"]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest-asyncio>=1.0.0",
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
@@ -106,30 +106,47 @@ ignore = ["E501"]  # Line too long - handled by formatter
 
 [tool.mypy]
 python_version = "3.11"
-# Relaxed settings - enable stricter checking incrementally
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
 check_untyped_defs = false
 disallow_untyped_defs = false
-# Ignore errors in all modules for now (pre-existing issues)
-# TODO: Enable strict checking and fix type errors
-ignore_errors = true
 exclude = [
     "examples/",
     "tests/",
     ".*/site-packages/.*",
 ]
 
+# Per-module overrides for files with pre-existing type errors.
+# Fix these incrementally and remove the override when clean.
+[[tool.mypy.overrides]]
+module = [
+    "chuk_ai_session_manager.session_manager",
+    "chuk_ai_session_manager.session_prompt_builder",
+    "chuk_ai_session_manager.session_storage",
+    "chuk_ai_session_manager.session_aware_tool_processor",
+    "chuk_ai_session_manager.infinite_conversation",
+    "chuk_ai_session_manager.models.session",
+    "chuk_ai_session_manager.models.session_run",
+    "chuk_ai_session_manager.memory.fault_handler",
+    "chuk_ai_session_manager.memory.artifacts_bridge",
+    "chuk_ai_session_manager.guards.manager",
+]
+ignore_errors = true
+
 [dependency-groups]
 dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=1.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
     "bs4>=0.0.2",
     "chuk-llm>=0.3",
     "fastapi>=0.115.12",
     "geopy>=2.4.1",
     "openai>=1.88.0",
-    "pytest-asyncio>=1.0.0",
-    "pytest-cov>=7.0.0",
     "tiktoken>=0.9.0",
     "uvicorn>=0.34.2",
 ]

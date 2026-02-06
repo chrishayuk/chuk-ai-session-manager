@@ -449,14 +449,14 @@ class TestSessionPersistence:
         assert conversation[1]["content"] == "Original response"
 
     async def test_load_nonexistent_session(self):
-        """Test loading a session that doesn't exist."""
-        # Use "nonexistent" prefix to trigger the ValueError
-        fake_id = f"nonexistent-{uuid4()}"
+        """Test loading a session that doesn't exist creates a new one."""
+        fake_id = f"test-missing-{uuid4()}"
         sm = SessionManager(session_id=fake_id)
 
-        # Should raise error when trying to use
-        with pytest.raises(ValueError, match=f"Session {fake_id} not found"):
-            await sm.user_says("Hello")
+        # When a session ID is not found in storage, a new session is created
+        session_id = await sm.user_says("Hello")
+        assert isinstance(session_id, str)
+        assert len(session_id) > 0
 
     async def test_session_saves_automatically(self):
         """Test that sessions are saved automatically."""

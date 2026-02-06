@@ -14,9 +14,7 @@ Comprehensive test suite targeting >90% coverage for ALL model files:
 import importlib
 import sys
 import pytest
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
-from uuid import uuid4
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
@@ -30,6 +28,7 @@ from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
 # ===========================================================================
 # EventSource tests
 # ===========================================================================
+
 
 class TestEventSource:
     """Tests for EventSource enum covering all members and string behaviour."""
@@ -57,6 +56,7 @@ class TestEventSource:
 # ===========================================================================
 # EventType tests
 # ===========================================================================
+
 
 class TestEventType:
     """Tests for EventType enum covering all members."""
@@ -97,6 +97,7 @@ class TestEventType:
 # TokenUsage tests
 # ===========================================================================
 
+
 class TestTokenUsageCoverage:
     """Thorough tests for TokenUsage model."""
 
@@ -130,17 +131,26 @@ class TestTokenUsageCoverage:
 
     # --- Cost calculation for every known model ---
 
-    @pytest.mark.parametrize("model_name", [
-        "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
-        "claude-3-opus", "claude-3-sonnet", "claude-3-haiku",
-    ])
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "claude-3-opus",
+            "claude-3-sonnet",
+            "claude-3-haiku",
+        ],
+    )
     def test_cost_known_models(self, model_name):
         usage = TokenUsage(prompt_tokens=1000, completion_tokens=500, model=model_name)
         assert usage.estimated_cost_usd is not None
         assert usage.estimated_cost_usd > 0
 
     def test_cost_unknown_model_uses_default(self):
-        usage = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="mystery-model-9000")
+        usage = TokenUsage(
+            prompt_tokens=1000, completion_tokens=500, model="mystery-model-9000"
+        )
         assert usage.estimated_cost_usd is not None
         assert usage.estimated_cost_usd > 0
 
@@ -150,7 +160,9 @@ class TestTokenUsageCoverage:
 
     def test_gpt4_more_expensive_than_gpt35(self):
         gpt4 = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="gpt-4")
-        gpt35 = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo")
+        gpt35 = TokenUsage(
+            prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo"
+        )
         assert gpt4.estimated_cost_usd > gpt35.estimated_cost_usd
 
     # --- _calculate_cost_sync directly ---
@@ -307,7 +319,9 @@ class TestTokenUsageCoverage:
 
     def test_count_tokens_without_tiktoken(self):
         """When tiktoken is not available, falls back to len(text)/4 approximation."""
-        with patch("chuk_ai_session_manager.models.token_usage.TIKTOKEN_AVAILABLE", False):
+        with patch(
+            "chuk_ai_session_manager.models.token_usage.TIKTOKEN_AVAILABLE", False
+        ):
             tokens = TokenUsage._count_tokens_sync("Hello world this is a test string")
             expected = len("Hello world this is a test string") // 4
             assert tokens == expected
@@ -316,6 +330,7 @@ class TestTokenUsageCoverage:
 # ===========================================================================
 # TokenSummary tests
 # ===========================================================================
+
 
 class TestTokenSummaryCoverage:
     """Thorough tests for TokenSummary model."""
@@ -401,7 +416,9 @@ class TestTokenSummaryCoverage:
     async def test_add_usage_async_different_models(self):
         summary = TokenSummary()
         u1 = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4")
-        u2 = TokenUsage(prompt_tokens=200, completion_tokens=75, model="claude-3-sonnet")
+        u2 = TokenUsage(
+            prompt_tokens=200, completion_tokens=75, model="claude-3-sonnet"
+        )
         await summary.add_usage(u1)
         await summary.add_usage(u2)
         assert len(summary.usage_by_model) == 2
@@ -425,6 +442,7 @@ class TestTokenSummaryCoverage:
 # ===========================================================================
 # SessionMetadata tests
 # ===========================================================================
+
 
 class TestSessionMetadataCoverage:
     """Thorough tests for SessionMetadata."""
@@ -466,6 +484,7 @@ class TestSessionMetadataCoverage:
 # ===========================================================================
 # SessionRun tests
 # ===========================================================================
+
 
 class TestSessionRunCoverage:
     """Extra coverage for SessionRun beyond existing test_models.py."""
@@ -587,6 +606,7 @@ class TestSessionRunCoverage:
 # SessionEvent tests
 # ===========================================================================
 
+
 class TestSessionEventCoverage:
     """Thorough tests for SessionEvent model."""
 
@@ -661,7 +681,9 @@ class TestSessionEventCoverage:
 
     async def test_update_token_usage_from_text(self):
         event = SessionEvent(message="test")
-        await event.update_token_usage(prompt="hello", completion="world", model="gpt-4")
+        await event.update_token_usage(
+            prompt="hello", completion="world", model="gpt-4"
+        )
         assert event.token_usage is not None
         assert event.token_usage.prompt_tokens > 0
         assert event.token_usage.completion_tokens > 0
@@ -696,7 +718,9 @@ class TestSessionEventCoverage:
         """Pass prompt_tokens directly on event that already has token_usage."""
         event = SessionEvent(
             message="test",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         await event.update_token_usage(prompt_tokens=200, model="gpt-4")
         assert event.token_usage.prompt_tokens == 200
@@ -762,7 +786,9 @@ class TestSessionEventCoverage:
     async def test_calculate_tokens_with_existing_usage(self):
         event = SessionEvent(
             message="test",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         result = await event.calculate_tokens()
         assert result == 15
@@ -830,7 +856,9 @@ class TestSessionEventCoverage:
     async def test_to_dict_with_token_usage(self):
         event = SessionEvent(
             message="hi",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         d = await event.to_dict()
         assert "token_usage" in d
@@ -862,6 +890,7 @@ class TestSessionEventCoverage:
 # ===========================================================================
 # Session tests
 # ===========================================================================
+
 
 class TestSessionCoverage:
     """Thorough tests for Session model."""
@@ -957,7 +986,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=parent)
@@ -975,7 +1006,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -991,7 +1024,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=parent)
@@ -1010,7 +1045,9 @@ class TestSessionCoverage:
         session = Session()
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1024,7 +1061,9 @@ class TestSessionCoverage:
         session = Session(child_ids=["child-1"])
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1039,7 +1078,9 @@ class TestSessionCoverage:
         session = Session(child_ids=["child-1", "child-2"])
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1054,7 +1095,9 @@ class TestSessionCoverage:
         session = Session(child_ids=["child-1"])
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1070,7 +1113,9 @@ class TestSessionCoverage:
         session = Session()
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1088,7 +1133,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(side_effect=lambda sid: store_data.get(sid))
@@ -1105,7 +1152,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -1121,7 +1170,9 @@ class TestSessionCoverage:
         session = Session()
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1140,7 +1191,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(side_effect=lambda sid: store_data.get(sid))
@@ -1158,7 +1211,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -1181,7 +1236,9 @@ class TestSessionCoverage:
         session = Session()
         event = SessionEvent(
             message="with tokens",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         await session.add_event(event)
         assert len(session.events) == 1
@@ -1195,7 +1252,9 @@ class TestSessionCoverage:
 
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_gb.return_value = AsyncMock()
@@ -1217,12 +1276,16 @@ class TestSessionCoverage:
         e1 = SessionEvent(
             message="user msg",
             source=EventSource.USER,
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=0, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=0, model="gpt-4"
+            ),
         )
         e2 = SessionEvent(
             message="llm msg",
             source=EventSource.LLM,
-            token_usage=TokenUsage(prompt_tokens=0, completion_tokens=20, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=0, completion_tokens=20, model="gpt-4"
+            ),
         )
         e3 = SessionEvent(
             message="no tokens",
@@ -1246,7 +1309,9 @@ class TestSessionCoverage:
         e2 = SessionEvent(
             message="m2",
             source=EventSource.USER,
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=7, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=7, model="gpt-4"
+            ),
         )
         session.events = [e1, e2]
         result = await session.get_token_usage_by_source()
@@ -1277,12 +1342,16 @@ class TestSessionCoverage:
         e1 = SessionEvent(
             message="msg",
             task_id="run-1",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         e2 = SessionEvent(
             message="msg",
             task_id=None,
-            token_usage=TokenUsage(prompt_tokens=20, completion_tokens=10, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=20, completion_tokens=10, model="gpt-4"
+            ),
         )
         e3 = SessionEvent(
             message="no tokens",
@@ -1301,12 +1370,16 @@ class TestSessionCoverage:
         e1 = SessionEvent(
             message="msg",
             task_id="run-1",
-            token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=10, completion_tokens=5, model="gpt-4"
+            ),
         )
         e2 = SessionEvent(
             message="msg",
             task_id="run-2",
-            token_usage=TokenUsage(prompt_tokens=20, completion_tokens=10, model="gpt-4"),
+            token_usage=TokenUsage(
+                prompt_tokens=20, completion_tokens=10, model="gpt-4"
+            ),
         )
         session.events = [e1, e2]
 
@@ -1380,7 +1453,9 @@ class TestSessionCoverage:
     async def test_create_no_args(self):
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -1396,7 +1471,9 @@ class TestSessionCoverage:
     async def test_create_with_session_id(self):
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -1410,7 +1487,9 @@ class TestSessionCoverage:
     async def test_create_with_parent_id(self):
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -1425,7 +1504,9 @@ class TestSessionCoverage:
         parent = Session(id="parent-1")
         with (
             patch("chuk_ai_session_manager.session_storage.get_backend") as mock_gb,
-            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_sc,
+            patch(
+                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
+            ) as mock_sc,
         ):
             mock_store = AsyncMock()
             mock_store.get = AsyncMock(return_value=parent)
@@ -1443,6 +1524,7 @@ class TestSessionCoverage:
 # models/__init__.py tests
 # ===========================================================================
 
+
 class TestModelsInit:
     """Tests for models/__init__.py import handling and __all__."""
 
@@ -1451,81 +1533,115 @@ class TestModelsInit:
         import chuk_ai_session_manager.models as models_pkg
 
         for name in [
-            "EventSource", "EventType", "SessionEvent",
-            "SessionMetadata", "SessionRun", "RunStatus", "Session",
+            "EventSource",
+            "EventType",
+            "SessionEvent",
+            "SessionMetadata",
+            "SessionRun",
+            "RunStatus",
+            "Session",
         ]:
             assert name in models_pkg.__all__, f"{name} not in __all__"
             assert hasattr(models_pkg, name), f"{name} not accessible on module"
 
     def test_event_source_accessible(self):
         from chuk_ai_session_manager.models import EventSource as ES
+
         assert ES.USER == "user"
 
     def test_event_type_accessible(self):
         from chuk_ai_session_manager.models import EventType as ET
+
         assert ET.MESSAGE == "message"
 
     def test_session_event_accessible(self):
         from chuk_ai_session_manager.models import SessionEvent as SE
+
         event = SE(message="hi")
         assert event.message == "hi"
 
     def test_session_metadata_accessible(self):
         from chuk_ai_session_manager.models import SessionMetadata as SM
+
         meta = SM()
         assert meta.properties == {}
 
     def test_session_run_accessible(self):
         from chuk_ai_session_manager.models import SessionRun as SR
+
         run = SR()
         assert run.status == RunStatus.PENDING
 
     def test_run_status_accessible(self):
         from chuk_ai_session_manager.models import RunStatus as RS
+
         assert RS.PENDING == "pending"
 
     def test_session_accessible(self):
         from chuk_ai_session_manager.models import Session as S
+
         s = S()
         assert s.events == []
 
     def test_import_failure_event_source(self):
         """When event_source import fails, module still loads without crashing."""
-        with patch.dict(sys.modules, {"chuk_ai_session_manager.models.event_source": None}):
+        with patch.dict(
+            sys.modules, {"chuk_ai_session_manager.models.event_source": None}
+        ):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_import_failure_event_type(self):
-        with patch.dict(sys.modules, {"chuk_ai_session_manager.models.event_type": None}):
+        with patch.dict(
+            sys.modules, {"chuk_ai_session_manager.models.event_type": None}
+        ):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_import_failure_session_event(self):
-        with patch.dict(sys.modules, {"chuk_ai_session_manager.models.session_event": None}):
+        with patch.dict(
+            sys.modules, {"chuk_ai_session_manager.models.session_event": None}
+        ):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_import_failure_session_metadata(self):
-        with patch.dict(sys.modules, {"chuk_ai_session_manager.models.session_metadata": None}):
+        with patch.dict(
+            sys.modules, {"chuk_ai_session_manager.models.session_metadata": None}
+        ):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_import_failure_session_run(self):
-        with patch.dict(sys.modules, {"chuk_ai_session_manager.models.session_run": None}):
+        with patch.dict(
+            sys.modules, {"chuk_ai_session_manager.models.session_run": None}
+        ):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_import_failure_session(self):
         with patch.dict(sys.modules, {"chuk_ai_session_manager.models.session": None}):
             import chuk_ai_session_manager.models as models_pkg
+
             importlib.reload(models_pkg)
 
     def test_reload_restores_all(self):
         """After failures, reloading recovers everything."""
         import chuk_ai_session_manager.models as models_pkg
+
         importlib.reload(models_pkg)
         for name in [
-            "EventSource", "EventType", "SessionEvent",
-            "SessionMetadata", "SessionRun", "RunStatus", "Session",
+            "EventSource",
+            "EventType",
+            "SessionEvent",
+            "SessionMetadata",
+            "SessionRun",
+            "RunStatus",
+            "Session",
         ]:
             assert name in models_pkg.__all__

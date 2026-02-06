@@ -1,5 +1,6 @@
 # tests/test_fault_handler_coverage.py
 """Tests for memory/fault_handler.py to achieve >90% coverage."""
+
 import pytest
 from unittest.mock import AsyncMock
 
@@ -14,7 +15,6 @@ from chuk_ai_session_manager.memory.fault_handler import (
 from chuk_ai_session_manager.memory.models import (
     AudioContent,
     CompressionLevel,
-    FaultEffects,
     ImageContent,
     MemoryPage,
     Modality,
@@ -131,7 +131,9 @@ class TestHandleFault:
     def handler_with_table(self):
         handler = PageFaultHandler()
         pt = PageTable()
-        page = _make_page("pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2)
+        page = _make_page(
+            "pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2
+        )
         handler.store_page(page)
         pt.register(page)
         handler.configure(pt)
@@ -235,7 +237,9 @@ class TestHandleFault:
     async def test_custom_compressor(self):
         handler = PageFaultHandler()
         pt = PageTable()
-        page = _make_page("pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2)
+        page = _make_page(
+            "pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2
+        )
         handler.store_page(page)
         pt.register(page)
 
@@ -315,7 +319,9 @@ class TestFormatContentForModality:
 
     def test_image_base64(self):
         handler = PageFaultHandler()
-        page = _make_page("p1", modality=Modality.IMAGE, content="data:image/png;base64,abc")
+        page = _make_page(
+            "p1", modality=Modality.IMAGE, content="data:image/png;base64,abc"
+        )
         result = handler._format_content_for_modality(page)
         assert isinstance(result, ImageContent)
         assert result.base64 == "data:image/png;base64,abc"
