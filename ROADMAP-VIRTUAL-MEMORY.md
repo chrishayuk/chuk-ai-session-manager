@@ -24,38 +24,41 @@
 
 ---
 
-## Current Status (v0.8.2)
+## Current Status (v0.9)
 
-> **Shipped February 2025.** The core VM infrastructure is fully implemented and tested. 1480 tests passing.
+> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, and demand paging. 1618 tests passing.
 
 ### What's Shipped
 
 | Component | Module | Status |
 |-----------|--------|--------|
-| MemoryPage, PageTableEntry, all enums | `models.py` | Complete |
-| PageType taxonomy + provenance | `models.py` | Complete |
-| FaultPolicy, FaultReason, FaultRecord | `models.py` | Complete |
-| MemoryABI, PageManifestEntry | `models.py` | Complete |
-| UserExperienceMetrics | `models.py` | Complete |
-| PageTable with dirty/tier/modality tracking | `page_table.py` | Complete |
-| PageTLB + TLBWithPageTable | `tlb.py` | Complete |
-| WorkingSetManager + PinnedSet + AntiThrash | `working_set.py` | Complete |
-| ContextPacker (cross-modal formatters) | `context_packer.py` | Complete |
-| ManifestBuilder + VMManifest | `manifest.py` | Complete |
-| PageFaultHandler + PageSearchHandler | `fault_handler.py` | Complete |
-| ArtifactsBridge (chuk-artifacts + fallback) | `artifacts_bridge.py` | Complete |
-| MutationLogLite (append-only, replay) | `mutation_log.py` | Complete |
-| SimplePrefetcher (heuristic-based) | `prefetcher.py` | Complete |
-| ContextPackCache (LRU) | `pack_cache.py` | Complete |
-| VM prompts (strict/relaxed/passive) + tools | `vm_prompts.py` | Complete |
+| MemoryPage, PageTableEntry, all enums | `models.py` | v0.8 |
+| PageType taxonomy + provenance | `models.py` | v0.8 |
+| FaultPolicy, FaultReason, FaultRecord | `models.py` | v0.8 |
+| MemoryABI, PageManifestEntry | `models.py` | v0.8 |
+| UserExperienceMetrics | `models.py` | v0.8 |
+| PageTable with dirty/tier/modality/type tracking | `page_table.py` | v0.8 |
+| PageTLB + TLBWithPageTable | `tlb.py` | v0.8 |
+| WorkingSetManager + PinnedSet + AntiThrash | `working_set.py` | v0.8 |
+| ContextPacker (cross-modal formatters) | `context_packer.py` | v0.8 |
+| ManifestBuilder + VMManifest | `manifest.py` | v0.8 |
+| PageFaultHandler + PageSearchHandler | `fault_handler.py` | v0.8 |
+| ArtifactsBridge (chuk-artifacts + fallback) | `artifacts_bridge.py` | v0.8 |
+| MutationLogLite (append-only, replay) | `mutation_log.py` | v0.8 |
+| SimplePrefetcher (heuristic-based) | `prefetcher.py` | v0.8 |
+| ContextPackCache (LRU) | `pack_cache.py` | v0.8 |
+| VM prompts (strict/relaxed/passive) + tools | `vm_prompts.py` | v0.8 |
+| **MemoryManager orchestrator** | `manager.py` | **v0.9** |
+| **SessionManager VM integration** (`enable_vm`) | `session_manager.py` | **v0.9** |
+| **Event-to-Page mapper** (auto page creation) | `session_manager.py` | **v0.9** |
+| **Segmentation hook** (evict on rollover) | `session_manager.py` | **v0.9** |
+| **VM-aware prompt builder** (`VM:CONTEXT`) | `session_manager.py` | **v0.9** |
+| **DemandPagingPrePass** (recall + prefetch) | `demand_paging.py` | **v0.9** |
 
 ### What's Next
 
 | Priority | Component | Phase |
 |----------|-----------|-------|
-| **P0** | MemoryManager orchestrator | v0.9 |
-| **P0** | SessionManager VM integration | v0.9 |
-| **P0** | Demand paging strategy | v0.9 |
 | **P1** | Closed-loop learning (procedural + guards) | v0.10 |
 | **P1** | Generic EvictionPolicy protocol + compressors | v0.10 |
 | **P1** | Storage query layer (beyond K/V) | v0.10 |
@@ -1210,7 +1213,7 @@ This becomes critical when:
 
 ---
 
-## Phase 11: Demand Paging Strategy (v0.9)
+## Phase 11: Demand Paging Strategy (v0.9) — SHIPPED
 
 > **Critical design decision:** How does the system decide what to page in?
 
@@ -1289,9 +1292,9 @@ Prefetch = readahead
 The summarization callback in `_create_new_segment` is literally writing to the swap file. The question is whether to make this explicit in the API or keep it transparent.
 
 ### 11.4 Deliverables
-- [ ] `DemandPagingPrePass` — user message scanner with recall heuristics
-- [ ] Configurable paging mode (model-initiated / runtime / hybrid)
-- [ ] Pre-pass integration into `SessionManager.user_says()`
+- [x] `DemandPagingPrePass` — user message scanner with recall heuristics
+- [x] Configurable paging mode (model-initiated / runtime / hybrid)
+- [x] Pre-pass integration into `SessionManager.user_says()`
 - [ ] Metrics: prefetch hit rate vs. model-initiated fault rate
 - [ ] Documentation: when to use which mode
 
@@ -2210,7 +2213,7 @@ Track *why* faults happen to tune policies:
 | 1 | v0.8 | Foundations — MemoryPage, PageTable, TLB | **SHIPPED** |
 | 2 | v0.8 | Working Set — PinnedSet, AntiThrash, TokenBudget | **SHIPPED** |
 | 3 | v0.8 | Page Faults — FaultHandler, ArtifactsBridge, FaultPolicy | **SHIPPED** |
-| **11** | **v0.9** | **MemoryManager orchestrator + demand paging strategy** | **NEXT** |
+| **11** | **v0.9** | **MemoryManager orchestrator + demand paging strategy** | **SHIPPED** |
 | 4 | v0.10 | Eviction — Generic EvictionPolicy, modality compressors | Partial |
 | **12** | **v0.10** | **Closed-loop learning — procedural memory + guards feedback** | **NEXT** |
 | **13** | **v0.10** | **Storage query layer — page index beyond K/V** | **NEXT** |
@@ -2336,12 +2339,12 @@ class SessionManager:
 
 | Metric | Target | Result |
 |--------|--------|--------|
-| Tests passing | 100% | **1480 tests passing** |
+| Tests passing | 100% | **1618 tests passing** |
 | Fault handling works | Model can page_fault, get content | **Complete — async, protocol-extensible** |
 | TLB hit rate | > 80% for repeated accesses | **Complete — LRU with stats tracking** |
 | Manifest generation | Valid JSON, parseable | **Complete — ManifestBuilder with policies** |
 | Context packing | Stays under token budget | **Complete — cross-modal formatters** |
-| Integration | Works with existing SessionManager | **Pending — MemoryManager orchestrator (v0.9)** |
+| Integration | Works with existing SessionManager | **Complete — MemoryManager orchestrator + SessionManager enable_vm (v0.9)** |
 
 ### v0.8 Non-Goals
 
@@ -2745,12 +2748,12 @@ session.state["vm:page_locations"] = {
 
 | Priority | Component | Description | Phase |
 |----------|-----------|-------------|-------|
-| **P0** | `MemoryManager` | Orchestrator tying PageTable, WorkingSet, FaultHandler, Packer together | v0.9 |
-| **P0** | `SessionManager.memory` | Optional VM integration property on SessionManager | v0.9 |
-| **P0** | Event↔Page mapper | Convert SessionEvents to MemoryPages automatically | v0.9 |
-| **P0** | Segmentation hook | Trigger eviction on new segment creation | v0.9 |
-| **P0** | VM-aware prompt builder | Use `VM:CONTEXT` when `enable_vm=True` | v0.9 |
-| **P0** | `DemandPagingPrePass` | Scan user messages for recall signals, prefetch | v0.9 |
+| ~~**P0**~~ | ~~`MemoryManager`~~ | ~~Orchestrator tying PageTable, WorkingSet, FaultHandler, Packer together~~ | ~~v0.9~~ ✅ |
+| ~~**P0**~~ | ~~`SessionManager.memory`~~ | ~~Optional VM integration property on SessionManager~~ | ~~v0.9~~ ✅ |
+| ~~**P0**~~ | ~~Event↔Page mapper~~ | ~~Convert SessionEvents to MemoryPages automatically~~ | ~~v0.9~~ ✅ |
+| ~~**P0**~~ | ~~Segmentation hook~~ | ~~Trigger eviction on new segment creation~~ | ~~v0.9~~ ✅ |
+| ~~**P0**~~ | ~~VM-aware prompt builder~~ | ~~Use `VM:CONTEXT` when `enable_vm=True`~~ | ~~v0.9~~ ✅ |
+| ~~**P0**~~ | ~~`DemandPagingPrePass`~~ | ~~Scan user messages for recall signals, prefetch~~ | ~~v0.9~~ ✅ |
 | **P1** | `GuardFeedbackIntegration` | Wire guard triggers into procedural memory | v0.10 |
 | **P1** | `PageIndex` | Lightweight query index over page metadata | v0.10 |
 | **P1** | `EvictionPolicy` protocol | Swappable eviction strategies (LRU, importance-weighted, etc.) | v0.10 |
