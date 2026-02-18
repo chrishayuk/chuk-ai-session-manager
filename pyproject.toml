@@ -4,15 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.8.1"
+version = "0.8.2"
 description = "Session manager for AI applications"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
 
 # Core dependencies - only what's absolutely required
 dependencies = [
-    "chuk-sessions>=0.4.1",
-    "chuk-tool-processor>=0.18",
+    "chuk-sessions>=0.6.1",
+    "chuk-tool-processor>=0.20.1",
     "pydantic>=2.11.3",
 ]
 
@@ -39,7 +40,7 @@ dev = [
 
 # All optional features
 all = [
-    "chuk-sessions[redis]>=0.4",
+    "chuk-sessions[redis]>=0.6.1",
     "redis>=4.0.0",
     "tiktoken>=0.9.0",
 ]
@@ -108,6 +109,7 @@ ignore = ["E501"]  # Line too long - handled by formatter
 python_version = "3.11"
 warn_return_any = false
 warn_unused_configs = true
+warn_unused_ignores = false
 ignore_missing_imports = true
 check_untyped_defs = false
 disallow_untyped_defs = false

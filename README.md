@@ -3,7 +3,7 @@
 **A powerful session management system for AI applications**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Automatic conversation tracking, token usage monitoring, tool call logging, infinite context support with automatic summarization, and hierarchical session relationships. Perfect for AI applications that need reliable session management.
 
@@ -299,7 +299,7 @@ except SessionManagerError as e:
 
 ## 📄 License
 
-MIT License - build amazing AI applications with confidence!
+Apache 2.0 - build amazing AI applications with confidence!
 
 ---
 

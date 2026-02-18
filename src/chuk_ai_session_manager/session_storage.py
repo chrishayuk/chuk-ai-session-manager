@@ -69,7 +69,7 @@ class SessionStorage:
 
             # Parse the JSON data
             session_data = json.loads(ai_session_json)
-            ai_session = Session.model_validate(session_data)
+            ai_session: Session = Session.model_validate(session_data)
 
             self._cache[session_id] = ai_session
             return ai_session

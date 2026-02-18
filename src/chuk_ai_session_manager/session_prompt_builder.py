@@ -41,7 +41,7 @@ async def build_prompt_from_session(
     include_parent_context: bool = False,
     current_query: Optional[str] = None,
     max_history: int = 5,  # Add this parameter for conversation strategy
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """
     Build a prompt for the next LLM call from a Session asynchronously.
 
@@ -84,7 +84,7 @@ async def build_prompt_from_session(
         return await _build_minimal_prompt(session)
 
 
-async def _build_minimal_prompt(session: Session) -> List[Dict[str, str]]:
+async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
     """
     Build a minimal prompt from a session.
 
@@ -132,7 +132,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, str]]:
     summaries = [c for c in children if c.type == EventType.SUMMARY]
 
     # Assemble prompt
-    prompt: List[Dict[str, str]] = []
+    prompt: List[Dict[str, Any]] = []
     if first_user:
         prompt.append({"role": "user", "content": _extract_content(first_user.message)})
 
@@ -190,7 +190,7 @@ def _extract_content(message: Any) -> str:
         return str(message)
 
 
-async def _build_task_focused_prompt(session: Session) -> List[Dict[str, str]]:
+async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     """
     Build a task-focused prompt.
 
@@ -223,7 +223,7 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, str]]:
     )
 
     # Build prompt
-    prompt = []
+    prompt: List[Dict[str, Any]] = []
 
     # Always include the first user message (the main task)
     prompt.append({"role": "user", "content": _extract_content(first_user.message)})
@@ -273,7 +273,7 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, str]]:
     return prompt
 
 
-async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, str]]:
+async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     """
     Build a tool-focused prompt.
 
@@ -306,7 +306,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, str]]:
     )
 
     # Build prompt
-    prompt = []
+    prompt: List[Dict[str, Any]] = []
 
     # Include user message
     prompt.append({"role": "user", "content": _extract_content(latest_user.message)})
@@ -350,7 +350,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, str]]:
 
 async def _build_conversation_prompt(
     session: Session, max_history: int = 5
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """
     Build a conversation-style prompt with recent history.
 
@@ -370,7 +370,7 @@ async def _build_conversation_prompt(
     )
 
     # Build the conversation history
-    prompt = []
+    prompt: List[Dict[str, Any]] = []
     for i, msg in enumerate(recent_messages):
         role = "user" if msg.source == EventSource.USER else "assistant"
         content = _extract_content(msg.message)
@@ -416,7 +416,7 @@ async def _build_conversation_prompt(
 
 async def _build_hierarchical_prompt(
     session: Session, include_parent_context: bool = True
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """
     Build a prompt that includes hierarchical context.
 
@@ -473,10 +473,10 @@ async def _build_hierarchical_prompt(
 
 
 async def truncate_prompt_to_token_limit(
-    prompt: List[Dict[str, str]],
+    prompt: List[Dict[str, Any]],
     max_tokens: int,
     model: str = "gpt-3.5-turbo",
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """
     Trim a prompt so its total token count is ≤ `max_tokens`.
 
@@ -514,7 +514,7 @@ async def truncate_prompt_to_token_limit(
         None,
     )
 
-    kept: List[Dict[str, str]] = []
+    kept: List[Dict[str, Any]] = []
     if first_user_idx is not None:
         kept.append(prompt[first_user_idx])
     if last_asst_idx is not None:

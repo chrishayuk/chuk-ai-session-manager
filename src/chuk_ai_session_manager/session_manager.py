@@ -112,11 +112,11 @@ class SessionManager:
         if self._session:
             return self._session.id
         elif self._session_id:
-            return self._session_id
+            return self._session_id or ""
         else:
             # Generate a new ID if needed
             self._session_id = str(uuid.uuid4())
-            return self._session_id
+            return self._session_id or ""
 
     @property
     def system_prompt(self) -> Optional[str]:
@@ -273,6 +273,7 @@ class SessionManager:
             return False
 
         await self._ensure_initialized()
+        assert self._session is not None
 
         # Check token threshold
         if self._session.total_tokens >= self._token_threshold:
@@ -296,6 +297,7 @@ class SessionManager:
                          Should accept List[Dict] messages and return str summary.
         """
         await self._ensure_initialized()
+        assert self._session is not None
         message_events = [
             e for e in self._session.events if e.type == EventType.MESSAGE
         ]
@@ -346,6 +348,8 @@ class SessionManager:
             message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY
         )
         await self._ensure_initialized()
+        await self._ensure_initialized()
+        assert self._session is not None
         await self._session.add_event_and_save(summary_event)
 
         # Create new session with current as parent
@@ -368,7 +372,7 @@ class SessionManager:
         logger.info(
             f"Created new session segment: {old_session_id} -> {self._session_id}"
         )
-        return self._session_id
+        return self._session_id or ""
 
     async def user_says(self, message: str, **metadata) -> str:
         """
@@ -386,6 +390,7 @@ class SessionManager:
             await self._create_new_segment()
 
         await self._ensure_initialized()
+        assert self._session is not None
 
         # Create and add the event
         event = await SessionEvent.create_with_tokens(
@@ -413,7 +418,7 @@ class SessionManager:
                 }
             )
 
-        return self._session_id
+        return self._session_id or ""
 
     async def ai_responds(
         self,
@@ -439,6 +444,7 @@ class SessionManager:
             await self._create_new_segment()
 
         await self._ensure_initialized()
+        assert self._session is not None
 
         # Create and add the event
         event = await SessionEvent.create_with_tokens(
@@ -476,7 +482,7 @@ class SessionManager:
                 }
             )
 
-        return self._session_id
+        return self._session_id or ""
 
     async def tool_used(
         self,
@@ -500,6 +506,7 @@ class SessionManager:
             The current session ID.
         """
         await self._ensure_initialized()
+        assert self._session is not None
 
         tool_message = {
             "tool": tool_name,
@@ -524,7 +531,7 @@ class SessionManager:
         tool_events = [e for e in self._session.events if e.type == EventType.TOOL_CALL]
         logger.debug(f"Tool events after adding: {len(tool_events)}")
 
-        return self._session_id
+        return self._session_id or ""
 
     async def get_messages_for_llm(
         self, include_system: bool = True
@@ -539,6 +546,7 @@ class SessionManager:
             List of message dictionaries with 'role' and 'content' keys.
         """
         await self._ensure_initialized()
+        assert self._session is not None
 
         messages = []
 
@@ -579,6 +587,7 @@ class SessionManager:
         else:
             # Return current session only
             await self._ensure_initialized()
+            assert self._session is not None
             conversation = []
             for event in self._session.events:
                 if event.type == EventType.MESSAGE:
@@ -627,14 +636,15 @@ class SessionManager:
             include_all_segments = self._infinite_context
 
         await self._ensure_initialized()
+        assert self._session is not None
 
         if self._infinite_context and include_all_segments:
             # For infinite context, build the complete chain if needed
             if len(self._session_chain) < self._total_segments:
                 # Need to reconstruct the chain
                 store = self._store
-                chain = []
-                current_id = self._session_id
+                chain: List[str] = []
+                current_id: Optional[str] = self._session_id
 
                 # Walk backwards to find all segments
                 while current_id:
@@ -668,6 +678,7 @@ class SessionManager:
                 try:
                     # For the current session, use self._session directly
                     # to ensure we have the latest in-memory state
+                    sess: Optional[Session]
                     if session_id == self._session_id:
                         sess = self._session
                     else:
@@ -751,9 +762,10 @@ class SessionManager:
         store = self._store
 
         # Start from current session and work backwards
-        current_id = self._session_id
-        chain = [current_id]
-        conversation = []
+        assert self._session_id is not None
+        current_id: str = self._session_id
+        chain: List[str] = [current_id]
+        conversation: List[Dict[str, Any]] = []
 
         while current_id:
             session = await store.get(current_id)

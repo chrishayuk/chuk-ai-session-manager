@@ -46,7 +46,7 @@ class SessionAwareToolProcessor:
         self.retry_delay = retry_delay
         self.cache: Dict[str, ToolResult] = {}
 
-        self._tp = ToolProcessor()
+        self._tp: ToolProcessor = ToolProcessor()
         if not hasattr(self._tp, "executor"):
             raise AttributeError(
                 "Installed chuk_tool_processor is too old - missing `.executor`"
@@ -76,7 +76,7 @@ class SessionAwareToolProcessor:
                 args = {"raw": fn.get("arguments")}
             tool_calls.append(ToolCall(tool=name, arguments=args))
 
-        results = await self._tp.executor.execute(tool_calls)
+        results = await self._tp.executor.execute(tool_calls)  # type: ignore[union-attr]
         for r in results:
             r.result = await self._maybe_await(r.result)
         return results
