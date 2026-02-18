@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-AI Virtual Memory Demo (v0.8)
+AI Virtual Memory Demo (v0.8 — low-level components)
 
-Demonstrates the VM protocol with a real LLM. Shows:
+NOTE: For the recommended v0.9 approach using MemoryManager and
+SessionManager(enable_vm=True), see examples/06_virtual_memory.py instead.
+
+This demo uses the low-level VM components directly to show how the
+protocol works under the hood with a real LLM. Shows:
 - VM:MANIFEST_JSON generation with page types
 - VM:CONTEXT packing
 - page_fault tool handling with fault reasons

@@ -514,9 +514,9 @@ class TestSpecialScenarios:
         for i, sm in enumerate(sessions):
             expected_category = "support" if i % 2 == 0 else "sales"
             actual_category = sm._session.metadata.properties.get("category")
-            assert (
-                actual_category == expected_category
-            ), f"Session {i} has wrong category: {actual_category}"
+            assert actual_category == expected_category, (
+                f"Session {i} has wrong category: {actual_category}"
+            )
 
         # In a real implementation, you could search sessions by metadata
         support_sessions = [

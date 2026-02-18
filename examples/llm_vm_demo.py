@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-LLM Virtual Memory Demo (v0.8)
+LLM Virtual Memory Demo (v0.8 — low-level components)
+
+NOTE: For the recommended v0.9 approach using MemoryManager and
+SessionManager(enable_vm=True), see examples/06_virtual_memory.py instead.
 
 A practical demonstration of the AI Virtual Memory system with a real LLM.
+Uses the low-level VM components directly to show the full page lifecycle.
 Simulates a multi-turn conversation where the model must use page faults
 to recall information from earlier in the conversation.
 

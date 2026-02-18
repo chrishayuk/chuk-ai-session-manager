@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Comprehensive example of the AI Virtual Memory system (v0.8).
+Comprehensive example of the AI Virtual Memory system (v0.8 — individual components).
 
-This example demonstrates:
+NOTE: For the recommended v0.9 approach using MemoryManager and
+SessionManager(enable_vm=True), see examples/06_virtual_memory.py instead.
+
+This example walks through each low-level VM component individually:
 1. Creating and managing memory pages with page types
 2. Page table operations with provenance tracking
 3. TLB caching

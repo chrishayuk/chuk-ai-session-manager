@@ -25,6 +25,7 @@ from .models import (
     Modality,
     PageTableEntry,
     PageTableStats,
+    PageType,
     StorageTier,
 )
 
@@ -219,6 +220,10 @@ class PageTable(BaseModel):
         """Get all entries of a specific modality."""
         page_ids = self._by_modality.get(modality, set())
         return [self.entries[pid] for pid in page_ids if pid in self.entries]
+
+    def get_by_type(self, page_type: PageType) -> List[PageTableEntry]:
+        """Get all entries of a specific page type."""
+        return [e for e in self.entries.values() if e.page_type == page_type]
 
     def get_dirty_pages(self) -> List[PageTableEntry]:
         """Get all dirty (modified) pages."""
