@@ -434,7 +434,7 @@ async def main():
     print("   CHUK Sessions - enterprise storage backend")
     print("   SessionManager - simple API wrapper (if available)")
 
-    print("\n🚀 Production Features:")
+    print("\n🚀 Features:")
     print("   • Complete conversation tracking")
     print("   • Real-time token and cost analytics")
     print("   • Hierarchical session relationships")

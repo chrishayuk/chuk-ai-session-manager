@@ -337,7 +337,7 @@ async def main():
         print("  • Session tracking: Adds observability without complexity")
         print("  • Token & cost tracking: Built-in with create_with_tokens")
         print("  • Parallel requests: Easy with simple functions")
-        print("  • Production ready: Full audit trail for all interactions")
+        print("  • Full audit trail for all interactions")
         print("  • Choose based on your use case!")
 
     except Exception as e:

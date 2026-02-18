@@ -15,7 +15,7 @@ Automatic conversation tracking, token usage monitoring, tool call logging, infi
 # Basic installation (memory storage only)
 pip install chuk-ai-session-manager
 
-# With Redis support for production
+# With Redis support for persistent storage
 pip install chuk-ai-session-manager[redis]
 
 # With enhanced token counting
@@ -105,7 +105,7 @@ await sm.ai_responds("Computing history begins with...", model="gpt-4")
 | Installation | Storage | Use Case | Performance |
 |-------------|---------|----------|-------------|
 | `pip install chuk-ai-session-manager` | Memory | Development, testing | 1.8M ops/sec |
-| `pip install chuk-ai-session-manager[redis]` | Redis | Production, persistence | 20K ops/sec |
+| `pip install chuk-ai-session-manager[redis]` | Redis | Persistent, distributed | 20K ops/sec |
 
 ### 🛡️ **Conversation Guards and Tool State**
 Runtime guardrails that prevent runaway tool loops, track value bindings, and enforce grounded tool calls.
@@ -228,7 +228,7 @@ session_id = await track_infinite_conversation(
 # Memory provider (default) - fast, no persistence
 export SESSION_PROVIDER=memory
 
-# Redis provider - persistent, production-ready (requires redis extra)
+# Redis provider - persistent, distributed (requires redis extra)
 export SESSION_PROVIDER=redis
 export SESSION_REDIS_URL=redis://localhost:6379/0
 ```
@@ -238,7 +238,7 @@ export SESSION_REDIS_URL=redis://localhost:6379/0
 | Command | Memory | Redis | Token Counting | Use Case |
 |---------|--------|-------|----------------|----------|
 | `pip install chuk-ai-session-manager` | ✅ | ❌ | Basic | Development |
-| `pip install chuk-ai-session-manager[redis]` | ✅ | ✅ | Basic | Production |
+| `pip install chuk-ai-session-manager[redis]` | ✅ | ✅ | Basic | Persistent |
 | `pip install chuk-ai-session-manager[tiktoken]` | ✅ | ❌ | Enhanced | Better accuracy |
 | `pip install chuk-ai-session-manager[all]` | ✅ | ✅ | Enhanced | Full features |
 
@@ -267,7 +267,7 @@ Session Segments: {stats.get('session_segments', 1)}
 - **Zero Configuration**: Start tracking conversations in 3 lines of code
 - **Infinite Context**: Never worry about token limits again
 - **Universal**: Works with any LLM provider (OpenAI, Anthropic, etc.)
-- **Production Ready**: Built-in persistence, monitoring, and error handling
+- **Robust**: Built-in persistence, monitoring, and error handling
 - **Token Aware**: Automatic cost tracking across all providers
 - **Tool Friendly**: Seamless tool call logging and retry mechanisms
 - **Guardrails**: Runtime guards prevent runaway tool loops and ungrounded calls

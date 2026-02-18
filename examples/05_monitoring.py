@@ -1,8 +1,8 @@
 # examples/05_monitoring.py
 """
-📈 PRODUCTION MONITORING: Cost tracking and analytics
+📈 MONITORING: Cost tracking and analytics
 
-Monitor AI usage, costs, and performance in production.
+Monitor AI usage, costs, and performance.
 """
 
 import asyncio
@@ -10,8 +10,8 @@ from datetime import datetime
 from chuk_ai_session_manager import SessionManager
 
 
-async def simulate_production_usage():
-    """Simulate a day of production AI usage"""
+async def simulate_usage():
+    """Simulate a day of AI usage"""
     sessions = []
 
     # Simulate different types of AI interactions
@@ -42,10 +42,10 @@ async def simulate_production_usage():
 
 
 async def main():
-    print("📈 Production monitoring simulation...")
+    print("📈 Monitoring simulation...")
 
     # Simulate usage
-    sessions = await simulate_production_usage()
+    sessions = await simulate_usage()
 
     # Analyze usage by use case
     usage_by_case = {}
@@ -69,8 +69,8 @@ async def main():
         total_cost += stats["estimated_cost"]
         total_tokens += stats["total_tokens"]
 
-    # Production monitoring report
-    print("\n📊 Production AI Usage Report")
+    # Monitoring report
+    print("\n📊 AI Usage Report")
     print("=" * 50)
     print(f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}")
     print(f"💰 Total Cost: ${total_cost:.6f}")

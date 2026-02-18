@@ -4,7 +4,7 @@
 fastapi_session_example.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A production-ready FastAPI server demonstrating the CHUK AI Session Manager.
+A FastAPI server demonstrating the CHUK AI Session Manager.
 
 Features:
 - Complete session lifecycle management (CRUD operations)
@@ -150,7 +150,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="CHUK AI Session Manager API",
     description="""
-    Production-ready API for managing AI conversation sessions with comprehensive tracking.
+    API for managing AI conversation sessions with comprehensive tracking.
 
     ## Features
     - **Session Management**: Create, read, update, delete sessions
@@ -181,7 +181,7 @@ app = FastAPI(
 # Add CORS middleware for web frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],  # Configure appropriately for your deployment
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

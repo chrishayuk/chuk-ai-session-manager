@@ -114,7 +114,7 @@ class PageFaultHandler(BaseModel):
     tlb: Optional[PageTLB] = None
 
     # Page storage (maps page_id -> MemoryPage for L2+ pages)
-    # In production, this would be replaced by ArtifactsBridge
+    # In a deployed system, this would be replaced by ArtifactsBridge
     page_store: Dict[str, MemoryPage] = Field(default_factory=dict)
 
     # Metrics

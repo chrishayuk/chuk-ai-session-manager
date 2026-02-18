@@ -442,7 +442,7 @@ async def main():
     print("  • Hierarchical session management with parent-child relationships")
     print("  • Full conversation history retrieval across session segments")
     print("  • Context building for LLM calls with summary inclusion")
-    print("  • Production-ready infinite conversation handling")
+    print("  • Robust infinite conversation handling")
 
 
 if __name__ == "__main__":

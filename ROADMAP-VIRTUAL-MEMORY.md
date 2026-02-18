@@ -1874,7 +1874,7 @@ class SessionManager:
 ### v0.8 Non-Goals
 
 - Perfect eviction policy (LRU is fine)
-- Production-ready compression (stub summarizer OK)
+- Full compression (stub summarizer OK)
 - Multi-modal anything
 - Distributed/shared state
 - Sub-100ms fault latency
@@ -2003,7 +2003,7 @@ async def test_north_star_vm_acceptance():
 | Provenance | Citations link back to source pages |
 | UX metrics | Recall success and thrash index within targets |
 
-If this test passes, the VM system "feels good" in production.
+If this test passes, the VM system "feels good" end-to-end.
 
 ---
 

@@ -480,7 +480,7 @@ async def main() -> None:
     log.info("   • Multi-model cost comparison")
     log.info("   • Running total cost monitoring")
     log.info("   • Detailed usage analytics by source and model")
-    log.info("   • Production-ready cost optimization insights")
+    log.info("   • Cost optimization insights")
 
 
 if __name__ == "__main__":

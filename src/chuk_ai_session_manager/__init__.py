@@ -33,7 +33,7 @@ Storage Configuration:
     # Default: Memory storage (no Redis required)
     pip install chuk-ai-session-manager
 
-    # Redis: For production persistence
+    # Redis: For persistent storage
     pip install chuk-ai-session-manager[redis]
     export SESSION_PROVIDER=redis
     export SESSION_REDIS_URL=redis://localhost:6379/0

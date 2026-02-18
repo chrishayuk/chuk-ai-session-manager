@@ -134,7 +134,7 @@ print(packed.content)  # VM:CONTEXT format
 
 ## v0.8 Components
 
-The v0.8 release adds several components to make the VM system production-ready:
+The v0.8 release adds several components to make the VM system robust and complete:
 
 ### Page Type Taxonomy
 

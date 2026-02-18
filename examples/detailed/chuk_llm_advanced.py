@@ -5,7 +5,7 @@ CHUK LLM Advanced API Integration with Session Management
 
 This example demonstrates integration with chuk-llm's advanced client API,
 providing complete session management, tool integration, and observability
-for production AI applications.
+for AI applications.
 
 Run with:
     uv run examples/chuk_llm_advanced_demo.py \
@@ -21,7 +21,7 @@ Features demonstrated:
 - Session-aware tool processing
 - Complete message and tool tracking
 - Token usage and cost monitoring
-- Production-ready error handling
+- Robust error handling
 """
 
 import argparse
@@ -328,7 +328,7 @@ class SessionAwareLLMClient:
         elif tool_name == "calculate":
             expression = arguments.get("expression", "0")
             try:
-                # Simple evaluation (in production, use a safe math evaluator)
+                # Simple evaluation (use a safe math evaluator for untrusted input)
                 result = eval(expression.replace("×", "*").replace("÷", "/"))
                 return {"expression": expression, "result": result, "success": True}
             except Exception as e:
