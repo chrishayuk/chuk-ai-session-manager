@@ -23,10 +23,23 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.session_storage import ChukSessionsStore
+from chuk_ai_session_manager.memory.manager import MemoryManager
+from chuk_ai_session_manager.memory.models import (
+    PageType,
+    StorageTier,
+    VMMode,
+)
+from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOKEN_MODEL = "gpt-4o-mini"
+
+# Default importance scores for VM page creation
+VM_IMPORTANCE_USER = 0.6
+VM_IMPORTANCE_AI = 0.5
+VM_IMPORTANCE_TOOL = 0.4
+VM_IMPORTANCE_SUMMARY = 0.9
 
 
 class SessionManager:
@@ -68,6 +81,9 @@ class SessionManager:
         token_threshold: int = 4000,
         max_turns_per_segment: int = 20,
         default_model: str = DEFAULT_TOKEN_MODEL,
+        enable_vm: bool = False,
+        vm_config: Optional[WorkingSetConfig] = None,
+        vm_mode: VMMode = VMMode.STRICT,
     ):
         """
         Initialize a SessionManager.
@@ -82,6 +98,9 @@ class SessionManager:
             token_threshold: Token limit before creating new session (infinite mode).
             max_turns_per_segment: Turn limit before creating new session (infinite mode).
             default_model: Model name used for token counting (default: gpt-4o-mini).
+            enable_vm: Enable AI Virtual Memory subsystem for context management.
+            vm_config: Optional WorkingSetConfig for VM working set sizing.
+            vm_mode: VM mode (STRICT, RELAXED, or PASSIVE). Default: STRICT.
         """
         # Core session management
         self._session_id = session_id
@@ -105,6 +124,15 @@ class SessionManager:
         self._session_chain: List[str] = []
         self._full_conversation: List[Dict[str, Any]] = []
         self._total_segments = 1
+
+        # Virtual Memory subsystem
+        self._vm: Optional[MemoryManager] = None
+        if enable_vm:
+            self._vm = MemoryManager(
+                session_id=self.session_id,
+                config=vm_config,
+                mode=vm_mode,
+            )
 
     @property
     def session_id(self) -> str:
@@ -134,6 +162,38 @@ class SessionManager:
         if not self._initialized:
             return True
         return not self._loaded_from_storage
+
+    @property
+    def vm(self) -> Optional[MemoryManager]:
+        """Access the Virtual Memory manager (None if VM is disabled)."""
+        return self._vm
+
+    def get_vm_context(
+        self,
+        model_id: str = "",
+        token_budget: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the full VM context for an LLM call.
+
+        Returns None if VM is disabled. Otherwise returns a dict with:
+        - developer_message: str with VM rules, manifest, and context
+        - tools: list of VM tool definitions
+        - manifest: VMManifest
+        - packed_context: PackedContext
+
+        Args:
+            model_id: Optional model identifier for context sizing.
+            token_budget: Optional token budget override.
+        """
+        if not self._vm:
+            return None
+
+        return self._vm.build_context(
+            system_prompt=self._system_prompt or "",
+            model_id=model_id,
+            token_budget=token_budget,
+        )
 
     async def _ensure_session(self) -> Optional[Session]:
         """Ensure session is initialized and return it."""
@@ -348,9 +408,21 @@ class SessionManager:
             message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY
         )
         await self._ensure_initialized()
-        await self._ensure_initialized()
         assert self._session is not None
         await self._session.add_event_and_save(summary_event)
+
+        # VM: create summary page, pin it, evict old segment pages
+        if self._vm:
+            summary_page = self._vm.create_page(
+                content=summary,
+                page_type=PageType.SUMMARY,
+                importance=VM_IMPORTANCE_SUMMARY,
+                hint=f"segment summary: {summary[:100]}",
+            )
+            self._vm.pin_page(summary_page.page_id)
+            await self._vm.add_to_working_set(summary_page)
+            self._vm.set_last_segment_summary(summary_page.page_id)
+            await self._vm.evict_segment_pages(StorageTier.L2)
 
         # Create new session with current as parent
         new_session = await Session.create(parent_id=self._session_id)
@@ -368,6 +440,11 @@ class SessionManager:
         self._session = new_session
         self._session_chain.append(self._session_id)
         self._total_segments += 1
+
+        # VM: update session_id and advance turn
+        if self._vm:
+            self._vm.update_session_id(self._session_id or "")
+            self._vm.new_turn()
 
         logger.info(
             f"Created new session segment: {old_session_id} -> {self._session_id}"
@@ -388,6 +465,10 @@ class SessionManager:
         # Check for segmentation before adding message
         if await self._should_create_new_segment():
             await self._create_new_segment()
+
+        # VM: run demand paging pre-pass before event creation
+        if self._vm:
+            await self._vm.demand_pre_pass(message)
 
         await self._ensure_initialized()
         assert self._session is not None
@@ -417,6 +498,16 @@ class SessionManager:
                     "session_id": self._session_id,
                 }
             )
+
+        # Add to VM working set
+        if self._vm:
+            vm_page = self._vm.create_page(
+                content=message,
+                page_type=PageType.TRANSCRIPT,
+                importance=VM_IMPORTANCE_USER,
+                page_id=f"msg_{event.id[:8]}" if event.id else None,
+            )
+            await self._vm.add_to_working_set(vm_page)
 
         return self._session_id or ""
 
@@ -482,6 +573,16 @@ class SessionManager:
                 }
             )
 
+        # Add to VM working set
+        if self._vm:
+            vm_page = self._vm.create_page(
+                content=response,
+                page_type=PageType.TRANSCRIPT,
+                importance=VM_IMPORTANCE_AI,
+                page_id=f"msg_{event.id[:8]}" if event.id else None,
+            )
+            await self._vm.add_to_working_set(vm_page)
+
         return self._session_id or ""
 
     async def tool_used(
@@ -531,6 +632,18 @@ class SessionManager:
         tool_events = [e for e in self._session.events if e.type == EventType.TOOL_CALL]
         logger.debug(f"Tool events after adding: {len(tool_events)}")
 
+        # Add to VM as artifact page
+        if self._vm:
+            tool_content = f"{tool_name}({arguments}) -> {result}"
+            if error:
+                tool_content += f" [error: {error}]"
+            vm_page = self._vm.create_page(
+                content=tool_content,
+                page_type=PageType.ARTIFACT,
+                importance=VM_IMPORTANCE_TOOL,
+            )
+            await self._vm.add_to_working_set(vm_page)
+
         return self._session_id or ""
 
     async def get_messages_for_llm(
@@ -547,6 +660,23 @@ class SessionManager:
         """
         await self._ensure_initialized()
         assert self._session is not None
+
+        # VM mode: replace system prompt with VM-packed context
+        # Only when include_system=True (avoid breaking _create_summary)
+        if self._vm and include_system:
+            ctx = self._vm.build_context(system_prompt=self._system_prompt or "")
+            messages: List[Dict[str, str]] = [
+                {"role": "system", "content": ctx["developer_message"]}
+            ]
+            for event in self._session.events:
+                if event.type == EventType.MESSAGE:
+                    if event.source == EventSource.USER:
+                        messages.append({"role": "user", "content": str(event.message)})
+                    elif event.source == EventSource.LLM:
+                        messages.append(
+                            {"role": "assistant", "content": str(event.message)}
+                        )
+            return messages
 
         messages = []
 

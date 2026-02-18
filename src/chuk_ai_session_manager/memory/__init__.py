@@ -112,6 +112,8 @@ from .artifacts_bridge import (
     InMemoryBackend,
     PageMetadata,
 )
+from .manager import MemoryManager, event_to_page
+from .demand_paging import DEFAULT_RECALL_SIGNALS, DemandPagingPrePass
 from .vm_prompts import (
     PAGE_FAULT_TOOL,
     SEARCH_PAGES_TOOL,
@@ -239,9 +241,15 @@ __all__ = [
     "VM_STRICT_PROMPT",
     "VM_TOOL_DEFINITIONS",
     "VM_TOOLS",
+    # Manager
+    "MemoryManager",
+    "event_to_page",
     # Builders
     "build_vm_developer_message",
     "get_prompt_for_mode",
     "get_vm_tools",
     "get_vm_tools_as_dicts",
+    # Demand Paging
+    "DEFAULT_RECALL_SIGNALS",
+    "DemandPagingPrePass",
 ]

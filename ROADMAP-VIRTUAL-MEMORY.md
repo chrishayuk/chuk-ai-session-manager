@@ -24,6 +24,50 @@
 
 ---
 
+## Current Status (v0.8.2)
+
+> **Shipped February 2025.** The core VM infrastructure is fully implemented and tested. 1480 tests passing.
+
+### What's Shipped
+
+| Component | Module | Status |
+|-----------|--------|--------|
+| MemoryPage, PageTableEntry, all enums | `models.py` | Complete |
+| PageType taxonomy + provenance | `models.py` | Complete |
+| FaultPolicy, FaultReason, FaultRecord | `models.py` | Complete |
+| MemoryABI, PageManifestEntry | `models.py` | Complete |
+| UserExperienceMetrics | `models.py` | Complete |
+| PageTable with dirty/tier/modality tracking | `page_table.py` | Complete |
+| PageTLB + TLBWithPageTable | `tlb.py` | Complete |
+| WorkingSetManager + PinnedSet + AntiThrash | `working_set.py` | Complete |
+| ContextPacker (cross-modal formatters) | `context_packer.py` | Complete |
+| ManifestBuilder + VMManifest | `manifest.py` | Complete |
+| PageFaultHandler + PageSearchHandler | `fault_handler.py` | Complete |
+| ArtifactsBridge (chuk-artifacts + fallback) | `artifacts_bridge.py` | Complete |
+| MutationLogLite (append-only, replay) | `mutation_log.py` | Complete |
+| SimplePrefetcher (heuristic-based) | `prefetcher.py` | Complete |
+| ContextPackCache (LRU) | `pack_cache.py` | Complete |
+| VM prompts (strict/relaxed/passive) + tools | `vm_prompts.py` | Complete |
+
+### What's Next
+
+| Priority | Component | Phase |
+|----------|-----------|-------|
+| **P0** | MemoryManager orchestrator | v0.9 |
+| **P0** | SessionManager VM integration | v0.9 |
+| **P0** | Demand paging strategy | v0.9 |
+| **P1** | Closed-loop learning (procedural + guards) | v0.10 |
+| **P1** | Generic EvictionPolicy protocol + compressors | v0.10 |
+| **P1** | Storage query layer (beyond K/V) | v0.10 |
+| **P2** | StreamingFaultHandler | v0.11 |
+| **P2** | Real multi-modal handlers | v0.11 |
+| **P2** | Memory pressure monitoring | v0.11 |
+| **P3** | Agent Planning & Skills (mcp-cli) | v0.12 |
+| **P3** | Coherency, versioning, time-travel | v0.12 |
+| **P3** | Advanced (shared memory, COW, GC, NUMA) | v1.0+ |
+
+---
+
 ## Vision
 
 Just as operating systems virtualize physical memory to give processes the illusion of infinite address space, AI Virtual Memory virtualizes context windows to give AI conversations the illusion of infinite memory across all modalities (text, images, audio, video).
@@ -88,7 +132,7 @@ This makes coherency tractable: L2 is the log, L1 is the cache.
 
 ---
 
-## Phase 1: Foundations (v0.8)
+## Phase 1: Foundations (v0.8) — SHIPPED
 
 ### 1.1 Page Type Taxonomy
 
@@ -305,7 +349,7 @@ This drastically reduces overhead for "small incremental turns" - user says some
 
 ---
 
-## Phase 2: Working Set Management (v0.9)
+## Phase 2: Working Set Management (v0.9) — SHIPPED
 
 ### 2.1 WorkingSetManager
 Tracks which pages are "hot" and manages L0/L1 capacity.
@@ -487,7 +531,7 @@ This is gold for debugging agent weirdness and supports the strict grounding sto
 
 ---
 
-## Phase 3: Page Faults & Loading (v0.10)
+## Phase 3: Page Faults & Loading (v0.10) — SHIPPED (except StreamingFaultHandler)
 
 ### 3.1 PageFaultHandler
 Handles requests for pages not in L0/L1.
@@ -617,17 +661,19 @@ class ArtifactsBridge:
 ```
 
 ### 3.6 Deliverables
-- [ ] `PageFaultHandler` class
-- [ ] `FaultPolicy` with token budget and confidence threshold
-- [ ] `FaultReason` enum for intent tracking
-- [ ] `StreamingFaultHandler` with `DeferredPage`
-- [ ] `ArtifactsBridge` integration
-- [ ] Lazy loading configuration
-- [ ] Fault metrics and logging (with reason breakdown)
+- [x] `PageFaultHandler` class
+- [x] `FaultPolicy` with token budget and confidence threshold
+- [x] `FaultReason` enum for intent tracking
+- [ ] `StreamingFaultHandler` with `DeferredPage` *(deferred — model-dependent, not needed to prove concept)*
+- [x] `ArtifactsBridge` integration
+- [x] Lazy loading configuration
+- [x] Fault metrics and logging (with reason breakdown)
 
 ---
 
-## Phase 4: Eviction & Compression (v0.11)
+## Phase 4: Eviction & Compression (v0.10) — PARTIAL
+
+> **Status:** WorkingSetManager has importance-weighted LRU eviction scoring with anti-thrash integration. What's missing: generic `EvictionPolicy` protocol for swappable strategies, and modality-specific `Compressor` implementations.
 
 ### 4.1 EvictionPolicy
 Decides which pages to move to lower tiers.
@@ -691,7 +737,9 @@ class VideoCompressor(Compressor):
 
 ---
 
-## Phase 5: Multi-Modal Integration (v0.12)
+## Phase 5: Multi-Modal Integration (v0.11) — PARTIAL
+
+> **Status:** ContextPacker has cross-modal formatters (text, image, audio, video, structured). MemoryABI model exists in `models.py`. What's missing: real modality handlers for LLM context building (actual base64 image injection, audio transcription pipelines, etc.), and cross-modal reference tracking.
 
 ### 5.1 Unified Content Addressing
 Reference any content uniformly.
@@ -808,14 +856,16 @@ This enables:
 
 ### 5.5 Deliverables
 - [ ] Unified page reference syntax
-- [ ] `ContextPacker` with multi-modal support
-- [ ] `MemoryABI` specification and serialization
-- [ ] Modality handlers for LLM context building
+- [x] `ContextPacker` with multi-modal support *(formatters for all modalities shipped in v0.8)*
+- [x] `MemoryABI` specification and serialization *(model shipped in v0.8)*
+- [ ] Modality handlers for LLM context building *(real image/audio/video pipeline integration)*
 - [ ] Cross-modal reference tracking
 
 ---
 
-## Phase 6: Prefetch & Prediction (v0.13)
+## Phase 6: Prefetch & Prediction (v0.11) — PARTIAL
+
+> **Status:** `SimplePrefetcher` shipped in v0.8 with heuristic-based prefetch (summary + claims + tool prereqs). What's missing: ML-based prediction, background loading infrastructure, plugin system for custom strategies.
 
 ### 6.1 PrefetchManager
 Proactively load pages likely to be needed.
@@ -839,14 +889,14 @@ class PrefetchManager:
 - Cancel prefetch on context switch
 
 ### 6.4 Deliverables
-- [ ] `PrefetchManager` class
+- [x] `PrefetchManager` class *(SimplePrefetcher shipped in v0.8)*
 - [ ] Prediction strategy plugins
 - [ ] Background loading infrastructure
-- [ ] Prefetch hit rate metrics
+- [x] Prefetch hit rate metrics *(basic stats in SimplePrefetcher)*
 
 ---
 
-## Phase 7: Memory Pressure & Health (v0.14)
+## Phase 7: Memory Pressure & Health (v0.11)
 
 ### 7.1 MemoryPressureMonitor
 Track and respond to memory pressure.
@@ -884,7 +934,7 @@ class MemoryMetrics:
 
 ---
 
-## Phase 8: Coherency & Versioning (v0.15)
+## Phase 8: Coherency & Versioning (v0.12)
 
 ### 8.1 Page Versioning
 Track page mutations over time.
@@ -911,7 +961,7 @@ class PageVersion:
 
 ### 8.4 Full Event-Sourced Mutations
 
-Extends `MutationLogLite` from v0.9 with full time-travel capabilities.
+Extends `MutationLogLite` (shipped in v0.8) with full time-travel capabilities.
 
 ```python
 class PageMutationFull(PageMutation):
@@ -957,7 +1007,7 @@ This enables:
 
 ---
 
-## Phase 9: Tools as Memory Writers (v0.16)
+## Phase 9: Tools as Memory Writers (v0.12)
 
 Tools are first-class memory citizens - they create, read, and mutate pages.
 
@@ -1157,6 +1207,422 @@ This becomes critical when:
 - Artifacts live in S3 (high latency)
 - Multi-region deployments
 - Hybrid cloud/local setups
+
+---
+
+## Phase 11: Demand Paging Strategy (v0.9)
+
+> **Critical design decision:** How does the system decide what to page in?
+
+The `page_fault` tool exists and works. The open question is *who initiates* the fault and *when*. This is the difference between a system that technically pages and one that feels seamless.
+
+### 11.1 Three Paging Modes
+
+| Mode | Initiator | Latency | Quality | Use Case |
+|------|-----------|---------|---------|----------|
+| **Model-initiated** | Model calls `page_fault` | +1 round trip | High (model knows what it needs) | Complex recall, multi-hop reasoning |
+| **Runtime-initiated** | Pre-pass heuristic scans user message | 0 (prefetched) | Medium (heuristic may miss) | Conversational chat, "what did we say about X?" |
+| **Hybrid** | Runtime prefetches likely pages, model faults for gaps | 0 for common cases, +1 for misses | High | Production agents |
+
+### 11.2 Runtime Pre-Pass Heuristic
+
+Before sending to the model, scan the user message for recall signals:
+
+```python
+class DemandPagingPrePass:
+    """
+    Scan user message for signals that old context will be needed.
+    Prefetch before the model even sees the message.
+    """
+
+    # Recall signal patterns
+    RECALL_PATTERNS = [
+        r"(as we|what did we|earlier|previously|remember when)",
+        r"(that (decision|choice|plan|approach) (about|for|regarding))",
+        r"(go back to|revisit|return to)",
+    ]
+
+    async def prefetch_for_message(
+        self,
+        user_message: str,
+        page_table: PageTable,
+        working_set: WorkingSetManager,
+    ) -> List[str]:
+        """
+        Returns page_ids to prefetch into L0 before model invocation.
+        """
+        prefetch_ids = []
+
+        # 1. Check for recall patterns
+        if self._has_recall_signal(user_message):
+            # Load claim pages (decisions are the most commonly recalled)
+            claims = page_table.get_by_type(PageType.CLAIM)
+            prefetch_ids.extend(c.page_id for c in claims[:5])
+
+        # 2. Check for topic references
+        topics = self._extract_topics(user_message)
+        for topic in topics:
+            matching = page_table.search_by_content_hint(topic)
+            prefetch_ids.extend(m.page_id for m in matching[:2])
+
+        # 3. Always prefetch last segment summary
+        prefetch_ids.append(await self._get_last_segment_summary())
+
+        return prefetch_ids
+```
+
+### 11.3 The "Swap File" Pattern
+
+With infinite context + demand paging, the system becomes an LLM swap file:
+
+```
+Active conversation → L0 (context window)
+Recent history      → L1 (session state cache)
+Full transcript     → L2 (session events, source of truth)
+Artifacts           → L3/L4 (disk/S3)
+
+Summary = compressed swap
+Claim = pinned swap page (never swaps out)
+Prefetch = readahead
+```
+
+The summarization callback in `_create_new_segment` is literally writing to the swap file. The question is whether to make this explicit in the API or keep it transparent.
+
+### 11.4 Deliverables
+- [ ] `DemandPagingPrePass` — user message scanner with recall heuristics
+- [ ] Configurable paging mode (model-initiated / runtime / hybrid)
+- [ ] Pre-pass integration into `SessionManager.user_says()`
+- [ ] Metrics: prefetch hit rate vs. model-initiated fault rate
+- [ ] Documentation: when to use which mode
+
+---
+
+## Phase 12: Closed-Loop Learning (v0.10)
+
+> **Key insight:** Procedural memory and guards are currently parallel systems. Wire them together and you get genuine agent skill acquisition, not just pattern replay.
+
+### 12.1 The Feedback Loop
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLOSED-LOOP LEARNING                       │
+│                                                               │
+│  ToolMemoryManager ──records──► Pattern DB                    │
+│       ▲                              │                        │
+│       │                              ▼                        │
+│       │                     ProceduralContextFormatter         │
+│       │                              │                        │
+│       │                              ▼                        │
+│       │                     Context injection                 │
+│       │                              │                        │
+│       │                              ▼                        │
+│       │                     Model uses patterns               │
+│       │                              │                        │
+│       │                              ▼                        │
+│   NEW: Guard ◄──────────── ToolStateManager                   │
+│   Feedback                   │                                │
+│       │                      ▼                                │
+│       │              Detects: failure, runaway, ungrounded    │
+│       │                      │                                │
+│       └──────────────────────┘                                │
+│                                                               │
+│   "This tool sequence failed 3x → suggest alternative"        │
+│   "Tool X always needs claim Y prefetched → auto-prefetch"    │
+│   "Tool X → Y → Z pattern succeeds 90% → promote to skill"   │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 12.2 Guard-Informed Procedural Memory
+
+```python
+class GuardFeedbackIntegration:
+    """
+    Feed guard outcomes back into procedural memory.
+    Turns failures into learned avoidance patterns.
+    """
+
+    def __init__(
+        self,
+        tool_memory: ToolMemoryManager,
+        tool_state: ToolStateManager,
+    ):
+        self.tool_memory = tool_memory
+        self.tool_state = tool_state
+
+    async def on_guard_trigger(
+        self,
+        guard_type: str,  # "runaway", "ungrounded", "budget"
+        tool_name: str,
+        context: Dict[str, Any],
+    ):
+        """Record guard triggers as negative patterns."""
+        await self.tool_memory.record(
+            tool_name=tool_name,
+            arguments=context.get("arguments", {}),
+            result=None,
+            success=False,
+            failure_reason=f"guard:{guard_type}",
+            metadata={
+                "guard_type": guard_type,
+                "call_count": context.get("call_count"),
+                "sequence": context.get("recent_sequence"),
+            },
+        )
+
+    async def get_avoidance_patterns(self, tool_name: str) -> List[str]:
+        """
+        Generate warnings for the model based on failure history.
+        'Tool X with args matching Y has failed 3 times due to Z.'
+        """
+        failures = await self.tool_memory.get_failures(tool_name)
+        if len(failures) >= 3:
+            return [self._format_avoidance(f) for f in failures[:3]]
+        return []
+```
+
+### 12.3 Skill Promotion
+
+When a tool sequence succeeds repeatedly, promote it to a named skill:
+
+```python
+class SkillPromoter:
+    """
+    Detect stable tool patterns and promote them to named skills.
+    'search → extract → summarize' used 10 times → Skill: 'research_topic'
+    """
+    promotion_threshold: int = 5  # Successes before promotion
+
+    async def check_for_promotion(self, session_id: str) -> List[Skill]:
+        patterns = await self.tool_memory.get_successful_sequences(
+            min_occurrences=self.promotion_threshold
+        )
+        return [
+            Skill(
+                name=self._generate_name(p),
+                tool_sequence=p.tools,
+                typical_args=p.common_args,
+                success_rate=p.success_rate,
+                page_prereqs=p.commonly_read_pages,
+            )
+            for p in patterns
+        ]
+```
+
+### 12.4 Memory-Aware Tool Context
+
+Procedural memory informs prefetch: "Tool X always reads claim Y first."
+
+```python
+class MemoryAwareToolContext:
+    """
+    Before executing a tool, prefetch pages it typically needs.
+    Based on procedural memory of past successful invocations.
+    """
+
+    async def prepare_for_tool(self, tool_name: str) -> List[str]:
+        patterns = await self.tool_memory.get_patterns(tool_name)
+        prereq_pages = patterns.commonly_read_pages
+        # Prefetch these into L0 before tool execution
+        for page_id in prereq_pages:
+            await self.working_set.ensure_in_l0(page_id)
+        return prereq_pages
+```
+
+### 12.5 Deliverables
+- [ ] `GuardFeedbackIntegration` — wire guard triggers to procedural memory
+- [ ] `SkillPromoter` — detect and promote stable tool patterns
+- [ ] `MemoryAwareToolContext` — prefetch pages for tools based on learned patterns
+- [ ] Avoidance pattern injection into model context
+- [ ] Metrics: skill promotion rate, avoidance pattern effectiveness
+
+---
+
+## Phase 13: Storage Query Layer (v0.10)
+
+> **Problem:** `chuk-sessions` is key-value. The VM layer needs richer query semantics.
+
+### 13.1 The Query Gap
+
+Current chuk-sessions operations:
+- `get(session_id)` → Session
+- `put(session_id, session)` → None
+- `list()` → List[session_id]
+
+What the VM layer needs:
+- Query pages by `PageType` (all claims, all summaries)
+- Query by provenance chain (what pages derive from msg_042?)
+- Query by recency/importance score (top 5 most-accessed claims)
+- Query by content (pages mentioning "PostgreSQL")
+- Cross-session queries (all claims across a user's sessions)
+
+### 13.2 Options
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **A: Lightweight index layer on K/V** | No new dependencies, works with existing backends | Query performance limited, must maintain index consistency |
+| **B: Document store (e.g., SQLite)** | Rich queries, ACID, well-understood | New dependency, migration complexity |
+| **C: Hybrid** | K/V for hot path, index for queries | Complexity, two sources of truth risk |
+
+**Recommended: Option A for v0.10, evolve to B if query complexity grows.**
+
+### 13.3 Lightweight Page Index
+
+```python
+class PageIndex:
+    """
+    In-memory index over page metadata, rebuilt from PageTable on startup.
+    Persisted to Session.state for fast recovery.
+    """
+
+    # Indexes
+    _by_type: Dict[PageType, Set[str]]          # PageType → page_ids
+    _by_provenance: Dict[str, Set[str]]          # source_page_id → derived_page_ids
+    _by_importance: SortedList[Tuple[float, str]] # (importance, page_id) sorted
+    _by_content_hint: Dict[str, Set[str]]        # keyword → page_ids
+
+    def query_by_type(self, page_type: PageType) -> List[str]:
+        """All pages of a given type."""
+
+    def query_provenance_chain(self, page_id: str) -> List[str]:
+        """Walk the provenance graph: what derives from this page?"""
+
+    def query_top_by_importance(self, n: int, page_type: Optional[PageType] = None) -> List[str]:
+        """Top N pages by importance, optionally filtered by type."""
+
+    def query_by_content(self, query: str) -> List[str]:
+        """Simple keyword match against content hints."""
+
+    def rebuild_from_page_table(self, page_table: PageTable) -> None:
+        """Rebuild all indexes from the authoritative PageTable."""
+
+    def persist_to_session_state(self, session: Session) -> None:
+        """Store index in Session.state['vm:page_index'] for fast recovery."""
+```
+
+### 13.4 Deliverables
+- [ ] `PageIndex` with type, provenance, importance, and content indexes
+- [ ] Index persistence to `Session.state`
+- [ ] Index rebuild from PageTable
+- [ ] Integration with `PageSearchHandler`
+- [ ] Cross-session index queries (stretch goal)
+
+---
+
+## Phase 14: Agent Planning & Skills — mcp-cli Foundation (v0.12)
+
+> **North star:** The VM gives agents *continuity*. Plans and skills give agents *intentionality*. Together, they're the foundation for agents that persist, learn, and improve across sessions.
+
+### 14.1 The Connection
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       mcp-cli                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ Agent Loop   │  │ Plans        │  │ Skills           │   │
+│  │              │  │              │  │                  │   │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────────┘   │
+│         │                 │                 │               │
+└─────────┼─────────────────┼─────────────────┼───────────────┘
+          │                 │                 │
+          ▼                 ▼                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│              chuk-ai-session-manager                         │
+│                                                              │
+│  Plans ──────► Claim pages (pinned, high-importance)         │
+│                "Goal: Build auth system"                     │
+│                "Decision: Use JWT"                           │
+│                "Status: In progress"                         │
+│                                                              │
+│  Skills ─────► Procedure pages + promoted patterns           │
+│                "When user asks for code review, do X→Y→Z"    │
+│                "Tool sequence: search→read→analyze"          │
+│                                                              │
+│  Continuity ─► VM working set + demand paging                │
+│                Agent remembers across turns & restarts        │
+│                Claims survive eviction                       │
+│                                                              │
+│  Learning ───► Procedural memory + guard feedback            │
+│                Agent improves tool use over time              │
+│                Failed patterns become avoidance rules         │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 14.2 Plans as Claim Pages
+
+A plan is a set of claim pages with structure:
+
+```python
+class PlanPage(MemoryPage):
+    """
+    A plan is a high-importance claim page that tracks goals and progress.
+    Plans are auto-pinned — they survive eviction pressure.
+    """
+    page_type: Literal[PageType.CLAIM] = PageType.CLAIM
+
+    # Plan-specific
+    plan_status: Literal["active", "completed", "abandoned"] = "active"
+    goals: List[str] = []
+    decisions: List[str] = []  # Each references a claim page_id
+    progress: float = 0.0     # 0-1
+
+    # Auto-pin when active
+    @property
+    def importance(self) -> float:
+        return 0.99 if self.plan_status == "active" else 0.5
+```
+
+Why this works: plans are just claim pages with extra structure. They get all the VM guarantees for free — pinning, anti-thrash, provenance tracking, demand paging.
+
+### 14.3 Skills as Promoted Procedures
+
+Skills are procedure pages that have been validated through the closed-loop learning system:
+
+```python
+class SkillPage(MemoryPage):
+    """
+    A skill is a validated procedure page.
+    Promoted from procedural memory when a pattern is stable.
+    """
+    page_type: Literal[PageType.PROCEDURE] = PageType.PROCEDURE
+
+    # Skill-specific
+    skill_name: str
+    tool_sequence: List[str]
+    success_rate: float
+    invocation_count: int
+    page_prereqs: List[str]  # Pages to prefetch before executing
+
+    # Skills are injected into context when relevant tools are active
+    @property
+    def importance(self) -> float:
+        return min(0.9, 0.5 + (self.success_rate * 0.4))
+```
+
+### 14.4 Agent Lifecycle
+
+```
+Session 1: Agent encounters task, creates plan (claim pages)
+Session 2: Agent continues plan, makes decisions (more claims)
+Session 3: Plan completes, tool patterns promoted to skills
+Session 4: Agent uses skills from Session 3 on new tasks
+           Claims from Session 1-2 available via demand paging
+```
+
+The VM makes this possible because:
+1. **Claims persist** — decisions and plans survive across sessions
+2. **Procedures learn** — tool patterns accumulate and get promoted
+3. **Demand paging** — old context is always available, never truly lost
+4. **Provenance** — every decision traces back to the conversation that created it
+
+### 14.5 Deliverables
+- [ ] `PlanPage` model with goal/decision/progress tracking
+- [ ] `SkillPage` model with tool sequence and prereqs
+- [ ] Plan lifecycle (create → update → complete/abandon)
+- [ ] Skill injection into model context when relevant
+- [ ] Cross-session plan continuity via demand paging
+- [ ] mcp-cli integration layer (Plans API, Skills API)
 
 ---
 
@@ -1739,24 +2205,30 @@ Track *why* faults happen to tune policies:
 
 ## Timeline Overview
 
-| Phase | Version | Focus |
-|-------|---------|-------|
-| 1 | v0.8 | Foundations - MemoryPage, PageTable, TLB |
-| 2 | v0.9 | Working Set Management |
-| 3 | v0.10 | Page Faults & Loading (including streaming) |
-| 4 | v0.11 | Eviction & Compression |
-| 5 | v0.12 | Multi-Modal Integration + Memory ABI |
-| 6 | v0.13 | Prefetch & Prediction |
-| 7 | v0.14 | Memory Pressure & Health |
-| 8 | v0.15 | Coherency, Versioning & Event Sourcing |
-| 9 | v0.16 | Tools as Memory Writers |
-| 10 | v1.0+ | Advanced Features (Shared Memory, COW, GC, NUMA) |
+| Phase | Version | Focus | Status |
+|-------|---------|-------|--------|
+| 1 | v0.8 | Foundations — MemoryPage, PageTable, TLB | **SHIPPED** |
+| 2 | v0.8 | Working Set — PinnedSet, AntiThrash, TokenBudget | **SHIPPED** |
+| 3 | v0.8 | Page Faults — FaultHandler, ArtifactsBridge, FaultPolicy | **SHIPPED** |
+| **11** | **v0.9** | **MemoryManager orchestrator + demand paging strategy** | **NEXT** |
+| 4 | v0.10 | Eviction — Generic EvictionPolicy, modality compressors | Partial |
+| **12** | **v0.10** | **Closed-loop learning — procedural memory + guards feedback** | **NEXT** |
+| **13** | **v0.10** | **Storage query layer — page index beyond K/V** | **NEXT** |
+| 5 | v0.11 | Multi-Modal — Real modality handlers, ABI negotiation | Partial |
+| 6 | v0.11 | Prefetch — ML prediction, background loading | Partial |
+| 7 | v0.11 | Memory Pressure — Active monitoring, adaptive thresholds | Planned |
+| 8 | v0.12 | Coherency — Versioning, time-travel, full event sourcing | Planned |
+| 9 | v0.12 | Tools as Memory Writers — First-class tool memory interface | Planned |
+| **14** | **v0.12** | **Agent Planning & Skills — mcp-cli foundation** | **Planned** |
+| 10 | v1.0+ | Advanced — Shared Memory, COW, GC, NUMA | Planned |
 
 ---
 
-## Minimum Viable v0.8 Scope
+## Minimum Viable v0.8 Scope — SHIPPED
 
-What to ship first to prove VM works. Text-only, single-session, synchronous faults.
+> **v0.8 exceeded its planned scope.** Originally targeted core models + page table + basic faults. Shipped all of Phases 1-3 including mutation log, prefetcher, pack cache, and full fault policy system.
+
+What shipped to prove VM works. Text-only, single-session, synchronous faults.
 
 ### Ship First (v0.8)
 
@@ -1860,16 +2332,16 @@ class SessionManager:
 | Full event sourcing | Lite version in v0.9, full time-travel in v0.15 |
 | ML-based prefetch | Simple heuristics in v0.9, ML prediction in v0.13 |
 
-### v0.8 Success Criteria
+### v0.8 Success Criteria — ALL MET
 
-| Metric | Target |
-|--------|--------|
-| Tests passing | 100% |
-| Fault handling works | Model can page_fault, get content |
-| TLB hit rate | > 80% for repeated accesses |
-| Manifest generation | Valid JSON, parseable |
-| Context packing | Stays under token budget |
-| Integration | Works with existing SessionManager |
+| Metric | Target | Result |
+|--------|--------|--------|
+| Tests passing | 100% | **1480 tests passing** |
+| Fault handling works | Model can page_fault, get content | **Complete — async, protocol-extensible** |
+| TLB hit rate | > 80% for repeated accesses | **Complete — LRU with stats tracking** |
+| Manifest generation | Valid JSON, parseable | **Complete — ManifestBuilder with policies** |
+| Context packing | Stays under token budget | **Complete — cross-modal formatters** |
+| Integration | Works with existing SessionManager | **Pending — MemoryManager orchestrator (v0.9)** |
 
 ### v0.8 Non-Goals
 
@@ -1886,32 +2358,40 @@ class SessionManager:
 ### Resolved
 - ~~**Real-time streaming**: How to page in/out during streaming responses?~~ → `DeferredPage` with speculative placeholders (Phase 3)
 - ~~**Cross-session sharing**: How to handle shared pages across sessions?~~ → `SharedMemoryRegion` with scope-based access control (Phase 10)
+- ~~**Phase ordering**: Should we build the orchestrator first or the primitives?~~ → Primitives first (Phases 1-3 shipped in v0.8), orchestrator next (Phase 11/v0.9)
+- ~~**How much to ship in v0.8?**: Core models only or full fault handling?~~ → Shipped everything through fault handling, mutation log, prefetcher, pack cache. Implementation ran ahead of planned phases.
 
 ### Active
-1. **Embedding storage**: Store vectors in artifacts or separate vector DB?
+1. **Storage query semantics** *(NEW — see Phase 13)*: `chuk-sessions` is K/V. The VM layer needs queries by PageType, provenance chain, importance score, content hints. Build a lightweight index layer on top of K/V or push toward a document store? Current recommendation: lightweight `PageIndex` on K/V for v0.10, evaluate doc store if query complexity grows.
+
+2. **Demand paging initiation** *(NEW — see Phase 11)*: Who triggers page faults? Model-initiated (current `page_fault` tool), runtime pre-pass (scan user message for recall signals), or hybrid?
+
+3. **Embedding storage**: Store vectors in artifacts or separate vector DB?
    - Option A: Artifacts (unified, simpler)
    - Option B: Dedicated vector DB (faster similarity search)
    - Option C: Hybrid (embeddings in vector DB, linked to artifact pages)
 
-2. **Compression callbacks**: Use LLM for summarization or local models?
+4. **Compression callbacks**: Use LLM for summarization or local models?
    - LLM: Higher quality, higher latency, cost
    - Local: Fast, cheap, lower quality
    - Hybrid: Local for L1, LLM for L2+
 
-3. **Cost optimization**: Balance storage vs. compute (recompression)?
+5. **Cost optimization**: Balance storage vs. compute (recompression)?
    - Store all compression levels (storage heavy)
    - Recompute on demand (compute heavy)
    - Adaptive based on access patterns
 
-4. **Multi-model memory sharing**: How do different models share memory?
+6. **Multi-model memory sharing**: How do different models share memory?
    - Same Memory ABI, different token budgets?
    - Model-specific compression preferences?
    - Handoff protocol between models?
 
-5. **Memory as capability**: Should tools declare memory requirements?
+7. **Memory as capability**: Should tools declare memory requirements?
    - "This tool needs 10K tokens of context"
    - "This tool creates large pages"
    - Memory budgeting in tool selection
+
+8. **Closed-loop learning scope** *(NEW — see Phase 12)*: How aggressive should skill promotion be? Threshold for promoting a tool sequence to a named skill? Should guard-triggered avoidance patterns be ephemeral (session-scoped) or persistent (cross-session)?
 
 ---
 
@@ -2245,20 +2725,41 @@ session.state["vm:page_locations"] = {
 | Parent-child chain | ✅ Exists | Segment navigation |
 | Token tracking | ✅ Exists | Per-event token counts |
 | ChukSessionsStore | ✅ Exists | Persistence layer |
-| MemoryPage, PageTable | ✅ Done | v0.8 implementation |
-| WorkingSetManager | ✅ Done | v0.8 implementation |
-| ContextPacker | ✅ Done | v0.8 implementation |
-| FaultHandler | ✅ Done | v0.8 implementation |
+| MemoryPage, PageTableEntry, all enums | ✅ Done | v0.8 — Pydantic models, no magic strings |
+| PageTable (dirty/tier/modality tracking) | ✅ Done | v0.8 — Full index management |
+| PageTLB + TLBWithPageTable | ✅ Done | v0.8 — LRU cache with hit/miss stats |
+| WorkingSetManager + PinnedSet + AntiThrash | ✅ Done | v0.8 — Importance-weighted eviction scoring |
+| ContextPacker (cross-modal formatters) | ✅ Done | v0.8 — Text, image, audio, video, structured |
+| ManifestBuilder + VMManifest | ✅ Done | v0.8 — JSON manifest with policies |
+| PageFaultHandler + PageSearchHandler | ✅ Done | v0.8 — Async, protocol-extensible |
+| FaultPolicy + FaultReason + FaultRecord | ✅ Done | v0.8 — Token budget, confidence threshold, intent tracking |
+| ArtifactsBridge (chuk-artifacts + fallback) | ✅ Done | v0.8 — In-memory fallback when artifacts unavailable |
+| MutationLogLite (append-only, replay) | ✅ Done | v0.8 — Context snapshots, per-turn replay |
+| SimplePrefetcher (heuristic-based) | ✅ Done | v0.8 — Summary + claims + tool prereqs |
+| ContextPackCache (LRU) | ✅ Done | v0.8 — Session-aware invalidation |
+| VM prompts (strict/relaxed/passive) | ✅ Done | v0.8 — Tool definitions + mode-specific rules |
+| MemoryABI model | ✅ Done | v0.8 — Model in models.py, serialization ready |
+| UserExperienceMetrics | ✅ Done | v0.8 — Recall success rate, thrash index |
 
 ### What Needs Building
 
-| Component | Description | Phase |
-|-----------|-------------|-------|
-| `MemoryManager` | Orchestrator tying all pieces together | v0.10 |
-| `SessionManager.memory` | Optional VM integration property | v0.10 |
-| Event↔Page mapper | Convert SessionEvents to MemoryPages | v0.10 |
-| Segmentation hook | Trigger eviction on new segment | v0.10 |
-| VM-aware prompt builder | Use `VM:CONTEXT` when enabled | v0.10 |
+| Priority | Component | Description | Phase |
+|----------|-----------|-------------|-------|
+| **P0** | `MemoryManager` | Orchestrator tying PageTable, WorkingSet, FaultHandler, Packer together | v0.9 |
+| **P0** | `SessionManager.memory` | Optional VM integration property on SessionManager | v0.9 |
+| **P0** | Event↔Page mapper | Convert SessionEvents to MemoryPages automatically | v0.9 |
+| **P0** | Segmentation hook | Trigger eviction on new segment creation | v0.9 |
+| **P0** | VM-aware prompt builder | Use `VM:CONTEXT` when `enable_vm=True` | v0.9 |
+| **P0** | `DemandPagingPrePass` | Scan user messages for recall signals, prefetch | v0.9 |
+| **P1** | `GuardFeedbackIntegration` | Wire guard triggers into procedural memory | v0.10 |
+| **P1** | `PageIndex` | Lightweight query index over page metadata | v0.10 |
+| **P1** | `EvictionPolicy` protocol | Swappable eviction strategies (LRU, importance-weighted, etc.) | v0.10 |
+| **P1** | `SkillPromoter` | Detect and promote stable tool patterns | v0.10 |
+| **P2** | `StreamingFaultHandler` | Non-blocking faults during streaming responses | v0.11 |
+| **P2** | Modality handlers | Real image/audio/video LLM context building | v0.11 |
+| **P2** | `MemoryPressureMonitor` | Active pressure tracking with adaptive thresholds | v0.11 |
+| **P3** | `PlanPage` / `SkillPage` | Plan & skill models for mcp-cli integration | v0.12 |
+| **P3** | Full event sourcing | Time-travel, version vectors, deterministic replay | v0.12 |
 
 ### Configuration Example
 
