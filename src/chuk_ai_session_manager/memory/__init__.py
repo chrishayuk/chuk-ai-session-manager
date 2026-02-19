@@ -112,6 +112,25 @@ from .artifacts_bridge import (
     InMemoryBackend,
     PageMetadata,
 )
+from .eviction_policy import (
+    EvictionCandidate,
+    EvictionContext,
+    EvictionPolicy,
+    ImportanceWeightedLRU,
+    ImportanceWeightedLRUConfig,
+    LRUEvictionPolicy,
+    ModalityAwareLRU,
+    ModalityAwareLRUConfig,
+)
+from .compressor import (
+    CompressionResult,
+    Compressor,
+    CompressorRegistry,
+    ImageCompressor,
+    PassthroughCompressor,
+    TextCompressor,
+    TextCompressorConfig,
+)
 from .manager import MemoryManager, event_to_page
 from .demand_paging import DEFAULT_RECALL_SIGNALS, DemandPagingPrePass
 from .vm_prompts import (
@@ -241,6 +260,23 @@ __all__ = [
     "VM_STRICT_PROMPT",
     "VM_TOOL_DEFINITIONS",
     "VM_TOOLS",
+    # Eviction Policy
+    "EvictionCandidate",
+    "EvictionContext",
+    "EvictionPolicy",
+    "ImportanceWeightedLRU",
+    "ImportanceWeightedLRUConfig",
+    "LRUEvictionPolicy",
+    "ModalityAwareLRU",
+    "ModalityAwareLRUConfig",
+    # Compressor
+    "CompressionResult",
+    "Compressor",
+    "CompressorRegistry",
+    "ImageCompressor",
+    "PassthroughCompressor",
+    "TextCompressor",
+    "TextCompressorConfig",
     # Manager
     "MemoryManager",
     "event_to_page",

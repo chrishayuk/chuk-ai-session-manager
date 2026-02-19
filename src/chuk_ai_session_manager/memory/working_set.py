@@ -14,12 +14,16 @@ Design principles:
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field, PrivateAttr
 
+if TYPE_CHECKING:
+    from .page_table import PageTable
+
 from .models import (
     MemoryPage,
+    Modality,
     StorageTier,
     TokenBudget,
     WorkingSetStats,
@@ -244,6 +248,13 @@ class WorkingSetManager(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
+    # Pluggable eviction policy (Protocol, not serializable)
+    _eviction_policy: Any = PrivateAttr(default=None)
+
+    def set_eviction_policy(self, policy: Any) -> None:
+        """Set a custom eviction policy (EvictionPolicy protocol)."""
+        self._eviction_policy = policy
+
     def __len__(self) -> int:
         """Total pages in working set."""
         return len(self.l0_pages) + len(self.l1_cache)
@@ -388,6 +399,24 @@ class WorkingSetManager(BaseModel):
         """Get a page from L1 cache (L0 pages are tracked by ID only)."""
         return self.l1_cache.get(page_id)
 
+    def update_page_tokens(
+        self,
+        page_id: str,
+        old_tokens: int,
+        new_tokens: int,
+        modality: Modality = Modality.TEXT,
+    ) -> None:
+        """
+        Adjust the token budget after an in-place page change (e.g. compression).
+
+        Only affects L0 budget accounting. Removes old_tokens and adds new_tokens
+        for the given modality.
+        """
+        if page_id not in self.l0_pages:
+            return
+        self.budget.remove(old_tokens, modality)
+        self.budget.add(new_tokens, modality)
+
     def is_in_l0(self, page_id: str) -> bool:
         """Check if a page is in L0."""
         return page_id in self.l0_pages
@@ -404,6 +433,7 @@ class WorkingSetManager(BaseModel):
         self,
         tokens_needed: int = 0,
         from_tier: StorageTier = StorageTier.L0,
+        page_table: Optional["PageTable"] = None,
     ) -> List[Tuple[str, float]]:
         """
         Get pages that are candidates for eviction, scored by priority.
@@ -418,7 +448,28 @@ class WorkingSetManager(BaseModel):
         - Access frequency (LFU component)
         - Importance (user/system-assigned)
         - Position (older messages first)
+
+        If a custom eviction policy is set via set_eviction_policy(),
+        delegates scoring to that policy instead.
         """
+        # Delegate to custom policy if set
+        if self._eviction_policy is not None:
+            from .eviction_policy import EvictionContext
+
+            context = EvictionContext(
+                current_turn=self.current_turn,
+                l0_page_ids=list(self.l0_pages),
+                l1_pages=dict(self.l1_cache),
+                pinned_page_ids=self.pinned_set.get_all_pinned(),
+                importance_overrides=dict(self.importance_overrides),
+                anti_thrash=self.anti_thrash,
+                page_table=page_table,
+            )
+            candidates = self._eviction_policy.score_candidates(
+                context, from_tier, tokens_needed
+            )
+            return [(c.page_id, c.score) for c in candidates]
+
         candidates = []
 
         if from_tier == StorageTier.L0:

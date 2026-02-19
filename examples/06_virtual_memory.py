@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Virtual Memory Integration Demo (v0.9)
+Virtual Memory Integration Demo (v0.10)
 
-Demonstrates the MemoryManager orchestrator and SessionManager VM integration.
+Demonstrates the MemoryManager orchestrator and SessionManager VM integration,
+including swappable eviction policies and per-modality compression.
 No API keys required — runs entirely locally.
 
 Shows:
@@ -12,6 +13,8 @@ Shows:
 4. Stats and diagnostics across all subsystems
 5. Segmentation hook (infinite context + VM rollover)
 6. Demand paging pre-pass (recall signal detection + prefetch)
+7. Eviction policies (ImportanceWeightedLRU, LRU, ModalityAware)
+8. Compression (TextCompressor, CompressorRegistry, compress-before-evict)
 
 Usage:
     python examples/06_virtual_memory.py
@@ -22,11 +25,23 @@ import asyncio
 from chuk_ai_session_manager import SessionManager
 from chuk_ai_session_manager.memory.manager import MemoryManager
 from chuk_ai_session_manager.memory.models import (
+    CompressionLevel,
+    Modality,
     PageType,
     StorageTier,
     VMMode,
 )
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
+from chuk_ai_session_manager.memory.eviction_policy import (
+    ImportanceWeightedLRU,
+    LRUEvictionPolicy,
+    ModalityAwareLRU,
+)
+from chuk_ai_session_manager.memory.compressor import (
+    CompressorRegistry,
+    TextCompressor,
+    TextCompressorConfig,
+)
 
 
 async def demo_session_manager_integration():
@@ -403,8 +418,230 @@ async def demo_demand_paging():
     print(f"Pre-pass faulted {len(faulted3)} pages (topic match on 'redis')")
 
 
+async def demo_eviction_policies():
+    """Demonstrate swappable eviction policies."""
+    print("\n" + "=" * 60)
+    print("7. Eviction Policies — Swappable Strategies")
+    print("=" * 60)
+
+    # --- ImportanceWeightedLRU (default) ---
+    print("\n--- ImportanceWeightedLRU (default) ---")
+    vm_iw = MemoryManager(
+        session_id="demo-eviction-iw",
+        config=WorkingSetConfig(max_l0_tokens=500),
+        eviction_policy=ImportanceWeightedLRU(),
+    )
+    # Add pages with varying importance
+    p_low = vm_iw.create_page(
+        "Low importance chat message " * 10,
+        page_type=PageType.TRANSCRIPT,
+        importance=0.2,
+        page_id="low_imp",
+    )
+    p_high = vm_iw.create_page(
+        "DECISION: Use PostgreSQL " * 10,
+        page_type=PageType.CLAIM,
+        importance=0.9,
+        page_id="high_imp",
+    )
+    await vm_iw.add_to_working_set(p_low)
+    await vm_iw.add_to_working_set(p_high)
+
+    # Force eviction by adding a large page
+    p_big = vm_iw.create_page(
+        "Big new content " * 30,
+        page_type=PageType.TRANSCRIPT,
+        page_id="big_page",
+    )
+    await vm_iw.add_to_working_set(p_big)
+
+    l0 = [p.page_id for p in vm_iw.get_l0_pages()]
+    print(f"  After eviction pressure, L0 has: {l0}")
+    print(f"  Evictions total: {vm_iw.metrics.evictions_total}")
+    # High-importance page should survive eviction longer
+    if "high_imp" in l0:
+        print("  High-importance claim survived (as expected)")
+
+    # --- LRU (simple position-based) ---
+    print("\n--- LRUEvictionPolicy (pure LRU) ---")
+    vm_lru = MemoryManager(
+        session_id="demo-eviction-lru",
+        config=WorkingSetConfig(max_l0_tokens=500),
+        eviction_policy=LRUEvictionPolicy(),
+    )
+    for i in range(5):
+        p = vm_lru.create_page(
+            f"Message {i} " * 10,
+            page_type=PageType.TRANSCRIPT,
+            page_id=f"msg_{i}",
+        )
+        await vm_lru.add_to_working_set(p)
+
+    l0 = [p.page_id for p in vm_lru.get_l0_pages()]
+    print(f"  L0 after filling: {l0}")
+    print(f"  LRU evicted oldest first: {vm_lru.metrics.evictions_total} evictions")
+
+    # --- ModalityAwareLRU ---
+    print("\n--- ModalityAwareLRU (media evicts before text) ---")
+    vm_ma = MemoryManager(
+        session_id="demo-eviction-modality",
+        config=WorkingSetConfig(max_l0_tokens=500),
+        eviction_policy=ModalityAwareLRU(),
+    )
+    p_text = vm_ma.create_page(
+        "Important text content " * 10,
+        page_type=PageType.TRANSCRIPT,
+        modality=Modality.TEXT,
+        page_id="text_page",
+    )
+    p_img = vm_ma.create_page(
+        "image_reference_data " * 10,
+        page_type=PageType.ARTIFACT,
+        modality=Modality.IMAGE,
+        page_id="img_page",
+    )
+    await vm_ma.add_to_working_set(p_text)
+    await vm_ma.add_to_working_set(p_img)
+
+    # Trigger eviction
+    p_new = vm_ma.create_page(
+        "New content " * 30,
+        page_type=PageType.TRANSCRIPT,
+        page_id="new_page",
+    )
+    await vm_ma.add_to_working_set(p_new)
+
+    l0 = [p.page_id for p in vm_ma.get_l0_pages()]
+    print(f"  L0 after pressure: {l0}")
+    if "img_page" not in l0 and "text_page" in l0:
+        print("  Image evicted before text (lower modality weight)")
+
+    # --- SessionManager passthrough ---
+    print("\n--- SessionManager with custom eviction policy ---")
+    sm = SessionManager(
+        enable_vm=True,
+        vm_eviction_policy=ImportanceWeightedLRU(),
+    )
+    await sm.user_says("Hello!")
+    print("  SessionManager VM active with custom eviction policy")
+
+
+async def demo_compression():
+    """Demonstrate per-modality compression and compress-before-evict."""
+    print("\n" + "=" * 60)
+    print("8. Compression — Per-Modality + Compress-Before-Evict")
+    print("=" * 60)
+
+    # --- Direct compression ---
+    print("\n--- Direct page compression ---")
+    registry = CompressorRegistry.default()
+    vm = MemoryManager(
+        session_id="demo-compression",
+        config=WorkingSetConfig(max_l0_tokens=2000),
+        compressor_registry=registry,
+    )
+
+    long_text = (
+        "The team discussed the API architecture at length. "
+        "We decided on FastAPI for the web framework. "
+        "PostgreSQL will be the primary database. "
+        "Redis handles caching and session storage. "
+        "Authentication uses OAuth2 with JWT tokens. "
+        "The deployment target is Kubernetes on AWS EKS. "
+    ) * 3
+
+    page = vm.create_page(
+        long_text,
+        page_type=PageType.TRANSCRIPT,
+        importance=0.5,
+        page_id="long_transcript",
+    )
+    await vm.add_to_working_set(page)
+
+    original_tokens = page.size_tokens or page.estimate_tokens()
+    print(f"  Original: {original_tokens} tokens, level={page.compression_level.name}")
+
+    # Compress FULL → REDUCED
+    result = await vm.compress_page("long_transcript", CompressionLevel.REDUCED)
+    if result:
+        print(
+            f"  REDUCED:  {result.compressed_tokens} tokens, "
+            f"saved {result.tokens_saved} tokens"
+        )
+
+    # Compress REDUCED → ABSTRACT
+    result = await vm.compress_page("long_transcript", CompressionLevel.ABSTRACT)
+    if result:
+        print(
+            f"  ABSTRACT: {result.compressed_tokens} tokens, "
+            f"saved {result.tokens_saved} tokens"
+        )
+        print(f"  Content:  {str(result.page.content)[:80]}...")
+
+    # Compress ABSTRACT → REFERENCE
+    result = await vm.compress_page("long_transcript", CompressionLevel.REFERENCE)
+    if result:
+        print(
+            f"  REFERENCE: {result.compressed_tokens} tokens, "
+            f"saved {result.tokens_saved} tokens"
+        )
+        print(f"  Content:  {result.page.content}")
+
+    print("\n  Compression metrics:")
+    print(f"    Total compressions: {vm.metrics.compressions_total}")
+    print(f"    Tokens saved: {vm.metrics.tokens_saved_by_compression}")
+
+    # --- Compress-before-evict ---
+    print("\n--- Compress-before-evict behavior ---")
+    vm2 = MemoryManager(
+        session_id="demo-compress-evict",
+        config=WorkingSetConfig(max_l0_tokens=800),
+        compressor_registry=CompressorRegistry.default(),
+    )
+
+    # Fill working set
+    for i in range(4):
+        p = vm2.create_page(
+            f"Discussion point {i}: detailed analysis of topic. " * 8,
+            page_type=PageType.TRANSCRIPT,
+            page_id=f"disc_{i}",
+        )
+        await vm2.add_to_working_set(p)
+
+    print(f"  After filling: {len(vm2.get_l0_pages())} pages in L0")
+    print(f"  Compressions: {vm2.metrics.compressions_total}")
+    print(f"  Evictions: {vm2.metrics.evictions_total}")
+
+    if vm2.metrics.compressions_total > 0:
+        print("  Pages were compressed before eviction (saving tokens)")
+    if vm2.metrics.evictions_total > 0:
+        print("  Some pages still evicted (compression wasn't enough)")
+
+    # --- Custom TextCompressor config ---
+    print("\n--- Custom TextCompressor config ---")
+    custom_config = TextCompressorConfig(
+        reduced_ratio=0.3,  # Keep only 30% of text
+        abstract_max_tokens=100,  # Shorter abstracts
+        reference_max_tokens=30,  # Shorter references
+    )
+    custom_registry = CompressorRegistry.default()
+    custom_registry.register(Modality.TEXT, TextCompressor(config=custom_config))
+    print("  Registered custom TextCompressor (30% reduced ratio)")
+
+    # --- SessionManager with compression ---
+    print("\n--- SessionManager with compression ---")
+    sm = SessionManager(
+        enable_vm=True,
+        vm_compressor_registry=CompressorRegistry.default(),
+        vm_eviction_policy=ImportanceWeightedLRU(),
+    )
+    await sm.user_says("Hello, let's design an API!")
+    await sm.ai_responds("Great! Let's start with the endpoints.", model="gpt-4o")
+    print("  SessionManager VM active with compression + eviction policy")
+
+
 async def main():
-    print("AI Virtual Memory — v0.9 MemoryManager Demo")
+    print("AI Virtual Memory — v0.10 MemoryManager Demo")
     print("No API keys required.\n")
 
     await demo_session_manager_integration()
@@ -413,6 +650,8 @@ async def main():
     await demo_stats_and_diagnostics()
     await demo_segmentation_hook()
     await demo_demand_paging()
+    await demo_eviction_policies()
+    await demo_compression()
 
     print("\n" + "=" * 60)
     print("DEMO COMPLETE")

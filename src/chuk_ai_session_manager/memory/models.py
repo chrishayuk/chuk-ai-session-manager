@@ -765,10 +765,22 @@ class VMMetrics(BaseModel):
         self.evictions_total += 1
         self.evictions_this_turn += 1
 
+    # Compression stats
+    compressions_total: int = Field(default=0)
+    compressions_this_turn: int = Field(default=0)
+    tokens_saved_by_compression: int = Field(default=0)
+
+    def record_compression(self, tokens_saved: int = 0) -> None:
+        """Record a compression event."""
+        self.compressions_total += 1
+        self.compressions_this_turn += 1
+        self.tokens_saved_by_compression += tokens_saved
+
     def new_turn(self) -> None:
         """Reset per-turn counters."""
         self.faults_this_turn = 0
         self.evictions_this_turn = 0
+        self.compressions_this_turn = 0
 
 
 # =============================================================================

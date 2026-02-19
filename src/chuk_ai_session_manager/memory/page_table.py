@@ -169,6 +169,22 @@ class PageTable(BaseModel):
 
         return True
 
+    def update_compression(
+        self,
+        page_id: str,
+        compression_level: CompressionLevel,
+    ) -> bool:
+        """
+        Update only the compression level for a page (no tier change).
+
+        Returns True if successful, False if page not found.
+        """
+        entry = self.entries.get(page_id)
+        if not entry:
+            return False
+        entry.compression_level = compression_level
+        return True
+
     def mark_accessed(self, page_id: str) -> bool:
         """
         Mark a page as accessed (updates LRU tracking).
