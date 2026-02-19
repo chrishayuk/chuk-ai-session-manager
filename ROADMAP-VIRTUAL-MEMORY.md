@@ -24,9 +24,9 @@
 
 ---
 
-## Current Status (v0.9)
+## Current Status (v0.10)
 
-> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, and demand paging. 1618 tests passing.
+> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, demand paging, swappable eviction policies, and per-modality compression. 1704 tests passing.
 
 ### What's Shipped
 
@@ -54,13 +54,16 @@
 | **Segmentation hook** (evict on rollover) | `session_manager.py` | **v0.9** |
 | **VM-aware prompt builder** (`VM:CONTEXT`) | `session_manager.py` | **v0.9** |
 | **DemandPagingPrePass** (recall + prefetch) | `demand_paging.py` | **v0.9** |
+| **EvictionPolicy protocol** (3 implementations) | `eviction_policy.py` | **v0.10** |
+| **CompressorRegistry** (text, image, passthrough) | `compressor.py` | **v0.10** |
+| **Compress-before-evict** in MemoryManager | `manager.py` | **v0.10** |
+| **VMMetrics compression tracking** | `models.py` | **v0.10** |
 
 ### What's Next
 
 | Priority | Component | Phase |
 |----------|-----------|-------|
 | **P1** | Closed-loop learning (procedural + guards) | v0.10 |
-| **P1** | Generic EvictionPolicy protocol + compressors | v0.10 |
 | **P1** | Storage query layer (beyond K/V) | v0.10 |
 | **P2** | StreamingFaultHandler | v0.11 |
 | **P2** | Real multi-modal handlers | v0.11 |
@@ -674,9 +677,9 @@ class ArtifactsBridge:
 
 ---
 
-## Phase 4: Eviction & Compression (v0.10) — PARTIAL
+## Phase 4: Eviction & Compression (v0.10) — SHIPPED
 
-> **Status:** WorkingSetManager has importance-weighted LRU eviction scoring with anti-thrash integration. What's missing: generic `EvictionPolicy` protocol for swappable strategies, and modality-specific `Compressor` implementations.
+> **Status:** Complete. Generic `EvictionPolicy` protocol with 3 implementations (`ImportanceWeightedLRU`, `LRUEvictionPolicy`, `ModalityAwareLRU`). `Compressor` protocol with `TextCompressor`, `ImageCompressor`, `PassthroughCompressor`, and `CompressorRegistry`. Compress-before-evict integrated into `MemoryManager._run_eviction()`. VMMetrics tracks compression stats. SessionManager passes through `vm_eviction_policy` and `vm_compressor_registry`.
 
 ### 4.1 EvictionPolicy
 Decides which pages to move to lower tiers.
@@ -733,10 +736,10 @@ class VideoCompressor(Compressor):
 - Explicit (user/system request)
 
 ### 4.4 Deliverables
-- [ ] `EvictionPolicy` interface and implementations
-- [ ] Modality-specific compressors
-- [ ] Compression level transitions
-- [ ] Eviction metrics and logging
+- [x] `EvictionPolicy` interface and implementations (`ImportanceWeightedLRU`, `LRUEvictionPolicy`, `ModalityAwareLRU`)
+- [x] Modality-specific compressors (`TextCompressor`, `ImageCompressor`, `PassthroughCompressor`, `CompressorRegistry`)
+- [x] Compression level transitions (FULL → REDUCED → ABSTRACT → REFERENCE, compress-before-evict)
+- [x] Eviction metrics and logging (`VMMetrics.record_compression()`, mutation log `COMPRESS` type)
 
 ---
 
@@ -2214,7 +2217,7 @@ Track *why* faults happen to tune policies:
 | 2 | v0.8 | Working Set — PinnedSet, AntiThrash, TokenBudget | **SHIPPED** |
 | 3 | v0.8 | Page Faults — FaultHandler, ArtifactsBridge, FaultPolicy | **SHIPPED** |
 | **11** | **v0.9** | **MemoryManager orchestrator + demand paging strategy** | **SHIPPED** |
-| 4 | v0.10 | Eviction — Generic EvictionPolicy, modality compressors | Partial |
+| **4** | **v0.10** | **Eviction — Generic EvictionPolicy, modality compressors** | **SHIPPED** |
 | **12** | **v0.10** | **Closed-loop learning — procedural memory + guards feedback** | **NEXT** |
 | **13** | **v0.10** | **Storage query layer — page index beyond K/V** | **NEXT** |
 | 5 | v0.11 | Multi-Modal — Real modality handlers, ABI negotiation | Partial |
@@ -2339,7 +2342,7 @@ class SessionManager:
 
 | Metric | Target | Result |
 |--------|--------|--------|
-| Tests passing | 100% | **1618 tests passing** |
+| Tests passing | 100% | **1704 tests passing** |
 | Fault handling works | Model can page_fault, get content | **Complete — async, protocol-extensible** |
 | TLB hit rate | > 80% for repeated accesses | **Complete — LRU with stats tracking** |
 | Manifest generation | Valid JSON, parseable | **Complete — ManifestBuilder with policies** |
@@ -2756,7 +2759,7 @@ session.state["vm:page_locations"] = {
 | ~~**P0**~~ | ~~`DemandPagingPrePass`~~ | ~~Scan user messages for recall signals, prefetch~~ | ~~v0.9~~ ✅ |
 | **P1** | `GuardFeedbackIntegration` | Wire guard triggers into procedural memory | v0.10 |
 | **P1** | `PageIndex` | Lightweight query index over page metadata | v0.10 |
-| **P1** | `EvictionPolicy` protocol | Swappable eviction strategies (LRU, importance-weighted, etc.) | v0.10 |
+| ~~**P1**~~ | ~~`EvictionPolicy` protocol~~ | ~~Swappable eviction strategies (LRU, importance-weighted, etc.)~~ | ~~v0.10~~ ✅ |
 | **P1** | `SkillPromoter` | Detect and promote stable tool patterns | v0.10 |
 | **P2** | `StreamingFaultHandler` | Non-blocking faults during streaming responses | v0.11 |
 | **P2** | Modality handlers | Real image/audio/video LLM context building | v0.11 |

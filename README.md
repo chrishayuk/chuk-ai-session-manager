@@ -49,31 +49,38 @@ That's it! Zero configuration required.
 ## ⚡ Major Features
 
 ### 🧠 **AI Virtual Memory**
-OS-style memory management for AI context windows. Pages, working sets, faults, and eviction - giving conversations the illusion of infinite memory.
+OS-style memory management for AI context windows. Pages, working sets, faults, eviction, and compression — giving conversations the illusion of infinite memory.
 
 ```python
+from chuk_ai_session_manager import SessionManager
 from chuk_ai_session_manager.memory import (
-    MemoryPage, PageTable, WorkingSetManager,
-    ContextPacker, ManifestBuilder, PageType,
+    MemoryManager, CompressorRegistry, ImportanceWeightedLRU,
+    PageType, VMMode, WorkingSetConfig,
 )
 
-# Create pages with type classification
-claim = MemoryPage(
-    page_id="claim_auth",
-    page_type=PageType.CLAIM,  # High-value, low eviction priority
-    content="Decision: Use JWT for authentication",
-    provenance=["msg_042", "msg_043"],
+# Zero-config: just enable VM on SessionManager
+sm = SessionManager(enable_vm=True, vm_mode=VMMode.STRICT)
+
+# Or fully customize eviction and compression
+vm = MemoryManager(
+    session_id="my_session",
+    config=WorkingSetConfig(max_l0_tokens=32_000),
+    eviction_policy=ImportanceWeightedLRU(),       # Swappable strategy
+    compressor_registry=CompressorRegistry.default(), # Per-modality compression
 )
 
-# Track in page table and working set
-table = PageTable()
-table.register(claim)
+# Create pages, add to working set
+page = vm.create_page("Decision: Use JWT for auth", page_type=PageType.CLAIM)
+await vm.add_to_working_set(page)
 
-# Pack context for model with manifest
-packer = ContextPacker()
-packed = packer.pack([claim])
-# Model sees VM:CONTEXT with page citations
+# Build context for LLM call
+ctx = vm.build_context(system_prompt="You are helpful.")
+# ctx["developer_message"] has VM:RULES + VM:MANIFEST_JSON + VM:CONTEXT
 ```
+
+**Eviction policies**: `ImportanceWeightedLRU` (default), `LRUEvictionPolicy`, `ModalityAwareLRU` — or implement the `EvictionPolicy` protocol for custom strategies.
+
+**Compression**: Pages compress through FULL → REDUCED → ABSTRACT → REFERENCE before eviction, saving tokens without losing context. Text, image, and passthrough compressors included; plug in custom `summarize_fn` for LLM-based compression.
 
 See [AI Virtual Memory docs](docs/memory/README.md) for full documentation.
 

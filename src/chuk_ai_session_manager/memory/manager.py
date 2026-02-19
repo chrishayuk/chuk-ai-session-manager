@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from .models import (
     Actor,
+    CompressionLevel,
     FaultPolicy,
     MemoryPage,
     Modality,
@@ -38,6 +39,7 @@ from .fault_handler import (
     PageSearchHandler,
     SearchResult,
 )
+from .compressor import CompressorRegistry, CompressionResult
 from .demand_paging import DemandPagingPrePass
 from .context_packer import ContextPacker
 from .manifest import ManifestBuilder
@@ -110,6 +112,8 @@ class MemoryManager:
         config: Optional[WorkingSetConfig] = None,
         fault_policy: Optional[FaultPolicy] = None,
         mode: VMMode = VMMode.STRICT,
+        eviction_policy: Optional[Any] = None,
+        compressor_registry: Optional[CompressorRegistry] = None,
     ) -> None:
         self._session_id = session_id or str(uuid.uuid4())
         self._mode = mode
@@ -125,13 +129,22 @@ class MemoryManager:
         self._tlb = PageTLB()
         self._tlb_with_pt = TLBWithPageTable(self._page_table, self._tlb)
         self._working_set = WorkingSetManager(config=ws_config)
-        self._fault_handler = PageFaultHandler()
+        self._fault_handler = PageFaultHandler(
+            max_faults_per_turn=self._fault_policy.max_faults_per_turn,
+        )
         self._context_packer = ContextPacker()
         self._manifest_builder = ManifestBuilder()
         self._mutation_log = MutationLogLite(session_id=self._session_id)
         self._prefetcher = SimplePrefetcher()
         self._pack_cache = ContextPackCache()
         self._metrics = VMMetrics()
+
+        # Eviction policy (optional, delegates to WorkingSetManager default)
+        if eviction_policy is not None:
+            self._working_set.set_eviction_policy(eviction_policy)
+
+        # Compressor registry (optional, enables compress-before-evict)
+        self._compressor_registry = compressor_registry
 
         # Storage
         self._bridge = ArtifactsBridge(session_id=self._session_id)
@@ -358,6 +371,58 @@ class MemoryManager:
 
         return True
 
+    async def compress_page(
+        self,
+        page_id: str,
+        target_level: CompressionLevel,
+    ) -> Optional[CompressionResult]:
+        """
+        Compress a page to the target compression level.
+
+        Updates page in store, page table, mutation log, and metrics.
+        Returns None if no compressor registry or page not found.
+        """
+        if self._compressor_registry is None:
+            return None
+
+        page = self._page_store.get(page_id)
+        if not page:
+            return None
+
+        result = await self._compressor_registry.compress_page(page, target_level)
+
+        if result.tokens_saved > 0:
+            # Update page in store
+            self._page_store[page_id] = result.page
+
+            # Update working set L0 token accounting
+            self._working_set.update_page_tokens(
+                page_id,
+                old_tokens=result.original_tokens,
+                new_tokens=result.compressed_tokens,
+                modality=result.page.modality,
+            )
+
+            # Update page table
+            self._page_table.update_compression(page_id, target_level)
+
+            # Invalidate caches
+            self._tlb.invalidate(page_id)
+            self._pack_cache.invalidate_session(self._session_id)
+
+            # Record
+            self._metrics.record_compression(result.tokens_saved)
+            self._mutation_log.record_mutation(
+                page_id=page_id,
+                mutation_type=MutationType.COMPRESS,
+                tier_after=page.storage_tier,
+                actor=Actor.SYSTEM,
+                cause=f"compress_{target_level.name.lower()}",
+                turn=self._turn,
+            )
+
+        return result
+
     async def _run_eviction(self, tokens_needed: int) -> List[str]:
         """Run eviction to free tokens. Returns evicted page IDs."""
         evicted_ids: List[str] = []
@@ -367,6 +432,7 @@ class MemoryManager:
         candidates = self._working_set.get_eviction_candidates(
             tokens_needed=tokens_needed,
             from_tier=StorageTier.L0,
+            page_table=self._page_table,
         )
 
         for page_id, _score in candidates:
@@ -378,6 +444,18 @@ class MemoryManager:
                 continue
 
             page_tokens = page.size_tokens or page.estimate_tokens()
+
+            # Try compression before eviction
+            if (
+                self._compressor_registry is not None
+                and page.compression_level < CompressionLevel.ABSTRACT
+            ):
+                next_level = CompressionLevel(page.compression_level + 1)
+                result = await self.compress_page(page_id, next_level)
+                if result and result.tokens_saved > 0:
+                    tokens_freed += result.tokens_saved
+                    continue  # Skip eviction — compression freed enough
+
             await self.evict_page(page_id, StorageTier.L2)
             tokens_freed += page_tokens
             evicted_ids.append(page_id)
@@ -426,6 +504,9 @@ class MemoryManager:
         Called before the LLM sees the user message, so relevant
         context is already in the working set.
 
+        Pre-fetches are transparent to the model: they do not consume
+        the model's per-turn fault budget.
+
         Returns list of page_ids successfully faulted in.
         """
         candidates = self._demand_pager.get_prefetch_candidates(
@@ -439,6 +520,13 @@ class MemoryManager:
             result = await self.handle_fault(page_id)
             if result.success:
                 faulted.append(page_id)
+
+        # Reset per-turn fault budgets — pre-fetches are a system
+        # optimisation and should not reduce the model's fault quota.
+        self._fault_handler.faults_this_turn = 0
+        self._fault_policy.faults_this_turn = 0
+        self._fault_policy.tokens_used_this_turn = 0
+
         return faulted
 
     # ------------------------------------------------------------------
@@ -468,6 +556,7 @@ class MemoryManager:
         if result.success and result.page:
             page_tokens = result.page.size_tokens or result.page.estimate_tokens()
             self._fault_policy.record_fault(page_tokens)
+            self._metrics.record_fault()
 
             # Store in page_store
             self._page_store[result.page.page_id] = result.page

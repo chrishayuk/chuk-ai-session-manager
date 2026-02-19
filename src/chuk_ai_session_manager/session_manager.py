@@ -84,6 +84,8 @@ class SessionManager:
         enable_vm: bool = False,
         vm_config: Optional[WorkingSetConfig] = None,
         vm_mode: VMMode = VMMode.STRICT,
+        vm_eviction_policy: Optional[Any] = None,
+        vm_compressor_registry: Optional[Any] = None,
     ):
         """
         Initialize a SessionManager.
@@ -101,6 +103,8 @@ class SessionManager:
             enable_vm: Enable AI Virtual Memory subsystem for context management.
             vm_config: Optional WorkingSetConfig for VM working set sizing.
             vm_mode: VM mode (STRICT, RELAXED, or PASSIVE). Default: STRICT.
+            vm_eviction_policy: Optional eviction policy for VM working set.
+            vm_compressor_registry: Optional compressor registry for compress-before-evict.
         """
         # Core session management
         self._session_id = session_id
@@ -132,6 +136,8 @@ class SessionManager:
                 session_id=self.session_id,
                 config=vm_config,
                 mode=vm_mode,
+                eviction_policy=vm_eviction_policy,
+                compressor_registry=vm_compressor_registry,
             )
 
     @property
