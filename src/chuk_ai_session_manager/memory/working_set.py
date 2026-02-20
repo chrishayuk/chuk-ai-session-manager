@@ -251,6 +251,14 @@ class WorkingSetManager(BaseModel):
     # Pluggable eviction policy (Protocol, not serializable)
     _eviction_policy: Any = PrivateAttr(default=None)
 
+    def model_post_init(self, __context: Any) -> None:
+        """Sync budget limits from config on construction."""
+        if self.budget.total_limit != self.config.max_l0_tokens:
+            self.budget = TokenBudget(
+                total_limit=self.config.max_l0_tokens,
+                reserved=self.config.reserved_tokens,
+            )
+
     def set_eviction_policy(self, policy: Any) -> None:
         """Set a custom eviction policy (EvictionPolicy protocol)."""
         self._eviction_policy = policy
