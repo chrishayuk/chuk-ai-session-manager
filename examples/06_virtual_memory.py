@@ -246,37 +246,37 @@ async def demo_stats_and_diagnostics():
 
     # Get stats
     stats = vm.get_stats()
-    print(f"\nSession: {stats['session_id']}")
-    print(f"Turn: {stats['turn']}")
-    print(f"Mode: {stats['mode']}")
-    print(f"Pages in store: {stats['pages_in_store']}")
+    print(f"\nSession: {stats.session_id}")
+    print(f"Turn: {stats.turn}")
+    print(f"Mode: {stats.mode}")
+    print(f"Pages in store: {stats.pages_in_store}")
 
     print("\nPage Table:")
-    pt = stats["page_table"]
-    print(f"  Total pages: {pt['total_pages']}")
-    print(f"  Pages by tier: {dict(pt['pages_by_tier'])}")
+    pt = stats.page_table
+    print(f"  Total pages: {pt.total_pages}")
+    print(f"  Pages by tier: {dict(pt.pages_by_tier)}")
 
     print("\nWorking Set:")
-    ws = stats["working_set"]
-    print(f"  L0 pages: {ws['l0_pages']}")
-    print(f"  Tokens used: {ws['tokens_used']}")
+    ws = stats.working_set
+    print(f"  L0 pages: {ws.l0_pages}")
+    print(f"  Tokens used: {ws.tokens_used}")
 
     print("\nFault Handler:")
-    fh = stats["fault_handler"]
-    print(f"  Total faults: {fh['total_faults']}")
-    print(f"  Faults remaining: {fh['faults_remaining']}")
+    fh = stats.fault_handler
+    print(f"  Total faults: {fh.total_faults}")
+    print(f"  Faults remaining: {fh.faults_remaining}")
 
     print("\nMutation Log:")
-    ml = stats["mutation_log"]
-    print(f"  Total mutations: {ml['total_mutations']}")
+    ml = stats.mutation_log
+    print(f"  Total mutations: {ml.total_mutations}")
     print(
-        f"  Creates: {ml['creates']}, Faults: {ml['faults']}, Evictions: {ml['evictions']}"
+        f"  Creates: {ml.creates}, Faults: {ml.faults}, Evictions: {ml.evictions}"
     )
 
     print("\nMetrics:")
-    m = stats["metrics"]
-    print(f"  Faults total: {m['faults_total']}")
-    print(f"  Evictions total: {m['evictions_total']}")
+    m = stats.metrics
+    print(f"  Faults total: {m.faults_total}")
+    print(f"  Evictions total: {m.evictions_total}")
 
 
 async def demo_segmentation_hook():
