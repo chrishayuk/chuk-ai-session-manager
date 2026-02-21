@@ -410,7 +410,7 @@ wheels = [
 
 [[package]]
 name = "chuk-ai-session-manager"
-version = "0.10.2"
+version = "0.10.3"
 source = { editable = "." }
 dependencies = [
     { name = "chuk-sessions" },

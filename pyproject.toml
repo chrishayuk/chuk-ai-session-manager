@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chuk-ai-session-manager"
-version = "0.10.2"
+version = "0.10.3"
 description = "Session manager for AI applications"
 readme = "README.md"
 license = {text = "Apache-2.0"}
