@@ -9,6 +9,7 @@ and how to present it.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -21,6 +22,8 @@ from chuk_ai_session_manager.procedural_memory.models import (
     ToolLogEntry,
     ToolPattern,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class FormatterConfig(BaseModel):

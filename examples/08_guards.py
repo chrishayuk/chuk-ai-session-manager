@@ -159,7 +159,7 @@ async def main() -> None:
         tsm.record_tool_call(f"tool_{i % 2}")
         status = tsm.check_runaway(f"tool_{i % 2}")
         budget = tsm.get_budget_status()
-        remaining = budget.get("total", {}).get("remaining", "?")
+        remaining = budget.total.limit - budget.total.used
         print(
             f"  Call {i + 1}: tool_{i % 2} — remaining={remaining}, "
             f"should_stop={status.should_stop}"
@@ -211,7 +211,7 @@ async def main() -> None:
     status = tsm.check_runaway()
     budget = tsm.get_budget_status()
     print(
-        f"4. Budget: {budget['total']['remaining']} remaining, runaway={status.should_stop}"
+        f"4. Budget: {budget.total.limit - budget.total.used} remaining, runaway={status.should_stop}"
     )
 
     # Final state summary for model

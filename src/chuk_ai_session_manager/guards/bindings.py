@@ -8,6 +8,7 @@ be referenced in subsequent tool calls using $vN syntax.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
@@ -19,6 +20,8 @@ from chuk_ai_session_manager.guards.models import (
     classify_value_type,
     compute_args_hash,
 )
+
+log = logging.getLogger(__name__)
 
 
 class BindingManager(BaseModel):

@@ -16,6 +16,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from chuk_ai_session_manager.base_models import DictCompatModel
+
 
 class ToolOutcome(str, Enum):
     """Outcome of a tool invocation."""
@@ -396,3 +398,20 @@ def _describe_fix(delta: dict[str, Any]) -> str:
         parts.append(f"change {'; '.join(changed)}")
 
     return "; ".join(parts) if parts else "unknown changes"
+
+
+# ── Statistics model ────────────────────────────────────────────────────
+
+
+class ToolMemoryStats(DictCompatModel):
+    """Statistics for procedural memory."""
+
+    session_id: str = ""
+    total_calls: int = 0
+    success_count: int = 0
+    failure_count: int = 0
+    success_rate: float = 0.0
+    total_fixes_detected: int = 0
+    tools_tracked: int = 0
+    created_at: str = ""
+    updated_at: str = ""

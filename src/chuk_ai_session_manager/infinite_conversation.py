@@ -13,13 +13,14 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+from chuk_ai_session_manager.exceptions import SessionNotFound
 from chuk_ai_session_manager.memory.models import MessageRole
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Type for LLM function callbacks
 LLMCallbackAsync = Callable[[list[dict[str, str]], str], Any]
@@ -49,6 +50,7 @@ class InfiniteConversationManager:
         token_threshold: int = 3000,
         max_turns_per_segment: int = 20,
         summarization_strategy: SummarizationStrategy = SummarizationStrategy.BASIC,
+        store: ChukSessionsStore | None = None,
     ):
         """
         Initialize the infinite conversation manager.
@@ -57,10 +59,18 @@ class InfiniteConversationManager:
             token_threshold: Maximum tokens before creating a new segment
             max_turns_per_segment: Maximum conversation turns per segment
             summarization_strategy: Strategy to use for summarization
+            store: Optional ChukSessionsStore instance (uses global backend if None).
         """
         self.token_threshold = token_threshold
         self.max_turns_per_segment = max_turns_per_segment
         self.summarization_strategy = summarization_strategy
+        self._store = store
+
+    def _get_store(self) -> ChukSessionsStore:
+        """Return the injected store or create one from the global backend."""
+        if self._store is not None:
+            return self._store
+        return ChukSessionsStore(get_backend())
 
     async def process_message(
         self,
@@ -89,13 +99,12 @@ class InfiniteConversationManager:
             The current session ID (may be a new one if threshold was exceeded)
         """
         # Get the store
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        store = self._get_store()
 
         # Get the current session
         session = await store.get(session_id)
         if not session:
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFound(session_id)
 
         # Add the message to the session
         event = await SessionEvent.create_with_tokens(
@@ -214,13 +223,12 @@ class InfiniteConversationManager:
             A list of messages suitable for an LLM call
         """
         # Get the store
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        store = self._get_store()
 
         # Get the current session
         session = await store.get(session_id)
         if not session:
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFound(session_id)
 
         # Initialize context
         context = []
@@ -269,11 +277,10 @@ class InfiniteConversationManager:
         *reverse* (closest parent first).  Tests expect root-first order,
         so we reverse it and then append the current session.
         """
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        store = self._get_store()
         session = await store.get(session_id)
         if not session:
-            raise ValueError(f"Session {session_id} not found")
+            raise SessionNotFound(session_id)
 
         ancestors = await session.ancestors()
         # ensure order root → … → parent

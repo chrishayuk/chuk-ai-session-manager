@@ -29,6 +29,7 @@ from chuk_ai_session_manager.procedural_memory.models import (
     ResultType,
     ToolFixRelation,
     ToolLogEntry,
+    ToolMemoryStats,
     ToolOutcome,
     ToolPattern,
 )
@@ -475,7 +476,7 @@ class ToolMemoryManager(BaseModel):
 
     # --- Statistics ---
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> ToolMemoryStats:
         """Get memory statistics."""
         total_calls = len(self.memory.tool_log)
         total_fixes = len(self.memory.fix_relations)
@@ -484,17 +485,17 @@ class ToolMemoryManager(BaseModel):
         success_count = sum(1 for e in self.memory.tool_log if e.outcome == ToolOutcome.SUCCESS)
         failure_count = sum(1 for e in self.memory.tool_log if e.is_failure())
 
-        return {
-            "session_id": self.session_id,
-            "total_calls": total_calls,
-            "success_count": success_count,
-            "failure_count": failure_count,
-            "success_rate": success_count / total_calls if total_calls > 0 else 0,
-            "total_fixes_detected": total_fixes,
-            "tools_tracked": tools_tracked,
-            "created_at": self.memory.created_at.isoformat(),
-            "updated_at": self.memory.updated_at.isoformat(),
-        }
+        return ToolMemoryStats(
+            session_id=self.session_id,
+            total_calls=total_calls,
+            success_count=success_count,
+            failure_count=failure_count,
+            success_rate=success_count / total_calls if total_calls > 0 else 0,
+            total_fixes_detected=total_fixes,
+            tools_tracked=tools_tracked,
+            created_at=self.memory.created_at.isoformat(),
+            updated_at=self.memory.updated_at.isoformat(),
+        )
 
     # --- Persistence hooks ---
 

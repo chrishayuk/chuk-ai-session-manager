@@ -592,23 +592,23 @@ async def show_compression(vm: MemoryManager) -> None:
 def print_stats(vm: MemoryManager) -> None:
     """Print VM metrics summary."""
     stats = vm.get_stats()
-    m = stats["metrics"]
-    ml = stats["mutation_log"]
-    ws = stats["working_set"]
+    m = stats.metrics
+    ml = stats.mutation_log
+    ws = stats.working_set
 
-    print(f"  Session:      {stats['session_id']}")
-    print(f"  Turns:        {stats['turn']}")
-    print(f"  Pages total:  {stats['pages_in_store']}")
-    print(f"  L0 pages:     {ws['l0_pages']}")
-    print(f"  L0 tokens:    {ws['tokens_used']}")
-    print(f"  Faults:       {m['faults_total']}")
-    print(f"  Evictions:    {m['evictions_total']}")
-    print(f"  Compressions: {m['compressions_total']}")
-    print(f"  Tokens saved: {m['tokens_saved_by_compression']}")
+    print(f"  Session:      {stats.session_id}")
+    print(f"  Turns:        {stats.turn}")
+    print(f"  Pages total:  {stats.pages_in_store}")
+    print(f"  L0 pages:     {ws.l0_pages}")
+    print(f"  L0 tokens:    {ws.tokens_used}")
+    print(f"  Faults:       {m.faults_total}")
+    print(f"  Evictions:    {m.evictions_total}")
+    print(f"  Compressions: {m.compressions_total}")
+    print(f"  Tokens saved: {m.tokens_saved_by_compression}")
     print(
-        f"  Mutations:    {ml['total_mutations']} "
-        f"(creates={ml['creates']}, faults={ml['faults']}, "
-        f"evictions={ml['evictions']})"
+        f"  Mutations:    {ml.total_mutations} "
+        f"(creates={ml.creates}, faults={ml.faults}, "
+        f"evictions={ml.evictions})"
     )
 
 

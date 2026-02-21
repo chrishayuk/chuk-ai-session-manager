@@ -14,6 +14,9 @@ Design principles:
 - Type-safe: Full type annotations throughout
 """
 
+from __future__ import annotations
+
+import logging
 from datetime import datetime
 
 from pydantic import BaseModel, Field, PrivateAttr
@@ -27,6 +30,8 @@ from .models import (
     PageType,
     StorageTier,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PageTable(BaseModel):
@@ -261,7 +266,7 @@ class PageTable(BaseModel):
         entries.sort(key=lambda e: e.last_accessed)
         return entries[:limit]
 
-    def get_stats(self) -> "PageTableStats":
+    def get_stats(self) -> PageTableStats:
         """Get page table statistics."""
         return PageTableStats(
             total_pages=len(self.entries),

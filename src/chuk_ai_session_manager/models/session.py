@@ -5,14 +5,15 @@ Session model for the chuk session manager with improved async support.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
-from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+from chuk_ai_session_manager.models.session_event import SessionEvent
 
 # Import models that Session depends on
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
@@ -20,6 +21,8 @@ from chuk_ai_session_manager.models.session_metadata import SessionMetadata
 # Import SessionRun and RunStatus directly to avoid circular import
 from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
 from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
+
+logger = logging.getLogger(__name__)
 
 MessageT = TypeVar("MessageT")
 
@@ -52,22 +55,25 @@ class Session(BaseModel, Generic[MessageT]):
         # but won't actually sync with storage - that requires async
         return model
 
-    async def async_init(self) -> None:
+    async def async_init(self, store: Any = None) -> None:
         """
         Initialize async components of the session.
 
         Call this after creating a new session to properly set up
         parent-child relationships in the async storage.
+
+        Args:
+            store: Optional ChukSessionsStore instance (uses global backend if None).
         """
         if self.parent_id:
-            # Import here to avoid circular import
-            from chuk_ai_session_manager.session_storage import (
-                ChukSessionsStore,
-                get_backend,
-            )
+            if store is None:
+                # Import here to avoid circular import
+                from chuk_ai_session_manager.session_storage import (
+                    ChukSessionsStore,
+                    get_backend,
+                )
 
-            backend = get_backend()
-            store = ChukSessionsStore(backend)
+                store = ChukSessionsStore(get_backend())
             parent = await store.get(self.parent_id)
             if parent and self.id not in parent.child_ids:
                 parent.child_ids.append(self.id)
@@ -98,47 +104,45 @@ class Session(BaseModel, Generic[MessageT]):
         """Return the total estimated cost of this session."""
         return self.token_summary.total_estimated_cost_usd
 
-    async def add_child(self, child_id: str) -> None:
+    async def add_child(self, child_id: str, store: Any = None) -> None:
         """Add a child session ID and save the session."""
         if child_id not in self.child_ids:
             self.child_ids.append(child_id)
-            # Save the updated session
-            from chuk_ai_session_manager.session_storage import (
-                ChukSessionsStore,
-                get_backend,
-            )
+            if store is None:
+                from chuk_ai_session_manager.session_storage import (
+                    ChukSessionsStore,
+                    get_backend,
+                )
 
-            backend = get_backend()
-            store = ChukSessionsStore(backend)
+                store = ChukSessionsStore(get_backend())
             await store.save(self)
 
-    async def remove_child(self, child_id: str) -> None:
+    async def remove_child(self, child_id: str, store: Any = None) -> None:
         """Remove a child session ID and save the session."""
         if child_id in self.child_ids:
             self.child_ids.remove(child_id)
-            # Save the updated session
-            from chuk_ai_session_manager.session_storage import (
-                ChukSessionsStore,
-                get_backend,
-            )
+            if store is None:
+                from chuk_ai_session_manager.session_storage import (
+                    ChukSessionsStore,
+                    get_backend,
+                )
 
-            backend = get_backend()
-            store = ChukSessionsStore(backend)
+                store = ChukSessionsStore(get_backend())
             await store.save(self)
 
-    async def ancestors(self) -> list[Session]:
+    async def ancestors(self, store: Any = None) -> list[Session]:
         """Fetch ancestor sessions from store asynchronously."""
         result: list[Session] = []
         current = self.parent_id
 
-        # Import here to avoid circular import
-        from chuk_ai_session_manager.session_storage import (
-            ChukSessionsStore,
-            get_backend,
-        )
+        if store is None:
+            # Import here to avoid circular import
+            from chuk_ai_session_manager.session_storage import (
+                ChukSessionsStore,
+                get_backend,
+            )
 
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+            store = ChukSessionsStore(get_backend())
 
         while current:
             parent = await store.get(current)
@@ -148,19 +152,19 @@ class Session(BaseModel, Generic[MessageT]):
             current = parent.parent_id
         return result
 
-    async def descendants(self) -> list[Session]:
+    async def descendants(self, store: Any = None) -> list[Session]:
         """Fetch all descendant sessions from store in DFS order asynchronously."""
         result: list[Session] = []
         stack = list(self.child_ids)
 
-        # Import here to avoid circular import
-        from chuk_ai_session_manager.session_storage import (
-            ChukSessionsStore,
-            get_backend,
-        )
+        if store is None:
+            # Import here to avoid circular import
+            from chuk_ai_session_manager.session_storage import (
+                ChukSessionsStore,
+                get_backend,
+            )
 
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+            store = ChukSessionsStore(get_backend())
 
         while stack:
             cid = stack.pop()
@@ -184,24 +188,25 @@ class Session(BaseModel, Generic[MessageT]):
         if event.token_usage:
             await self.token_summary.add_usage(event.token_usage)
 
-    async def add_event_and_save(self, event: SessionEvent[MessageT]) -> None:
+    async def add_event_and_save(self, event: SessionEvent[MessageT], store: Any = None) -> None:
         """
         Add an event to the session, update token tracking, and save the session.
 
         Args:
             event: The event to add
+            store: Optional ChukSessionsStore instance (uses global backend if None).
         """
         # Add the event asynchronously
         await self.add_event(event)
 
-        # Save the session
-        from chuk_ai_session_manager.session_storage import (
-            ChukSessionsStore,
-            get_backend,
-        )
+        if store is None:
+            # Save the session
+            from chuk_ai_session_manager.session_storage import (
+                ChukSessionsStore,
+                get_backend,
+            )
 
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+            store = ChukSessionsStore(get_backend())
         await store.save(self)
 
     async def get_token_usage_by_source(self) -> dict[str, TokenSummary]:
@@ -250,9 +255,7 @@ class Session(BaseModel, Generic[MessageT]):
 
         return result
 
-    async def count_message_tokens(
-        self, message: str | dict[str, Any], model: str = DEFAULT_TOKEN_MODEL
-    ) -> int:
+    async def count_message_tokens(self, message: str | dict[str, Any], model: str = DEFAULT_TOKEN_MODEL) -> int:
         """
         Count tokens in a message asynchronously.
 
@@ -283,12 +286,6 @@ class Session(BaseModel, Generic[MessageT]):
             value: The value to set
         """
         self.state[key] = value
-
-        # Auto-save if needed (could be added as an option)
-        # from chuk_ai_session_manager.chuk_sessions_storage import get_backend, ChukSessionsStore
-        # backend = get_backend()
-        # store = ChukSessionsStore(backend)
-        # await store.save(self)
 
     async def get_state(self, key: str, default: Any = None) -> Any:
         """
@@ -325,20 +322,21 @@ class Session(BaseModel, Generic[MessageT]):
         if key in self.state:
             del self.state[key]
 
-            # Auto-save if needed (could be added as an option)
-            # from chuk_ai_session_manager.chuk_sessions_storage import get_backend, ChukSessionsStore
-            # backend = get_backend()
-            # store = ChukSessionsStore(backend)
-            # await store.save(self)
-
     @classmethod
-    async def create(cls, session_id: str | None = None, parent_id: str | None = None, **kwargs) -> Session:
+    async def create(
+        cls,
+        session_id: str | None = None,
+        parent_id: str | None = None,
+        store: Any = None,
+        **kwargs,
+    ) -> Session:
         """
         Create a new session asynchronously, handling parent-child relationships.
 
         Args:
             session_id: Optional session ID to use (if not provided, generates a new one)
             parent_id: Optional parent session ID
+            store: Optional ChukSessionsStore instance (uses global backend if None).
             **kwargs: Additional arguments for Session initialization
 
         Returns:
@@ -350,16 +348,15 @@ class Session(BaseModel, Generic[MessageT]):
         else:
             session = cls(parent_id=parent_id, **kwargs)
 
-        await session.async_init()
+        if store is None:
+            from chuk_ai_session_manager.session_storage import (
+                ChukSessionsStore,
+                get_backend,
+            )
 
-        # Save the new session
-        from chuk_ai_session_manager.session_storage import (
-            ChukSessionsStore,
-            get_backend,
-        )
+            store = ChukSessionsStore(get_backend())
 
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        await session.async_init(store=store)
         await store.save(session)
 
         return session

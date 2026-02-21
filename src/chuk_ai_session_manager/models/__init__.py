@@ -39,6 +39,11 @@ try:
 except ImportError:
     pass
 
+try:
+    from chuk_ai_session_manager.models.session_stats import SessionStats  # noqa: F401
+except ImportError:
+    pass
+
 # Define __all__ based on what was successfully imported
 __all__ = []
 
@@ -51,6 +56,7 @@ for name in [
     "SessionRun",
     "RunStatus",
     "Session",
+    "SessionStats",
 ]:
     if name in globals():
         __all__.append(name)

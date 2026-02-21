@@ -14,6 +14,10 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
+from __future__ import annotations
+
+import logging
+
 from pydantic import BaseModel, Field
 
 from .models import (
@@ -24,6 +28,8 @@ from .models import (
     Modality,
     PageType,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PackedContext(BaseModel):

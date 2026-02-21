@@ -1,5 +1,3 @@
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
-
 # src/chuk_ai_session_manager/api/simple_api.py
 """
 Simple API convenience functions for the CHUK AI Session Manager.
@@ -29,11 +27,14 @@ Usage:
     )
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
 
+from chuk_ai_session_manager.models.session_stats import SessionStats
 from chuk_ai_session_manager.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,7 @@ async def quick_conversation(
     model: str = "unknown",
     provider: str = "unknown",
     infinite_context: bool = False,
-) -> dict[str, Any]:
+) -> SessionStats:
     """
     Quickest way to track a conversation and get basic stats.
 
@@ -298,7 +299,7 @@ async def track_tool_use(
     return await sm.tool_used(tool_name=tool_name, arguments=arguments, result=result, error=error, **metadata)
 
 
-async def get_session_stats(session_id: str, include_all_segments: bool = False) -> dict[str, Any]:
+async def get_session_stats(session_id: str, include_all_segments: bool = False) -> SessionStats:
     """
     Get statistics for an existing session.
 

@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from chuk_ai_session_manager.base_models import DictCompatModel
+
 
 def classify_value_type(value: Any) -> ValueType:
     """Classify the type of a value for binding."""
@@ -475,3 +477,21 @@ class RuntimeLimits(BaseModel):
             ungrounded_grace_calls=0,
             unused_results=UnusedResultAction.WARN,
         )
+
+
+# ── Budget status models ───────────────────────────────────────────────
+
+
+class ToolBudgetBranch(DictCompatModel):
+    """Budget status for a single branch (discovery/execution/total)."""
+
+    used: int = 0
+    limit: int = 0
+
+
+class BudgetStatus(DictCompatModel):
+    """Overall budget status across all branches."""
+
+    discovery: ToolBudgetBranch = Field(default_factory=ToolBudgetBranch)
+    execution: ToolBudgetBranch = Field(default_factory=ToolBudgetBranch)
+    total: ToolBudgetBranch = Field(default_factory=ToolBudgetBranch)

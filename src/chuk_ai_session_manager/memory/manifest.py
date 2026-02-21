@@ -14,6 +14,9 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
+from __future__ import annotations
+
+import logging
 from collections.abc import Callable
 
 from pydantic import BaseModel, Field
@@ -27,6 +30,8 @@ from .models import (
     StorageTier,
 )
 from .page_table import PageTable
+
+logger = logging.getLogger(__name__)
 
 # Tier hint constants for manifest generation
 _TIER_HINTS: dict[StorageTier, str] = {
@@ -176,6 +181,7 @@ class ManifestBuilder(BaseModel):
                 try:
                     hint = hint_generator(entry)
                 except Exception:
+                    logger.debug("Hint generation failed for page %s", page_id, exc_info=True)
                     hint = ""
 
             available_entry = AvailablePageEntry(
@@ -243,6 +249,7 @@ class ManifestBuilder(BaseModel):
                 try:
                     hint = hint_generator(entry)
                 except Exception:
+                    logger.debug("Hint generation failed for page %s", entry.page_id, exc_info=True)
                     hint = ""
 
             available_entry = AvailablePageEntry(

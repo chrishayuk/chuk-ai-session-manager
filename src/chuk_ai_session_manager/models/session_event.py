@@ -11,10 +11,10 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.token_usage import TokenUsage
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 MessageT = TypeVar("MessageT")
 

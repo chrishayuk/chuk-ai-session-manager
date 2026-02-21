@@ -33,11 +33,13 @@ from .models import (
     Actor,
     CompressionLevel,
     FaultPolicy,
+    MemoryManagerStats,
     MemoryPage,
     Modality,
     MutationType,
     PageType,
     StorageTier,
+    VMContext,
     VMMetrics,
     VMMode,
 )
@@ -294,6 +296,7 @@ class MemoryManager:
         # Record access for prefetcher
         self._prefetcher.record_page_access(pid)
 
+        logger.debug("[%s] Created page %s type=%s modality=%s", self._session_id, pid, page_type.value, modality.value)
         return page
 
     async def add_to_working_set(self, page: MemoryPage) -> bool:
@@ -318,6 +321,15 @@ class MemoryManager:
 
                 # Invalidate pack cache (working set changed)
                 self._pack_cache.invalidate_session(self._session_id)
+
+                logger.debug(
+                    "[%s] Added %s to L0 (%d tokens used)",
+                    self._session_id,
+                    page.page_id,
+                    self._working_set.tokens_used,
+                )
+            else:
+                logger.debug("[%s] Failed to add %s to L0 (tokens=%d)", self._session_id, page.page_id, tokens)
 
             return success
 
@@ -367,6 +379,7 @@ class MemoryManager:
             turn=self._turn,
         )
 
+        logger.debug("[%s] Evicted %s from %s to %s", self._session_id, page_id, old_tier.value, target_tier.value)
         return True
 
     async def compress_page(
@@ -390,6 +403,13 @@ class MemoryManager:
         result = await self._compressor_registry.compress_page(page, target_level)
 
         if result.tokens_saved > 0:
+            logger.debug(
+                "[%s] Compressed %s to %s (saved %d tokens)",
+                self._session_id,
+                page_id,
+                target_level.name,
+                result.tokens_saved,
+            )
             # Update page in store
             self._page_store[page_id] = result.page
 
@@ -423,6 +443,7 @@ class MemoryManager:
 
     async def _run_eviction(self, tokens_needed: int) -> list[str]:
         """Run eviction to free tokens. Returns evicted page IDs."""
+        logger.debug("[%s] Eviction run: need %d tokens", self._session_id, tokens_needed)
         evicted_ids: list[str] = []
         tokens_freed = 0
         target = self._working_set.calculate_eviction_target(tokens_needed)
@@ -455,6 +476,12 @@ class MemoryManager:
             tokens_freed += page_tokens
             evicted_ids.append(page_id)
 
+        logger.debug(
+            "[%s] Eviction complete: freed %d tokens, evicted %d pages",
+            self._session_id,
+            tokens_freed,
+            len(evicted_ids),
+        )
         return evicted_ids
 
     async def evict_segment_pages(
@@ -504,6 +531,7 @@ class MemoryManager:
 
         Returns list of page_ids successfully faulted in.
         """
+        logger.debug("[%s] Demand pre-pass for message: %.60s", self._session_id, user_message)
         candidates = self._demand_pager.get_prefetch_candidates(
             message=user_message,
             page_table=self._page_table,
@@ -522,6 +550,7 @@ class MemoryManager:
         self._fault_policy.faults_this_turn = 0
         self._fault_policy.tokens_used_this_turn = 0
 
+        logger.debug("[%s] Demand pre-pass faulted %d pages: %s", self._session_id, len(faulted), faulted)
         return faulted
 
     # ------------------------------------------------------------------
@@ -539,6 +568,7 @@ class MemoryManager:
         Checks fault policy, delegates to PageFaultHandler,
         and promotes the result to working set.
         """
+        logger.debug("[%s] Fault request: page_id=%s level=%d", self._session_id, page_id, target_level)
         estimated_tokens = 500
         if not self._fault_policy.can_fault(estimated_tokens):
             return FaultResult(
@@ -572,6 +602,10 @@ class MemoryManager:
                 turn=self._turn,
             )
 
+        if result.success:
+            logger.debug("[%s] Fault resolved: %s from %s", self._session_id, page_id, result.source_tier)
+        else:
+            logger.debug("[%s] Fault failed: %s — %s", self._session_id, page_id, result.error)
         return result
 
     # ------------------------------------------------------------------
@@ -593,16 +627,12 @@ class MemoryManager:
         system_prompt: str = "",
         model_id: str = "",  # noqa: ARG002 — reserved for model-specific context
         token_budget: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> VMContext:
         """
         Build the complete VM context for an LLM call.
 
         Returns:
-            dict with keys:
-            - "developer_message": str — VM:RULES + VM:MANIFEST_JSON + VM:CONTEXT
-            - "tools": list — VM tool definitions (page_fault, search_pages)
-            - "manifest": VMManifest
-            - "packed_context": PackedContext
+            VMContext with developer_message, tools, manifest, packed_context.
         """
         vm_mode = mode or self._mode
         l0_pages = self.get_l0_pages()
@@ -631,12 +661,12 @@ class MemoryManager:
         # Tools (only for non-passive modes)
         tools = get_vm_tools_as_dicts() if vm_mode != VMMode.PASSIVE else []
 
-        return {
-            "developer_message": developer_message,
-            "tools": tools,
-            "manifest": manifest,
-            "packed_context": packed,
-        }
+        return VMContext(
+            developer_message=developer_message,
+            tools=tools,
+            manifest=manifest,
+            packed_context=packed,
+        )
 
     # ------------------------------------------------------------------
     # Turn management
@@ -645,6 +675,7 @@ class MemoryManager:
     def new_turn(self) -> None:
         """Advance to a new turn. Resets per-turn counters."""
         self._turn += 1
+        logger.debug("[%s] Turn %d started", self._session_id, self._turn)
         self._working_set.new_turn()
         self._fault_handler.new_turn()
         self._fault_policy.new_turn()
@@ -684,19 +715,23 @@ class MemoryManager:
     # Stats
     # ------------------------------------------------------------------
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> MemoryManagerStats:
         """Get comprehensive stats across all subsystems."""
-        return {
-            "session_id": self._session_id,
-            "turn": self._turn,
-            "mode": self._mode.value,
-            "page_table": self._page_table.get_stats().model_dump(),
-            "working_set": self._working_set.get_stats().model_dump(),
-            "fault_handler": self._fault_handler.get_metrics().model_dump(),
-            "tlb": self._tlb.get_stats().model_dump(),
-            "mutation_log": self._mutation_log.get_summary(),
-            "prefetcher": self._prefetcher.get_stats(),
-            "pack_cache": self._pack_cache.get_stats(),
-            "metrics": self._metrics.model_dump(),
-            "pages_in_store": len(self._page_store),
-        }
+        try:
+            return MemoryManagerStats(
+                session_id=self._session_id,
+                turn=self._turn,
+                mode=self._mode.value,
+                page_table=self._page_table.get_stats(),
+                working_set=self._working_set.get_stats(),
+                fault_handler=self._fault_handler.get_metrics(),
+                tlb=self._tlb.get_stats(),
+                mutation_log=self._mutation_log.get_summary(),
+                prefetcher=self._prefetcher.get_stats(),
+                pack_cache=self._pack_cache.get_stats(),
+                metrics=self._metrics,
+                pages_in_store=len(self._page_store),
+            )
+        except Exception:
+            logger.warning("[%s] Failed to collect VM stats", self._session_id, exc_info=True)
+            return MemoryManagerStats(session_id=self._session_id, turn=self._turn)

@@ -3,6 +3,8 @@
 Sample tools for chuk session manager demos - corrected version following registry example
 """
 
+from __future__ import annotations
+
 import asyncio
 import random
 from datetime import datetime

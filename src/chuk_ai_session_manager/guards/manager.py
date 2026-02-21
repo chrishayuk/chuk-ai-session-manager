@@ -37,6 +37,7 @@ from chuk_ai_session_manager.guards.constants import (
     BINDING_SOURCE_EXTRACTED,
 )
 from chuk_ai_session_manager.guards.models import (
+    BudgetStatus,
     CachedToolResult,
     NamedVariable,
     PerToolCallStatus,
@@ -45,6 +46,7 @@ from chuk_ai_session_manager.guards.models import (
     RuntimeLimits,
     RuntimeMode,
     SoftBlockReason,
+    ToolBudgetBranch,
     ToolClassification,
     UngroundedCallResult,
     ValueBinding,
@@ -292,41 +294,35 @@ class ToolStateManager(BaseModel):
         if self.per_tool_guard:
             self.per_tool_guard.record_call(tool_name)
 
-    def get_budget_status(self) -> dict[str, Any]:
+    def get_budget_status(self) -> BudgetStatus:
         """Get current budget status."""
         if self.budget_guard:
             status: dict[str, Any] = self.budget_guard.get_status()
-            return status
-        return {
-            "discovery": {"used": 0, "limit": 0},
-            "execution": {"used": 0, "limit": 0},
-            "total": {"used": 0, "limit": 0},
-        }
+            return BudgetStatus(
+                discovery=ToolBudgetBranch(**status["discovery"]),
+                execution=ToolBudgetBranch(**status["execution"]),
+                total=ToolBudgetBranch(**status["total"]),
+            )
+        return BudgetStatus()
 
     def set_budget(self, budget: int) -> None:
         """Set the total tool budget."""
         self.limits = RuntimeLimits(tool_budget_total=budget, execution_budget=budget, discovery_budget=budget)
         self._init_guards()
 
-    def get_discovery_status(self) -> dict[str, int]:
+    def get_discovery_status(self) -> ToolBudgetBranch:
         """Get discovery budget status."""
         if self.budget_guard:
             status = self.budget_guard.get_status()
-            return {
-                "used": status["discovery"]["used"],
-                "limit": status["discovery"]["limit"],
-            }
-        return {"used": 0, "limit": 0}
+            return ToolBudgetBranch(**status["discovery"])
+        return ToolBudgetBranch()
 
-    def get_execution_status(self) -> dict[str, int]:
+    def get_execution_status(self) -> ToolBudgetBranch:
         """Get execution budget status."""
         if self.budget_guard:
             status = self.budget_guard.get_status()
-            return {
-                "used": status["execution"]["used"],
-                "limit": status["execution"]["limit"],
-            }
-        return {"used": 0, "limit": 0}
+            return ToolBudgetBranch(**status["execution"])
+        return ToolBudgetBranch()
 
     def is_discovery_exhausted(self) -> bool:
         """Check if discovery budget is exhausted."""

@@ -24,19 +24,19 @@
 
 ---
 
-## Current Status (v0.10)
+## Current Status (v0.11)
 
-> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, demand paging, swappable eviction policies, and per-modality compression. 1704 tests passing.
+> **Shipped February 2025.** Full VM infrastructure with architecture cleanup: typed Pydantic models throughout, structured exceptions, `DictCompatModel` for backward compat, `from __future__ import annotations` everywhere, full observability with session-scoped logging. 1719 tests passing, CI enforces ≥ 80% coverage.
 
 ### What's Shipped
 
 | Component | Module | Status |
 |-----------|--------|--------|
-| MemoryPage, PageTableEntry, all enums | `models.py` | v0.8 |
-| PageType taxonomy + provenance | `models.py` | v0.8 |
-| FaultPolicy, FaultReason, FaultRecord | `models.py` | v0.8 |
-| MemoryABI, PageManifestEntry | `models.py` | v0.8 |
-| UserExperienceMetrics | `models.py` | v0.8 |
+| MemoryPage, PageTableEntry, all enums | `models/` | v0.8 |
+| PageType taxonomy + provenance | `models/` | v0.8 |
+| FaultPolicy, FaultReason, FaultRecord | `models/` | v0.8 |
+| MemoryABI, PageManifestEntry | `models/` | v0.8 |
+| UserExperienceMetrics | `models/` | v0.8 |
 | PageTable with dirty/tier/modality/type tracking | `page_table.py` | v0.8 |
 | PageTLB + TLBWithPageTable | `tlb.py` | v0.8 |
 | WorkingSetManager + PinnedSet + AntiThrash | `working_set.py` | v0.8 |
@@ -57,19 +57,22 @@
 | **EvictionPolicy protocol** (3 implementations) | `eviction_policy.py` | **v0.10** |
 | **CompressorRegistry** (text, image, passthrough) | `compressor.py` | **v0.10** |
 | **Compress-before-evict** in MemoryManager | `manager.py` | **v0.10** |
-| **VMMetrics compression tracking** | `models.py` | **v0.10** |
+| **VMMetrics compression tracking** | `models/` | **v0.10** |
+| **Typed stats models** (VMContext, MemoryManagerStats, etc.) | `models/stats.py` | **v0.11** |
+| **Structured exceptions** (StorageError, InvalidSessionOperation) | `exceptions.py` | **v0.11** |
+| **DictCompatModel** backward-compat base | `base_models.py` | **v0.11** |
+| **Session-scoped logging** in MemoryManager | `manager.py` | **v0.11** |
+| **`_default_summary()` extraction** (separation of concerns) | `session_manager.py` | **v0.11** |
 
 ### What's Next
 
 | Priority | Component | Phase |
 |----------|-----------|-------|
-| **P1** | Closed-loop learning (procedural + guards) | v0.10 |
-| **P1** | Storage query layer (beyond K/V) | v0.10 |
-| **P2** | StreamingFaultHandler | v0.11 |
-| **P2** | Real multi-modal handlers | v0.11 |
-| **P2** | Memory pressure monitoring | v0.11 |
-| **P3** | Agent Planning & Skills (mcp-cli) | v0.12 |
-| **P3** | Coherency, versioning, time-travel | v0.12 |
+| **P1** | StreamingFaultHandler | v0.12 |
+| **P1** | Real multi-modal handlers | v0.12 |
+| **P2** | Memory pressure monitoring | v0.12 |
+| **P2** | Agent Planning & Skills (mcp-cli) | v0.12 |
+| **P3** | Coherency, versioning, time-travel | v0.13 |
 | **P3** | Advanced (shared memory, COW, GC, NUMA) | v1.0+ |
 
 ---

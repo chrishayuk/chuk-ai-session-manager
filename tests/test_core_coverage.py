@@ -7,10 +7,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from chuk_ai_session_manager.exceptions import SessionNotFound
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.models.session_stats import SessionStats
 
 
 def _make_mock_store_and_sessions():
@@ -115,10 +117,12 @@ class TestInitModule:
         from chuk_ai_session_manager import get_storage_info
 
         mock_backend = MagicMock()
-        mock_backend.get_stats.return_value = {
-            "backend": "chuk_sessions",
-            "sandbox_id": "test-sb",
-        }
+        from chuk_ai_session_manager.session_storage import SessionStorageStats
+
+        mock_backend.get_stats.return_value = SessionStorageStats(
+            backend="chuk_sessions",
+            sandbox_id="test-sb",
+        )
         with patch(
             "chuk_ai_session_manager.session_storage.get_backend",
             return_value=mock_backend,
@@ -240,7 +244,7 @@ class TestSimpleApiCoverage:
             await sm.user_says("Hi")
             await sm.ai_responds("Hello", model="gpt-4")
             stats = await get_session_stats("stats-session")
-            assert isinstance(stats, dict)
+            assert isinstance(stats, SessionStats)
             assert "session_id" in stats
 
     async def test_get_session_stats_with_segments(self):
@@ -258,7 +262,7 @@ class TestSimpleApiCoverage:
             session.id = "stats-seg-session"
             mock_create.return_value = session
             stats = await get_session_stats("stats-seg-session", include_all_segments=True)
-            assert isinstance(stats, dict)
+            assert isinstance(stats, SessionStats)
 
     async def test_get_conversation_history(self):
         from chuk_ai_session_manager.api.simple_api import get_conversation_history
@@ -470,7 +474,7 @@ class TestInfiniteConversationCoverage:
             store_inst = AsyncMock()
             store_inst.get.return_value = None
             mock_css.return_value = store_inst
-            with pytest.raises(ValueError, match="not found"):
+            with pytest.raises(SessionNotFound, match="not found"):
                 await mgr.get_session_chain("nonexistent-id")
 
     async def test_get_full_conversation_history(self):
@@ -752,7 +756,7 @@ class TestSessionManagerCoverage:
                 sm._total_segments = 2
                 sm._full_conversation = []
                 stats = await sm.get_stats(include_all_segments=True)
-                assert isinstance(stats, dict)
+                assert isinstance(stats, SessionStats)
 
     async def test_set_summary_callback(self):
         from chuk_ai_session_manager.session_manager import SessionManager

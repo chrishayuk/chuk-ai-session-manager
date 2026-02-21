@@ -26,6 +26,7 @@ from chuk_ai_session_manager.memory.models import (
     MessageRole,
     PageType,
     StorageTier,
+    VMContext,
     VMMode,
 )
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
@@ -33,6 +34,7 @@ from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.models.session_stats import SessionStats
 from chuk_ai_session_manager.session_storage import ChukSessionsStore
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,25 @@ VM_IMPORTANCE_SUMMARY = 0.9
 
 # Page ID prefixes for VM
 PAGE_ID_PREFIX_MSG = "msg"
+
+
+def _default_summary(messages: list[dict[str, str]]) -> str:
+    """Simple extractive summary for when no LLM callback is provided."""
+    user_messages = [m for m in messages if m.get("role") == "user"]
+    topics: list[str] = []
+    for msg in user_messages:
+        content = msg.get("content", "")
+        if "?" in content:
+            question = content.split("?")[0].strip()
+            if len(question) > 10:
+                topics.append(question[:50])
+
+    if topics:
+        summary = f"User discussed: {'; '.join(topics[:3])}"
+        if len(topics) > 3:
+            summary += f" and {len(topics) - 3} other topics"
+        return summary
+    return f"Conversation with {len(user_messages)} user messages and {len(messages) - len(user_messages)} responses"
 
 
 class SessionManager:
@@ -182,15 +203,12 @@ class SessionManager:
         self,
         model_id: str = "",
         token_budget: int | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> VMContext | None:
         """
         Get the full VM context for an LLM call.
 
-        Returns None if VM is disabled. Otherwise returns a dict with:
-        - developer_message: str with VM rules, manifest, and context
-        - tools: list of VM tool definitions
-        - manifest: VMManifest
-        - packed_context: PackedContext
+        Returns None if VM is disabled, otherwise a VMContext with
+        developer_message, tools, manifest, and packed_context.
 
         Args:
             model_id: Optional model identifier for context sizing.
@@ -327,38 +345,15 @@ class SessionManager:
         """
         Create a summary of the current session.
 
-        Args:
-            llm_callback: Optional async function to generate summary using an LLM.
-                         Should accept List[Dict] messages and return str summary.
+        Delegates to llm_callback if provided, otherwise uses the
+        module-level _default_summary() extractive fallback.
         """
         await self._ensure_initialized()
         assert self._session is not None
-        message_events = [e for e in self._session.events if e.type == EventType.MESSAGE]
-
-        # Use LLM callback if provided
+        messages = await self.get_messages_for_llm(include_system=False)
         if llm_callback:
-            messages = await self.get_messages_for_llm(include_system=False)
             return await llm_callback(messages)
-
-        # Simple summary generation
-        user_messages = [e for e in message_events if e.source == EventSource.USER]
-
-        topics = []
-        for event in user_messages:
-            content = str(event.message)
-            if "?" in content:
-                question = content.split("?")[0].strip()
-                if len(question) > 10:
-                    topics.append(question[:50])
-
-        if topics:
-            summary = f"User discussed: {'; '.join(topics[:3])}"
-            if len(topics) > 3:
-                summary += f" and {len(topics) - 3} other topics"
-        else:
-            summary = f"Conversation with {len(user_messages)} user messages and {len(message_events) - len(user_messages)} responses"
-
-        return summary
+        return _default_summary(messages)
 
     async def _create_new_segment(self, llm_callback: Callable | None = None) -> str:
         """
@@ -720,7 +715,7 @@ class SessionManager:
         else:
             return [self.session_id]
 
-    async def get_stats(self, include_all_segments: bool | None = None) -> dict[str, Any]:
+    async def get_stats(self, include_all_segments: bool | None = None) -> SessionStats:
         """
         Get conversation statistics.
 
@@ -728,18 +723,7 @@ class SessionManager:
             include_all_segments: Include all segments (defaults to infinite_context setting).
 
         Returns:
-            Dictionary with conversation stats including:
-            - session_id: Current session ID
-            - total_messages: Total number of messages
-            - user_messages: Number of user messages
-            - ai_messages: Number of AI messages
-            - tool_calls: Number of tool calls
-            - total_tokens: Total tokens used
-            - estimated_cost: Estimated cost in USD
-            - created_at: Session creation time
-            - last_update: Last update time
-            - session_segments: Number of segments (infinite context)
-            - infinite_context: Whether infinite context is enabled
+            SessionStats with conversation statistics.
         """
         if include_all_segments is None:
             include_all_segments = self._infinite_context
@@ -768,8 +752,8 @@ class SessionManager:
                 self._total_segments = len(chain)
 
             # Calculate stats across all segments
-            user_messages = len([t for t in self._full_conversation if t["role"] == "user"])
-            ai_messages = len([t for t in self._full_conversation if t["role"] == "assistant"])
+            user_messages = len([t for t in self._full_conversation if t["role"] == MessageRole.USER.value])
+            ai_messages = len([t for t in self._full_conversation if t["role"] == MessageRole.ASSISTANT.value])
 
             # Get token/cost stats by loading all sessions in chain
             total_tokens = 0
@@ -797,21 +781,21 @@ class SessionManager:
                 except Exception as e:
                     logger.warning(f"Failed to load session {session_id} in chain: {e}")
 
-            return {
-                "session_id": self._session_id,
-                "session_segments": self._total_segments,
-                "session_chain": self._session_chain.copy(),
-                "total_messages": user_messages + ai_messages,
-                "total_events": total_events,
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": tool_calls,
-                "total_tokens": total_tokens,
-                "estimated_cost": total_cost,
-                "created_at": self._session.metadata.created_at.isoformat(),
-                "last_update": self._session.last_update_time.isoformat(),
-                "infinite_context": True,
-            }
+            return SessionStats(
+                session_id=self._session_id,
+                session_segments=self._total_segments,
+                session_chain=self._session_chain.copy(),
+                total_messages=user_messages + ai_messages,
+                total_events=total_events,
+                user_messages=user_messages,
+                ai_messages=ai_messages,
+                tool_calls=tool_calls,
+                total_tokens=total_tokens,
+                estimated_cost=total_cost,
+                created_at=self._session.metadata.created_at.isoformat(),
+                last_update=self._session.last_update_time.isoformat(),
+                infinite_context=True,
+            )
         else:
             # Current session stats only
             user_messages = sum(
@@ -822,20 +806,20 @@ class SessionManager:
             )
             tool_calls = sum(1 for e in self._session.events if e.type == EventType.TOOL_CALL)
 
-            return {
-                "session_id": self._session.id,
-                "session_segments": 1,
-                "total_messages": user_messages + ai_messages,
-                "total_events": len(self._session.events),
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": tool_calls,
-                "total_tokens": self._session.total_tokens,
-                "estimated_cost": self._session.total_cost,
-                "created_at": self._session.metadata.created_at.isoformat(),
-                "last_update": self._session.last_update_time.isoformat(),
-                "infinite_context": self._infinite_context,
-            }
+            return SessionStats(
+                session_id=self._session.id,
+                session_segments=1,
+                total_messages=user_messages + ai_messages,
+                total_events=len(self._session.events),
+                user_messages=user_messages,
+                ai_messages=ai_messages,
+                tool_calls=tool_calls,
+                total_tokens=self._session.total_tokens,
+                estimated_cost=self._session.total_cost,
+                created_at=self._session.metadata.created_at.isoformat(),
+                last_update=self._session.last_update_time.isoformat(),
+                infinite_context=self._infinite_context,
+            )
 
     def set_summary_callback(self, callback: Callable[[list[dict]], str]) -> None:
         """

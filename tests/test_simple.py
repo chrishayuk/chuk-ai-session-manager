@@ -1,5 +1,4 @@
 # tests/test_simple.py
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Simple working test for chuk_ai_session_manager.
 
@@ -8,6 +7,9 @@ rather than implementation details.
 """
 
 import pytest
+
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+from chuk_ai_session_manager.models.session_stats import SessionStats
 
 
 class TestBasicImports:
@@ -234,7 +236,7 @@ class TestBasicFunctionality:
 
         stats = await quick_conversation(user_message="Hello!", ai_response="Hi there!")
 
-        assert isinstance(stats, dict)
+        assert isinstance(stats, SessionStats)
         assert "session_id" in stats
         assert "user_messages" in stats
         assert "ai_messages" in stats
@@ -512,7 +514,7 @@ class TestIntegrationScenarios:
         stats = await quick_conversation("Hello!", "Hi there!")
 
         assert isinstance(session_id1, str)
-        assert isinstance(stats, dict)
+        assert isinstance(stats, SessionStats)
         assert stats["user_messages"] == 1
         assert stats["ai_messages"] == 1
 

@@ -24,9 +24,23 @@ except ImportError as e:
         'python -c "import chuk_sessions; print(dir(chuk_sessions))"'
     ) from e
 
+from pydantic import Field
+
+from chuk_ai_session_manager.base_models import DictCompatModel
 from chuk_ai_session_manager.models.session import Session
 
 logger = logging.getLogger(__name__)
+
+SESSION_TYPE = "ai_session_manager"
+
+
+class SessionStorageStats(DictCompatModel):
+    """Statistics for the session storage backend."""
+
+    backend: str = ""
+    sandbox_id: str = ""
+    cached_ai_sessions: int = 0
+    chuk_sessions_stats: dict[str, Any] = Field(default_factory=dict)
 
 
 class SessionStorage:
@@ -57,7 +71,7 @@ class SessionStorage:
 
             # Check if it's an AI session manager session
             custom_metadata = info.get("custom_metadata", {})
-            if custom_metadata.get("session_type") != "ai_session_manager":
+            if custom_metadata.get("session_type") != SESSION_TYPE:
                 return None
 
             ai_session_json = custom_metadata.get("ai_session_data")
@@ -85,7 +99,7 @@ class SessionStorage:
             custom_metadata = {
                 "ai_session_data": session_json,
                 "event_count": len(session.events),
-                "session_type": "ai_session_manager",
+                "session_type": SESSION_TYPE,
             }
 
             await self.chuk.allocate_session(session_id=session.id, user_id=user_id, custom_metadata=custom_metadata)
@@ -125,14 +139,14 @@ class SessionStorage:
         """Extend session TTL."""
         return await self.chuk.extend_session_ttl(session_id, additional_hours)
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> SessionStorageStats:
         """Get storage statistics."""
-        return {
-            "backend": "chuk_sessions",
-            "sandbox_id": self.sandbox_id,
-            "cached_ai_sessions": len(self._cache),
-            "chuk_sessions_stats": self.chuk.get_cache_stats(),
-        }
+        return SessionStorageStats(
+            backend="chuk_sessions",
+            sandbox_id=self.sandbox_id,
+            cached_ai_sessions=len(self._cache),
+            chuk_sessions_stats=self.chuk.get_cache_stats(),
+        )
 
 
 # Global backend

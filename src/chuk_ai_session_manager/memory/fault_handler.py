@@ -16,6 +16,9 @@ Design principles:
 - Metrics-aware: Tracks fault counts and latencies
 """
 
+from __future__ import annotations
+
+import logging
 import time
 from collections.abc import Callable
 from typing import Protocol
@@ -42,6 +45,8 @@ from .models import (
 )
 from .page_table import PageTable
 from .tlb import PageTLB
+
+logger = logging.getLogger(__name__)
 
 
 class PageLoader(Protocol):
@@ -168,14 +173,14 @@ class PageFaultHandler(BaseModel):
         Returns:
             FaultResult with the loaded page or error
         """
-        start_time = time.time()
+        start_time = time.monotonic()
 
         # Check fault limit
         if not self.can_fault():
             return FaultResult(
                 success=False,
                 error=f"Fault limit exceeded ({self.max_faults_per_turn} per turn)",
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=(time.monotonic() - start_time) * 1000,
             )
 
         # Ensure we have a page table
@@ -183,7 +188,7 @@ class PageFaultHandler(BaseModel):
             return FaultResult(
                 success=False,
                 error="PageFaultHandler not configured",
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=(time.monotonic() - start_time) * 1000,
             )
 
         # Look up page entry (TLB first, then page table)
@@ -204,7 +209,7 @@ class PageFaultHandler(BaseModel):
             return FaultResult(
                 success=False,
                 error=f"Page not found: {page_id}",
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=(time.monotonic() - start_time) * 1000,
             )
 
         # Load the page
@@ -214,7 +219,7 @@ class PageFaultHandler(BaseModel):
                 success=False,
                 error=f"Failed to load page from {entry.tier.value}",
                 source_tier=entry.tier,
-                latency_ms=(time.time() - start_time) * 1000,
+                latency_ms=(time.monotonic() - start_time) * 1000,
             )
 
         # Compress if needed
@@ -229,7 +234,7 @@ class PageFaultHandler(BaseModel):
         self.metrics.record_fault()
         self.page_table.mark_accessed(page_id)
 
-        latency = (time.time() - start_time) * 1000
+        latency = (time.monotonic() - start_time) * 1000
         return FaultResult(
             success=True,
             page=page,

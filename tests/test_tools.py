@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from chuk_tool_processor.models.tool_result import ToolResult
 
+from chuk_ai_session_manager.exceptions import SessionNotFound
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.session_aware_tool_processor import (
@@ -149,7 +150,7 @@ class TestSessionAwareToolProcessor:
         store = ChukSessionsStore(None)
         store.get = AsyncMock(return_value=None)  # Session not found
 
-        with pytest.raises(ValueError, match="Session test-session not found"):
+        with pytest.raises(SessionNotFound, match="Session not found: test-session"):
             await SessionAwareToolProcessor.create("test-session")
 
     async def test_process_llm_message_no_tool_calls(self, tool_processor):

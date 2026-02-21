@@ -10,15 +10,20 @@ Don't wait for ML prediction. Start with dumb heuristics that work:
 Keep it simple: no ML prediction required.
 """
 
+from __future__ import annotations
+
+import logging
 from collections import Counter
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from .models import PageType
+from .models import PageType, PrefetcherStats
 
 if TYPE_CHECKING:
     from .page_table import PageTable
+
+logger = logging.getLogger(__name__)
 
 
 class ToolUsagePattern(BaseModel):
@@ -110,7 +115,7 @@ class SimplePrefetcher(BaseModel):
 
     def get_top_claims(
         self,
-        page_table: Optional["PageTable"] = None,
+        page_table: PageTable | None = None,
         limit: int | None = None,
     ) -> list[str]:
         """
@@ -141,7 +146,7 @@ class SimplePrefetcher(BaseModel):
     async def prefetch_on_turn_start(
         self,
         session_id: str,  # noqa: ARG002 — reserved for storage-backed prefetch
-        page_table: Optional["PageTable"] = None,
+        page_table: PageTable | None = None,
     ) -> list[str]:
         """
         Get pages to prefetch at the start of a turn.
@@ -179,10 +184,10 @@ class SimplePrefetcher(BaseModel):
         self._page_access_counts.clear()
         self._last_segment_summary_id = None
 
-    def get_stats(self) -> dict[str, int]:
+    def get_stats(self) -> PrefetcherStats:
         """Get prefetcher statistics."""
-        return {
-            "tools_tracked": len(self._tool_usage),
-            "pages_tracked": len(self._page_access_counts),
-            "total_accesses": sum(self._page_access_counts.values()),
-        }
+        return PrefetcherStats(
+            tools_tracked=len(self._tool_usage),
+            pages_tracked=len(self._page_access_counts),
+            total_accesses=sum(self._page_access_counts.values()),
+        )

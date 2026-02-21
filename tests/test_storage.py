@@ -1,5 +1,4 @@
 # tests/test_storage.py
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Test suite for session storage functionality in chuk_ai_session_manager.
 
@@ -12,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent

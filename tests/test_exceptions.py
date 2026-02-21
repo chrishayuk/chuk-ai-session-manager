@@ -342,12 +342,12 @@ class TestExceptionUsageScenarios:
 
             def save(self, data):
                 if self.should_fail:
-                    raise StorageError("Database connection lost")
+                    raise StorageError(message="Database connection lost")
                 return "saved"
 
             def load(self, key):
                 if self.should_fail:
-                    raise StorageError("Failed to read from storage")
+                    raise StorageError(message="Failed to read from storage")
                 return f"data_for_{key}"
 
         # Test successful operations
@@ -390,7 +390,7 @@ class TestExceptionMessageFormatting:
                 ToolProcessingError(tool_name="calc", reason="failed"),
                 "Tool 'calc' processing error: failed",
             ),
-            (StorageError("connection failed"), "connection failed"),
+            (StorageError(message="connection failed"), "connection failed"),
         ]
 
         for exception, expected_text in test_cases:
@@ -435,6 +435,58 @@ class TestExceptionMessageFormatting:
 
         tpe = ToolProcessingError(tool_name=None, reason=None)
         assert str(tpe) == "Tool processing error"
+
+
+class TestStructuredExceptionContext:
+    """Test structured context attributes on exceptions."""
+
+    def test_storage_error_no_args(self):
+        """StorageError with no args uses default message."""
+        err = StorageError()
+        assert str(err) == "Storage operation failed"
+        assert err.operation is None
+        assert err.backend is None
+
+    def test_storage_error_with_operation_and_backend(self):
+        """StorageError carries operation and backend attrs."""
+        err = StorageError(operation="load_page", backend="s3")
+        assert err.operation == "load_page"
+        assert err.backend == "s3"
+        assert "s3" in str(err)
+        assert "load_page" in str(err)
+
+    def test_storage_error_with_operation_only(self):
+        """StorageError with only operation."""
+        err = StorageError(operation="delete_page")
+        assert err.operation == "delete_page"
+        assert err.backend is None
+        assert "delete_page" in str(err)
+
+    def test_storage_error_with_custom_message(self):
+        """StorageError with explicit message overrides formatting."""
+        err = StorageError(message="custom failure")
+        assert str(err) == "custom failure"
+
+    def test_storage_error_inherits_from_session_manager_error(self):
+        """StorageError is still catchable as SessionManagerError."""
+        err = StorageError(operation="store", backend="redis")
+        assert isinstance(err, SessionManagerError)
+
+    def test_invalid_session_operation_with_session_id(self):
+        """InvalidSessionOperation carries session_id."""
+        err = InvalidSessionOperation(
+            operation="close",
+            reason="already closed",
+            session_id="sess-abc-123",
+        )
+        assert err.session_id == "sess-abc-123"
+        assert err.operation == "close"
+        assert err.reason == "already closed"
+
+    def test_invalid_session_operation_session_id_defaults_none(self):
+        """InvalidSessionOperation.session_id defaults to None."""
+        err = InvalidSessionOperation(operation="test")
+        assert err.session_id is None
 
 
 if __name__ == "__main__":

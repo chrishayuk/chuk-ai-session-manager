@@ -7,6 +7,8 @@ session manager to provide specific, informative error conditions
 for various failure modes.
 """
 
+from __future__ import annotations
+
 
 class SessionManagerError(Exception):
     """
@@ -61,9 +63,10 @@ class InvalidSessionOperation(SessionManagerError):
     - Attempting unsupported operations in the current session state
     """
 
-    def __init__(self, operation=None, reason=None, message=None):
+    def __init__(self, operation=None, reason=None, session_id=None, message=None):
         self.operation = operation
         self.reason = reason
+        self.session_id = session_id
 
         if message:
             default_message = message
@@ -108,7 +111,20 @@ class StorageError(SessionManagerError):
     It can be raised directly for general storage failures.
     """
 
-    pass
+    def __init__(self, operation=None, backend=None, message=None):
+        self.operation = operation
+        self.backend = backend
+
+        if message:
+            default_message = message
+        elif operation and backend:
+            default_message = f"Storage error in '{backend}' during {operation}"
+        elif operation:
+            default_message = f"Storage error during {operation}"
+        else:
+            default_message = "Storage operation failed"
+
+        super().__init__(default_message)
 
 
 class ToolProcessingError(SessionManagerError):

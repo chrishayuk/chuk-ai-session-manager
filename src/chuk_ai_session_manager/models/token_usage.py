@@ -1,8 +1,3 @@
-from __future__ import annotations
-
-# chuk_ai_session_manager/models/token_usage.py
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
-
 """
 Token usage tracking models for the chuk session manager.
 
@@ -10,10 +5,17 @@ This module provides models for tracking token usage in LLM interactions
 with proper async support.
 """
 
+from __future__ import annotations
+
 import asyncio
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+
+logger = logging.getLogger(__name__)
 
 # Try to import tiktoken, but make it optional
 try:
@@ -175,9 +177,7 @@ class TokenUsage(BaseModel):
         return await loop.run_in_executor(None, lambda: cls._from_text_sync(prompt, completion, model))
 
     @staticmethod
-    def _count_tokens_sync(
-        text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL
-    ) -> int:
+    def _count_tokens_sync(text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL) -> int:
         """
         Synchronous implementation of count_tokens.
 
@@ -196,6 +196,7 @@ class TokenUsage(BaseModel):
             try:
                 text = str(text)
             except Exception:
+                logger.debug("Failed to convert text to string for token counting", exc_info=True)
                 return 0
 
         # Empty string has 0 tokens
@@ -212,16 +213,13 @@ class TokenUsage(BaseModel):
                     encoding = tiktoken.get_encoding("cl100k_base")
                     return len(encoding.encode(text))
                 except Exception:
-                    # If all else fails, use the approximation
-                    pass
+                    logger.debug("Tiktoken fallback encoding failed, using approximation", exc_info=True)
 
         # Simple approximation: ~4 chars per token for English text
         return int(len(text) / 4)
 
     @staticmethod
-    async def count_tokens(
-        text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL
-    ) -> int:
+    async def count_tokens(text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL) -> int:
         """
         Async version of count_tokens.
 

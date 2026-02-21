@@ -12,10 +12,13 @@ faults relevant pages before the model even sees the message.
 
 from __future__ import annotations
 
+import logging
 import re
 
 from .models import PageType
 from .page_table import PageTable
+
+logger = logging.getLogger(__name__)
 
 # Default recall signal patterns (case-insensitive)
 DEFAULT_RECALL_SIGNALS: list[str] = [
