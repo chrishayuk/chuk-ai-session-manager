@@ -818,13 +818,14 @@ class TestWorkingSetManager:
         assert wsm.is_in_l0("p1")
         assert not wsm.is_in_l1("p1")
 
-    def test_add_to_l0_adds_large_page(self):
-        # WorkingSetManager may auto-evict to make space, so it succeeds
+    def test_add_to_l0_rejects_when_over_budget(self):
+        # With max_l0_tokens=100 and reserved=90, only 10 tokens available
+        # add_to_l0 does NOT auto-evict — MemoryManager handles eviction
         config = WorkingSetConfig(max_l0_tokens=100, reserved_tokens=90)
         wsm = WorkingSetManager(config=config)
         page = make_page("p1", size_tokens=50)
         result = wsm.add_to_l0(page)
-        assert result is True  # add_to_l0 always adds
+        assert result is False  # 50 > 10 available tokens
 
     def test_add_to_l0_duplicate(self):
         wsm = WorkingSetManager()

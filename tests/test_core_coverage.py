@@ -791,7 +791,7 @@ class TestSessionManagerCoverage:
         async def my_callback(messages):
             return "callback summary"
 
-        await sm.set_summary_callback(my_callback)
+        sm.set_summary_callback(my_callback)
         assert sm._summary_callback is my_callback
 
     async def test_load_session_chain_basic(self):

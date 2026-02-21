@@ -201,6 +201,12 @@ class ArtifactsBridge(BaseModel):
         """
         self.session_id = session_id
 
+        if artifact_store and not ARTIFACTS_AVAILABLE:
+            raise ImportError(
+                "chuk-artifacts is required for artifact bridge. "
+                "Install with: pip install chuk-artifacts"
+            )
+
         if artifact_store and ARTIFACTS_AVAILABLE:
             self._artifact_store = artifact_store
             self._using_artifacts = True
@@ -241,6 +247,11 @@ class ArtifactsBridge(BaseModel):
         tier: StorageTier,
     ) -> str:
         """Store using chuk-artifacts."""
+        if not ARTIFACTS_AVAILABLE:
+            raise ImportError(
+                "chuk-artifacts is required for artifact bridge. "
+                "Install with: pip install chuk-artifacts"
+            )
         # Serialize page
         data = page.model_dump_json().encode("utf-8")
 
@@ -299,6 +310,11 @@ class ArtifactsBridge(BaseModel):
         artifact_id: str,
     ) -> Optional[MemoryPage]:
         """Load using chuk-artifacts."""
+        if not ARTIFACTS_AVAILABLE:
+            raise ImportError(
+                "chuk-artifacts is required for artifact bridge. "
+                "Install with: pip install chuk-artifacts"
+            )
         try:
             # Get artifact data
             data = await self._artifact_store.retrieve(artifact_id)

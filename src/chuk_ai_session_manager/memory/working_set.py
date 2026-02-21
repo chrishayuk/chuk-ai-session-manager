@@ -13,6 +13,7 @@ Design principles:
 - Anti-thrash: Prevent evicting recently faulted pages
 """
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
@@ -250,6 +251,14 @@ class WorkingSetManager(BaseModel):
 
     # Pluggable eviction policy (Protocol, not serializable)
     _eviction_policy: Any = PrivateAttr(default=None)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Sync budget limits from config on construction."""
+        if self.budget.total_limit != self.config.max_l0_tokens:
+            self.budget = TokenBudget(
+                total_limit=self.config.max_l0_tokens,
+                reserved=self.config.reserved_tokens,
+            )
 
     def set_eviction_policy(self, policy: Any) -> None:
         """Set a custom eviction policy (EvictionPolicy protocol)."""
@@ -512,8 +521,6 @@ class WorkingSetManager(BaseModel):
                 recency_score = 1.0 / (1.0 + age_seconds / 3600)  # Decay over hours
 
                 # Frequency score (log scale)
-                import math
-
                 frequency_score = math.log1p(page.access_count) / 10.0
                 frequency_score = min(1.0, frequency_score)
 

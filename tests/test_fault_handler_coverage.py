@@ -70,7 +70,7 @@ class TestVMToolResult:
                 page_id="p1",
                 modality="text",
                 level=0,
-                tier="l0",
+                tier="L0",
                 content=TextContent(text="hi"),
                 meta=PageMeta(),
             )
@@ -450,7 +450,7 @@ class TestBuildMeta:
         page = _make_page("p1")
         fr = FaultResult(success=True, source_tier=None)
         meta = handler._build_meta(page, fr)
-        assert meta.source_tier == "unknown"
+        assert meta.source_tier is None
 
 
 # ── SearchResult ──

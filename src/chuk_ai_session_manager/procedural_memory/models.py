@@ -27,6 +27,38 @@ class ToolOutcome(str, Enum):
     CANCELLED = "cancelled"
 
 
+class DeltaKey(str, Enum):
+    """Keys for argument delta dicts."""
+
+    ADDED = "added"
+    REMOVED = "removed"
+    CHANGED = "changed"
+
+
+class DeltaChangeKey(str, Enum):
+    """Keys within a changed value entry."""
+
+    FROM = "from"
+    TO = "to"
+
+
+# Result type classification constants
+class ResultType(str, Enum):
+    """Standard result type classifications."""
+
+    NULL = "null"
+    BOOLEAN = "boolean"
+    NUMBER = "number"
+    STRING = "string"
+    LIST = "list"
+    OBJECT = "object"
+    UNKNOWN = "unknown"
+
+
+# Default fallback for unknown error types
+DEFAULT_ERROR_TYPE = "unknown"
+
+
 class ToolFixRelation(BaseModel):
     """Describes how one call fixed a prior failure."""
 
@@ -78,7 +110,7 @@ class ToolLogEntry(BaseModel):
     # Fix tracking
     fixed_by: Optional[str] = None  # ID of call that fixed this failure
     fix_for: Optional[str] = None  # ID of call this fixed
-    delta_args: Optional[dict[str, Any]] = None  # What changed to fix it
+    delta_args: Optional[dict[str, Any]] = Field(default=None)  # What changed to fix it
 
     model_config = {"frozen": False}
 
@@ -355,17 +387,19 @@ def _describe_fix(delta: dict[str, Any]) -> str:
     """Generate human-readable description of a fix."""
     parts = []
 
-    if "added" in delta:
-        added_keys = list(delta["added"].keys())
+    if DeltaKey.ADDED in delta:
+        added_keys = list(delta[DeltaKey.ADDED].keys())
         parts.append(f"add {', '.join(added_keys)}")
 
-    if "removed" in delta:
-        parts.append(f"remove {', '.join(delta['removed'])}")
+    if DeltaKey.REMOVED in delta:
+        parts.append(f"remove {', '.join(delta[DeltaKey.REMOVED])}")
 
-    if "changed" in delta:
+    if DeltaKey.CHANGED in delta:
         changed = []
-        for k, v in delta["changed"].items():
-            changed.append(f"{k}: {_abbrev(v['from'])} -> {_abbrev(v['to'])}")
+        for k, v in delta[DeltaKey.CHANGED].items():
+            changed.append(
+                f"{k}: {_abbrev(v[DeltaChangeKey.FROM])} -> {_abbrev(v[DeltaChangeKey.TO])}"
+            )
         parts.append(f"change {'; '.join(changed)}")
 
     return "; ".join(parts) if parts else "unknown changes"

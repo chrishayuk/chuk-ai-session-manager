@@ -14,6 +14,9 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.procedural_memory.models import (
+    DeltaKey,
+    DeltaChangeKey,
+    SuccessPattern,
     ToolLogEntry,
     ToolPattern,
 )
@@ -219,9 +222,9 @@ class ProceduralContextFormatter(BaseModel):
 
     def _filter_relevant_successes(
         self,
-        patterns: list,
+        patterns: list[SuccessPattern],
         context_goal: Optional[str],
-    ) -> list:
+    ) -> list[SuccessPattern]:
         """Filter success patterns to those relevant to current goal."""
         if not context_goal:
             return patterns
@@ -250,28 +253,28 @@ class ProceduralContextFormatter(BaseModel):
         """Format arg delta compactly."""
         parts = []
 
-        if "added" in delta:
-            added_keys = list(delta["added"].keys())
+        if DeltaKey.ADDED in delta:
+            added_keys = list(delta[DeltaKey.ADDED].keys())
             if len(added_keys) <= 2:
                 parts.append(f"+{', '.join(added_keys)}")
             else:
                 parts.append(f"+{len(added_keys)} args")
 
-        if "removed" in delta:
-            removed = delta["removed"]
+        if DeltaKey.REMOVED in delta:
+            removed = delta[DeltaKey.REMOVED]
             if len(removed) <= 2:
                 parts.append(f"-{', '.join(removed)}")
             else:
                 parts.append(f"-{len(removed)} args")
 
-        if "changed" in delta:
-            changed_keys = list(delta["changed"].keys())
+        if DeltaKey.CHANGED in delta:
+            changed_keys = list(delta[DeltaKey.CHANGED].keys())
             if len(changed_keys) <= 2:
                 changes = []
                 for k in changed_keys:
-                    v = delta["changed"][k]
+                    v = delta[DeltaKey.CHANGED][k]
                     changes.append(
-                        f"{k}:{self._abbrev(v['from'])}->{self._abbrev(v['to'])}"
+                        f"{k}:{self._abbrev(v[DeltaChangeKey.FROM])}->{self._abbrev(v[DeltaChangeKey.TO])}"
                     )
                 parts.append(", ".join(changes))
             else:

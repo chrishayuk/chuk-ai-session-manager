@@ -8,16 +8,14 @@ the result of prior computation. Enforces dataflow discipline.
 from __future__ import annotations
 
 import json
-import re
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
 # Import base classes from chuk-tool-processor
 from chuk_tool_processor.guards import BaseGuard, EnforcementLevel, GuardResult
 
-# Reference pattern: $v1, $v2, ${v1}, ${myalias}
-REFERENCE_PATTERN = re.compile(r"\$\{?([a-zA-Z_][a-zA-Z0-9_]*|v\d+)\}?")
+from chuk_ai_session_manager.guards.constants import REFERENCE_PATTERN
 
 
 class UngroundedGuardConfig(BaseModel):
@@ -45,8 +43,8 @@ class UngroundedGuard(BaseGuard):
     def __init__(
         self,
         config: UngroundedGuardConfig | None = None,
-        get_user_literals: Any = None,  # Callable[[], set[float]]
-        get_bindings: Any = None,  # Callable[[], dict]
+        get_user_literals: Callable[[], set[float]] | None = None,
+        get_bindings: Callable[[], dict[str, Any]] | None = None,
     ):
         self.config = config or UngroundedGuardConfig()
         self._get_user_literals = get_user_literals

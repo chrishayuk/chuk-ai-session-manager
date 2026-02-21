@@ -18,6 +18,15 @@ from chuk_ai_session_manager.guards.models import CachedToolResult, NamedVariabl
 log = logging.getLogger(__name__)
 
 
+class CacheStats(BaseModel):
+    """Statistics for the result cache."""
+
+    total_cached: int = 0
+    total_variables: int = 0
+    duplicate_calls: int = 0
+    call_order_length: int = 0
+
+
 class ResultCache(BaseModel):
     """Caches tool results for deduplication.
 
@@ -133,14 +142,14 @@ class ResultCache(BaseModel):
 
         return "\n".join(lines)
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self) -> CacheStats:
         """Get cache statistics."""
-        return {
-            "total_cached": len(self.cache),
-            "total_variables": len(self.variables),
-            "duplicate_calls": self.duplicate_count,
-            "call_order_length": len(self.call_order),
-        }
+        return CacheStats(
+            total_cached=len(self.cache),
+            total_variables=len(self.variables),
+            duplicate_calls=self.duplicate_count,
+            call_order_length=len(self.call_order),
+        )
 
     def reset(self) -> None:
         """Clear all cached state."""

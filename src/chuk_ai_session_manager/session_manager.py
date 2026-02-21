@@ -25,6 +25,7 @@ from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.session_storage import ChukSessionsStore
 from chuk_ai_session_manager.memory.manager import MemoryManager
 from chuk_ai_session_manager.memory.models import (
+    MessageRole,
     PageType,
     StorageTier,
     VMMode,
@@ -40,6 +41,9 @@ VM_IMPORTANCE_USER = 0.6
 VM_IMPORTANCE_AI = 0.5
 VM_IMPORTANCE_TOOL = 0.4
 VM_IMPORTANCE_SUMMARY = 0.9
+
+# Page ID prefixes for VM
+PAGE_ID_PREFIX_MSG = "msg"
 
 
 class SessionManager:
@@ -146,11 +150,10 @@ class SessionManager:
         if self._session:
             return self._session.id
         elif self._session_id:
-            return self._session_id or ""
+            return self._session_id
         else:
-            # Generate a new ID if needed
             self._session_id = str(uuid.uuid4())
-            return self._session_id or ""
+            return self._session_id
 
     @property
     def system_prompt(self) -> Optional[str]:
@@ -226,6 +229,28 @@ class SessionManager:
 
         logger.debug(f"Updated system prompt for session {self.session_id}")
 
+    async def _create_and_save_session(
+        self, session_id: Optional[str] = None
+    ) -> Session:
+        """Create a new session with metadata and save it."""
+        session_metadata: Dict[str, Any] = {}
+        if self._metadata:
+            session_metadata.update(self._metadata)
+        if self._system_prompt:
+            session_metadata["system_prompt"] = self._system_prompt
+
+        session = await Session.create(
+            session_id=session_id,
+            parent_id=self._parent_id,
+            metadata=session_metadata,
+        )
+
+        if session_metadata:
+            session.metadata.properties.update(session_metadata)
+
+        await self._store.save(session)
+        return session
+
     async def _ensure_initialized(self) -> None:
         """Ensure the session is initialized."""
         if self._initialized:
@@ -260,67 +285,26 @@ class SessionManager:
                             self._session_chain = [self._session_id]
                     else:
                         # Session not found - create a new session with the provided ID
-                        session_metadata = {}
-                        if self._metadata:
-                            session_metadata.update(self._metadata)
-                        if self._system_prompt:
-                            session_metadata["system_prompt"] = self._system_prompt
-
-                        self._session = await Session.create(
-                            session_id=self._session_id,
-                            parent_id=self._parent_id,
-                            metadata=session_metadata,
+                        self._session = await self._create_and_save_session(
+                            self._session_id
                         )
-
-                        # Ensure metadata properties are set
-                        if session_metadata:
-                            self._session.metadata.properties.update(session_metadata)
-
-                        await store.save(self._session)
                         self._loaded_from_storage = False
 
                         if self._infinite_context:
                             self._session_chain = [self._session_id]
                 except Exception as e:
-                    # For errors, create new session
-                    logger.debug(f"Error loading session {self._session_id}: {e}")
-                    session_metadata = {}
-                    if self._metadata:
-                        session_metadata.update(self._metadata)
-                    if self._system_prompt:
-                        session_metadata["system_prompt"] = self._system_prompt
-
-                    self._session = await Session.create(
-                        session_id=self._session_id,
-                        parent_id=self._parent_id,
-                        metadata=session_metadata,
+                    logger.warning(f"Failed to load session {self._session_id}: {e}")
+                    self._session = await self._create_and_save_session(
+                        self._session_id
                     )
-
-                    if session_metadata:
-                        self._session.metadata.properties.update(session_metadata)
-
-                    await store.save(self._session)
                     self._loaded_from_storage = False
 
                     if self._infinite_context:
                         self._session_chain = [self._session_id]
             else:
                 # Create new session
-                session_metadata = {}
-                if self._metadata:
-                    session_metadata.update(self._metadata)
-                if self._system_prompt:
-                    session_metadata["system_prompt"] = self._system_prompt
-
-                self._session = await Session.create(
-                    parent_id=self._parent_id, metadata=session_metadata
-                )
+                self._session = await self._create_and_save_session()
                 self._session_id = self._session.id
-
-                if session_metadata:
-                    self._session.metadata.properties.update(session_metadata)
-
-                await store.save(self._session)
                 self._loaded_from_storage = False
 
                 if self._infinite_context:
@@ -455,7 +439,7 @@ class SessionManager:
         logger.info(
             f"Created new session segment: {old_session_id} -> {self._session_id}"
         )
-        return self._session_id or ""
+        return self._session_id
 
     async def user_says(self, message: str, **metadata) -> str:
         """
@@ -498,7 +482,7 @@ class SessionManager:
         if self._infinite_context:
             self._full_conversation.append(
                 {
-                    "role": "user",
+                    "role": MessageRole.USER.value,
                     "content": message,
                     "timestamp": event.timestamp.isoformat(),
                     "session_id": self._session_id,
@@ -511,11 +495,12 @@ class SessionManager:
                 content=message,
                 page_type=PageType.TRANSCRIPT,
                 importance=VM_IMPORTANCE_USER,
-                page_id=f"msg_{event.id[:8]}" if event.id else None,
+                page_id=f"{PAGE_ID_PREFIX_MSG}_{event.id[:8]}" if event.id else None,
+                hint=f"[user] {message[:120]}",
             )
             await self._vm.add_to_working_set(vm_page)
 
-        return self._session_id or ""
+        return self._session_id
 
     async def ai_responds(
         self,
@@ -570,7 +555,7 @@ class SessionManager:
         if self._infinite_context:
             self._full_conversation.append(
                 {
-                    "role": "assistant",
+                    "role": MessageRole.ASSISTANT.value,
                     "content": response,
                     "timestamp": event.timestamp.isoformat(),
                     "session_id": self._session_id,
@@ -585,11 +570,12 @@ class SessionManager:
                 content=response,
                 page_type=PageType.TRANSCRIPT,
                 importance=VM_IMPORTANCE_AI,
-                page_id=f"msg_{event.id[:8]}" if event.id else None,
+                page_id=f"{PAGE_ID_PREFIX_MSG}_{event.id[:8]}" if event.id else None,
+                hint=f"[assistant] {response[:120]}",
             )
             await self._vm.add_to_working_set(vm_page)
 
-        return self._session_id or ""
+        return self._session_id
 
     async def tool_used(
         self,
@@ -650,7 +636,7 @@ class SessionManager:
             )
             await self._vm.add_to_working_set(vm_page)
 
-        return self._session_id or ""
+        return self._session_id
 
     async def get_messages_for_llm(
         self, include_system: bool = True
@@ -672,15 +658,23 @@ class SessionManager:
         if self._vm and include_system:
             ctx = self._vm.build_context(system_prompt=self._system_prompt or "")
             messages: List[Dict[str, str]] = [
-                {"role": "system", "content": ctx["developer_message"]}
+                {"role": MessageRole.SYSTEM.value, "content": ctx["developer_message"]}
             ]
             for event in self._session.events:
                 if event.type == EventType.MESSAGE:
                     if event.source == EventSource.USER:
-                        messages.append({"role": "user", "content": str(event.message)})
+                        messages.append(
+                            {
+                                "role": MessageRole.USER.value,
+                                "content": str(event.message),
+                            }
+                        )
                     elif event.source == EventSource.LLM:
                         messages.append(
-                            {"role": "assistant", "content": str(event.message)}
+                            {
+                                "role": MessageRole.ASSISTANT.value,
+                                "content": str(event.message),
+                            }
                         )
             return messages
 
@@ -688,16 +682,26 @@ class SessionManager:
 
         # Add system prompt if available and requested (and not empty)
         if include_system and self._system_prompt and self._system_prompt.strip():
-            messages.append({"role": "system", "content": self._system_prompt})
+            messages.append(
+                {"role": MessageRole.SYSTEM.value, "content": self._system_prompt}
+            )
 
         # Add conversation messages
         for event in self._session.events:
             if event.type == EventType.MESSAGE:
                 if event.source == EventSource.USER:
-                    messages.append({"role": "user", "content": str(event.message)})
+                    messages.append(
+                        {
+                            "role": MessageRole.USER.value,
+                            "content": str(event.message),
+                        }
+                    )
                 elif event.source == EventSource.LLM:
                     messages.append(
-                        {"role": "assistant", "content": str(event.message)}
+                        {
+                            "role": MessageRole.ASSISTANT.value,
+                            "content": str(event.message),
+                        }
                     )
 
         return messages
@@ -728,9 +732,11 @@ class SessionManager:
             for event in self._session.events:
                 if event.type == EventType.MESSAGE:
                     turn = {
-                        "role": "user"
-                        if event.source == EventSource.USER
-                        else "assistant",
+                        "role": (
+                            MessageRole.USER.value
+                            if event.source == EventSource.USER
+                            else MessageRole.ASSISTANT.value
+                        ),
                         "content": str(event.message),
                         "timestamp": event.timestamp.isoformat(),
                     }
@@ -876,7 +882,7 @@ class SessionManager:
                 "infinite_context": self._infinite_context,
             }
 
-    async def set_summary_callback(self, callback: Callable[[List[Dict]], str]) -> None:
+    def set_summary_callback(self, callback: Callable[[List[Dict]], str]) -> None:
         """
         Set a custom callback for generating summaries in infinite context mode.
 
@@ -914,9 +920,11 @@ class SessionManager:
                     conversation.insert(
                         0,
                         {
-                            "role": "user"
-                            if event.source == EventSource.USER
-                            else "assistant",
+                            "role": (
+                                MessageRole.USER.value
+                                if event.source == EventSource.USER
+                                else MessageRole.ASSISTANT.value
+                            ),
                             "content": str(event.message),
                             "timestamp": event.timestamp.isoformat(),
                             "session_id": current_id,

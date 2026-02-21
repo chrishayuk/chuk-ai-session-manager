@@ -36,7 +36,7 @@ from chuk_ai_session_manager.guards.models import (
 
 # Sub-managers
 from chuk_ai_session_manager.guards.bindings import BindingManager
-from chuk_ai_session_manager.guards.cache import ResultCache
+from chuk_ai_session_manager.guards.cache import CacheStats, ResultCache
 
 # Chat-specific guard
 from chuk_ai_session_manager.guards.ungrounded import (
@@ -75,6 +75,7 @@ __all__ = [
     "reset_tool_state",
     # Sub-managers
     "BindingManager",
+    "CacheStats",
     "ResultCache",
     # Guards (from chuk-tool-processor)
     "BaseGuard",

@@ -605,9 +605,9 @@ from chuk_ai_session_manager.memory import PageData, PageMeta
 
 class PageData(BaseModel):
     page_id: str
-    modality: str
-    level: int
-    tier: str
+    modality: Modality
+    level: CompressionLevel
+    tier: StorageTier
     content: PageContent  # Union of content types
     meta: PageMeta = PageMeta()
 ```
@@ -618,12 +618,12 @@ class PageData(BaseModel):
 from chuk_ai_session_manager.memory import PageMeta
 
 class PageMeta(BaseModel):
+    source_tier: Optional[StorageTier] = None
     mime_type: Optional[str] = None
     size_bytes: Optional[int] = None
-    source_tier: Optional[str] = None
-    dimensions: Optional[Tuple[int, int]] = None
+    dimensions: Optional[List[int]] = None
     duration_seconds: Optional[float] = None
-    word_count: Optional[int] = None
+    latency_ms: Optional[float] = None
 ```
 
 ### FaultEffects
@@ -660,9 +660,9 @@ from chuk_ai_session_manager.memory import SearchResultEntry
 
 class SearchResultEntry(BaseModel):
     page_id: str
-    modality: str
-    tier: str
-    levels: List[int] = []
+    modality: Modality
+    tier: StorageTier
+    levels: List[CompressionLevel] = []
     hint: str = ""
     relevance: float = 0.0
 ```

@@ -286,9 +286,9 @@ class PageFaultHandler(BaseModel):
             return VMToolResult(
                 page=PageData(
                     page_id="error",
-                    modality=Modality.TEXT.value,
-                    level=0,
-                    tier=StorageTier.L0.value,
+                    modality=Modality.TEXT,
+                    level=CompressionLevel.FULL,
+                    tier=StorageTier.L0,
                     content=TextContent(text=fault_result.error or "Unknown error"),
                     meta=PageMeta(),
                 ),
@@ -302,11 +302,13 @@ class PageFaultHandler(BaseModel):
         return VMToolResult(
             page=PageData(
                 page_id=page.page_id,
-                modality=page.modality.value,
-                level=page.compression_level
-                if isinstance(page.compression_level, int)
-                else page.compression_level.value,
-                tier=StorageTier.L1.value,  # Promoted to L1 after fault
+                modality=page.modality,
+                level=(
+                    CompressionLevel(page.compression_level)
+                    if isinstance(page.compression_level, int)
+                    else page.compression_level
+                ),
+                tier=StorageTier.L1,  # Promoted to L1 after fault
                 content=content,
                 meta=meta,
             ),
@@ -373,9 +375,7 @@ class PageFaultHandler(BaseModel):
     ) -> PageMeta:
         """Build metadata for tool result."""
         meta = PageMeta(
-            source_tier=fault_result.source_tier.value
-            if fault_result.source_tier
-            else "unknown",
+            source_tier=fault_result.source_tier if fault_result.source_tier else None,
         )
 
         if page.mime_type:
@@ -477,8 +477,12 @@ class PageSearchHandler(BaseModel):
 
         for page_id, entry in self.page_table.entries.items():
             # Filter by modality if specified
-            if modality and entry.modality.value != modality:
-                continue
+            if modality:
+                try:
+                    if entry.modality != Modality(modality):
+                        continue
+                except ValueError:
+                    continue
 
             # Check hint for match
             hint = self.page_hints.get(page_id, "")

@@ -29,7 +29,47 @@ The memory system sits between your application and the LLM API, providing:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Basic Integration
+## Quick Start: SessionManager with VM
+
+The easiest way to use virtual memory is through `SessionManager`:
+
+```python
+from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.memory import VMMode, WorkingSetConfig
+
+# Zero-config: just enable VM
+sm = SessionManager(enable_vm=True, vm_mode=VMMode.STRICT)
+
+# Or with full customization
+from chuk_ai_session_manager.memory import (
+    ImportanceWeightedLRU, CompressorRegistry,
+)
+
+sm = SessionManager(
+    enable_vm=True,
+    vm_mode=VMMode.STRICT,
+    vm_config=WorkingSetConfig(max_l0_tokens=32_000),
+    vm_eviction_policy=ImportanceWeightedLRU(),
+    vm_compressor_registry=CompressorRegistry.default(),
+)
+
+# Use normally — pages are created automatically
+await sm.user_says("What's the best auth approach?")
+await sm.ai_responds("I recommend JWT tokens...", model="gpt-4o")
+
+# Build context with VM:CONTEXT included
+messages = await sm.get_messages_for_llm(include_system=True)
+```
+
+The built-in `MemoryManager` (in `memory/manager.py`) orchestrates page table, working set,
+fault handling, eviction, and compression automatically. `SessionManager` creates it when
+`enable_vm=True` and maps conversation events to memory pages.
+
+## Custom Integration
+
+For full control, you can use the memory components directly.
+
+### Basic Integration
 
 ### Step 1: Initialize Components
 
@@ -407,33 +447,21 @@ asyncio.run(main())
 
 ## Integration with SessionManager
 
-If using the existing SessionManager:
+Since v0.9, `SessionManager` has built-in VM support — no subclassing needed:
 
 ```python
 from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.memory import VMMode
 
-class VMSessionManager(SessionManager):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.memory = MemoryManager(session_id=self.session_id)
+# Enable VM directly
+sm = SessionManager(enable_vm=True, vm_mode=VMMode.STRICT)
 
-    async def user_says(self, content: str, **kwargs):
-        # Create memory page
-        await self.memory.add_user_message(content)
+# Conversation events automatically create memory pages
+await sm.user_says("What's the best auth approach?")
+await sm.ai_responds("I recommend JWT tokens...", model="gpt-4o")
 
-        # Call parent
-        await super().user_says(content, **kwargs)
-
-    async def assistant_says(self, content: str, **kwargs):
-        # Create memory page
-        await self.memory.add_assistant_message(content)
-
-        # Call parent
-        await super().assistant_says(content, **kwargs)
-
-    def get_vm_context(self) -> str:
-        """Get VM-formatted context for prompt."""
-        return self.memory.build_request("")["messages"][0]["content"]
+# get_messages_for_llm includes VM:CONTEXT when include_system=True
+messages = await sm.get_messages_for_llm(include_system=True)
 ```
 
 ---

@@ -862,10 +862,10 @@ class TestResultCache:
         cache.put("add", {"a": 1}, 2)
         cache.store_variable("x", 1.0)
         stats = cache.get_stats()
-        assert stats["total_cached"] == 1
-        assert stats["total_variables"] == 1
-        assert stats["duplicate_calls"] == 0
-        assert stats["call_order_length"] == 1
+        assert stats.total_cached == 1
+        assert stats.total_variables == 1
+        assert stats.duplicate_calls == 0
+        assert stats.call_order_length == 1
 
     def test_reset(self):
         cache = ResultCache()
@@ -1820,18 +1820,12 @@ class TestToolStateManagerAdditional:
     def test_get_cache_stats(self):
         mgr = ToolStateManager()
         stats = mgr.get_cache_stats()
-        assert "total_cached" in stats
+        assert stats.total_cached == 0
 
     def test_format_duplicate_message(self):
         mgr = ToolStateManager()
         mgr.cache_result("add", {"a": 1}, 3)
         msg = mgr.format_duplicate_message("add", {"a": 1})
-        assert "Cached result" in msg
-
-    def test_format_duplicate_recovery_message(self):
-        mgr = ToolStateManager()
-        mgr.cache_result("add", {"a": 1}, 3)
-        msg = mgr.format_duplicate_recovery_message("add", {"a": 1})
         assert "Cached result" in msg
 
     def test_get_duplicate_count(self):

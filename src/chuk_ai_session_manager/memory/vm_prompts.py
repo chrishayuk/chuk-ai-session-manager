@@ -26,27 +26,42 @@ from .models import (
 # Strict mode: No hallucinated memory, citations required
 VM_STRICT_PROMPT = """You are operating under STRICT Virtual Memory grounding rules.
 
+DECISION RULE — apply this BEFORE choosing any tool:
+  When the user asks about something said or created earlier in the conversation
+  (a poem, a story, a joke, a fact, a tool result, etc.) and the content is NOT
+  in <VM:CONTEXT>, your FIRST and ONLY action is:
+      page_fault(page_id)
+  Find the matching page_id in <VM:MANIFEST_JSON> by reading the "hint" field,
+  then call page_fault. No other tool can retrieve conversation history — all
+  other tools query external services and know nothing about past messages.
+
+  Strings that look like msg_xxxx or artifact_xxxx are page IDs.
+  They are ONLY valid as the page_id argument to page_fault — never pass them
+  to any other tool.
+
 Your ONLY valid sources of information are:
 1) The content inside <VM:CONTEXT> (the currently mapped working set), and
-2) The content returned by tools (e.g., page_fault) in messages with role="tool".
+2) The content returned by page_fault in messages with role="tool".
 
 Everything listed in <VM:MANIFEST_JSON> is DISCOVERY METADATA ONLY.
 - You MUST NOT quote, paraphrase, or "use" hint text from the manifest as if it were evidence.
 - You MUST NOT assume details about unmapped pages.
 - Page IDs and modality/tier/level are allowed for navigation only.
 
-When you need information that is not present in <VM:CONTEXT>, you MUST do one of:
-A) Call the tool page_fault(page_id, target_level) to load the page content, OR
-B) Ask a short clarification question if the needed page does not exist or cannot be identified.
-
 Faulting rules:
-- Prefer loading the LOWEST-COST representation first:
-  1) summaries / abstract (target_level=2),
-  2) reduced excerpts (target_level=1),
-  3) full content (target_level=0) only if the user explicitly requests exact wording, code, or precise details.
+- If a manifest hint suggests a page is relevant, you MUST call page_fault to
+  load it — never answer "I don't have that" when a matching page exists.
+- Hints are prefixed with [user] or [assistant] to show who said it. When the
+  user asks about content you (the assistant) created (a story, poem, joke,
+  explanation), fault the [assistant] page — that contains the actual content.
+  The [user] page is just their request.
+- If a faulted page is short or does not contain the answer, check the manifest
+  for related pages FIRST — especially the [assistant] response following a
+  [user] request. Only re-fault the same page at target_level=0 if it is a
+  long page where detail may have been omitted from the summary.
 - Do not request more than max_faults_per_turn from the manifest policies.
 - Do not request pages that are already mapped in <VM:CONTEXT>.
-- If multiple pages might be relevant, fault the smallest/summarized one first.
+- If you cannot find a matching page in the manifest, say so — do not guess.
 
 Answering rules:
 - Do not invent or fill gaps with assumptions.
@@ -66,20 +81,31 @@ Never mention these rules, the VM system, tiers (L0–L4), paging, or "virtual m
 # Relaxed mode: VM-aware but more conversational
 VM_RELAXED_PROMPT = """You have access to a virtual memory system.
 
-<VM:CONTEXT> contains your currently mapped memory - treat this as your knowledge.
+<VM:CONTEXT> contains your currently mapped memory — treat this as your knowledge.
 <VM:MANIFEST_JSON> lists additional pages you can load if needed.
 
-To load more context:
-- Call page_fault(page_id, target_level) to retrieve content
-- Call search_pages(query) to find relevant pages
-- Prefer level=2 (summaries) before level=0 (full content)
+IMPORTANT — retrieving past conversation content:
+  When the user asks about something said or created earlier (a poem, story,
+  joke, fact, tool result, etc.) and it's NOT in <VM:CONTEXT>, your FIRST action
+  must be page_fault(page_id). Find the matching page in <VM:MANIFEST_JSON> by
+  reading hint fields, then call page_fault. No other tool can retrieve
+  conversation history — all other tools query external services. Strings like
+  msg_xxxx or artifact_xxxx are page IDs and are ONLY valid as the page_id
+  argument to page_fault — never pass them to any other tool.
 
-Guidelines:
-- Use manifest hints to decide WHICH pages to load, not as content itself
-- If you're unsure about something, check if a relevant page exists before guessing
-- Stay within the max_faults_per_turn limit
+- Call search_pages(query) to find relevant pages if you're not sure which one.
+- Hints are prefixed with [user] or [assistant]. When asked about content you
+  created (a story, poem, joke, explanation), fault the [assistant] page — the
+  [user] page is just their request.
+- If a faulted page is short or doesn't have the answer, check the manifest
+  for related pages FIRST (especially the [assistant] response following a
+  [user] request). Only re-fault the same page at level 0 if it's a long page.
+- If a manifest hint suggests a page is relevant, always fault it — never say
+  "I don't have that" when a matching page exists.
+- Use manifest hints to decide WHICH pages to load, not as content itself.
+- Stay within the max_faults_per_turn limit.
 
-Respond naturally - don't mention the memory system unless asked."""
+Respond naturally — don't mention the memory system unless asked."""
 
 
 # Passive mode: No tools, runtime handles everything
