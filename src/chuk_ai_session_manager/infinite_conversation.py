@@ -16,6 +16,7 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
+from chuk_ai_session_manager.memory.models import MessageRole
 
 # Type for LLM function callbacks
 LLMCallbackAsync = Callable[[List[Dict[str, str]], str], Any]
@@ -170,11 +171,15 @@ class InfiniteConversationManager:
 
         # Add system prompt based on summarization strategy
         system_prompt = self._get_summarization_prompt()
-        messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": MessageRole.SYSTEM, "content": system_prompt})
 
         # Add the conversation history
         for event in message_events:
-            role = "user" if event.source == EventSource.USER else "assistant"
+            role = (
+                MessageRole.USER
+                if event.source == EventSource.USER
+                else MessageRole.ASSISTANT
+            )
             content = event.message
             messages.append({"role": role, "content": content})
 
@@ -253,7 +258,7 @@ class InfiniteConversationManager:
             if summaries:
                 context.append(
                     {
-                        "role": "system",
+                        "role": MessageRole.SYSTEM,
                         "content": "Previous conversation context: "
                         + " ".join(summaries),
                     }
@@ -269,7 +274,11 @@ class InfiniteConversationManager:
 
         # Add messages to context
         for event in recent_messages:
-            role = "user" if event.source == EventSource.USER else "assistant"
+            role = (
+                MessageRole.USER
+                if event.source == EventSource.USER
+                else MessageRole.ASSISTANT
+            )
             content = event.message
             context.append({"role": role, "content": content})
 
@@ -319,7 +328,11 @@ class InfiniteConversationManager:
 
             # Add to history
             for event in message_events:
-                role = "user" if event.source == EventSource.USER else "assistant"
+                role = (
+                    MessageRole.USER
+                    if event.source == EventSource.USER
+                    else MessageRole.ASSISTANT
+                )
                 content = event.message
                 history.append((role, event.source, content))
 

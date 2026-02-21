@@ -18,7 +18,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.guards.bindings import BindingManager
-from chuk_ai_session_manager.guards.cache import ResultCache
+from chuk_ai_session_manager.guards.cache import CacheStats, ResultCache
+from chuk_ai_session_manager.guards.constants import (
+    BINDING_SOURCE_ASSISTANT_TEXT,
+    BINDING_SOURCE_EXTRACTED,
+)
 from chuk_ai_session_manager.guards.models import (
     CachedToolResult,
     NamedVariable,
@@ -216,39 +220,28 @@ class ToolStateManager(BaseModel):
 
     def check_references(self, arguments: dict[str, Any]) -> ReferenceCheckResult:
         """Check if all $vN references in arguments are valid."""
-        missing_refs: list[str] = []
-        resolved_refs: dict[str, Any] = {}
+        all_valid, missing, resolved = self.bindings.check_references(arguments)
 
-        def check_value(val: Any) -> None:
-            if isinstance(val, str) and val.startswith("$v"):
-                ref = val[1:]
-                binding = self.bindings.get(ref)
-                if binding:
-                    resolved_refs[val] = binding.raw_value
-                else:
-                    missing_refs.append(val)
-            elif isinstance(val, dict):
-                for v in val.values():
-                    check_value(v)
-            elif isinstance(val, list):
-                for v in val:
-                    check_value(v)
+        # Only consider $vN-style references (e.g. v1, v2), not arbitrary $identifiers
+        vn_missing = [ref for ref in missing if re.fullmatch(r"v\d+", ref)]
+        vn_resolved = {
+            f"${ref}": val
+            for ref, val in resolved.items()
+            if re.fullmatch(r"v\d+", ref)
+        }
 
-        for v in arguments.values():
-            check_value(v)
-
-        if missing_refs:
+        if vn_missing:
             return ReferenceCheckResult(
                 valid=False,
-                missing_refs=missing_refs,
-                resolved_refs=resolved_refs,
-                message=f"Missing references: {', '.join(missing_refs)}",
+                missing_refs=[f"${ref}" for ref in vn_missing],
+                resolved_refs=vn_resolved,
+                message=f"Missing references: {', '.join(f'${ref}' for ref in vn_missing)}",
             )
 
         return ReferenceCheckResult(
             valid=True,
             missing_refs=[],
-            resolved_refs=resolved_refs,
+            resolved_refs=vn_resolved,
             message="All references valid",
         )
 
@@ -287,7 +280,7 @@ class ToolStateManager(BaseModel):
         """Get a stored variable by name."""
         return self.cache.get_variable(name)
 
-    def get_cache_stats(self) -> dict[str, Any]:
+    def get_cache_stats(self) -> CacheStats:
         """Get cache statistics."""
         return self.cache.get_stats()
 
@@ -295,12 +288,6 @@ class ToolStateManager(BaseModel):
         self, tool_name: str, arguments: dict[str, Any]
     ) -> str:
         """Format message for duplicate tool call."""
-        return self.cache.format_duplicate_message(tool_name, arguments)
-
-    def format_duplicate_recovery_message(
-        self, tool_name: str, arguments: dict[str, Any]
-    ) -> str:
-        """Format recovery message for duplicate tool call (alias)."""
         return self.cache.format_duplicate_message(tool_name, arguments)
 
     # =========================================================================
@@ -752,8 +739,8 @@ class ToolStateManager(BaseModel):
                     continue
 
                 binding = self.bindings.bind(
-                    tool_name="assistant_text",
-                    arguments={"source": "extracted"},
+                    tool_name=BINDING_SOURCE_ASSISTANT_TEXT,
+                    arguments={"source": BINDING_SOURCE_EXTRACTED},
                     value=value,
                     aliases=[var_name],
                 )

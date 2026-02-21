@@ -13,14 +13,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from chuk_ai_session_manager.guards.constants import REFERENCE_PATTERN
 from chuk_ai_session_manager.guards.models import (
     ValueBinding,
     classify_value_type,
     compute_args_hash,
 )
-
-# Reference pattern: $v1, $v2, ${v1}, ${myalias}
-REFERENCE_PATTERN = re.compile(r"\$\{?([a-zA-Z_][a-zA-Z0-9_]*|v\d+)\}?")
 
 
 class BindingManager(BaseModel):

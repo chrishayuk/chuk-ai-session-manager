@@ -26,6 +26,10 @@ from chuk_ai_session_manager.procedural_memory.models import (
     ToolLogEntry,
     ToolOutcome,
     ToolPattern,
+    DeltaKey,
+    DeltaChangeKey,
+    ResultType,
+    DEFAULT_ERROR_TYPE,
 )
 
 if TYPE_CHECKING:
@@ -185,7 +189,7 @@ class ToolMemoryManager(BaseModel):
         # Handle failure - record error pattern
         elif outcome in (ToolOutcome.FAILURE, ToolOutcome.TIMEOUT):
             pattern.add_error_pattern(
-                error_type=error_type or "unknown",
+                error_type=error_type or DEFAULT_ERROR_TYPE,
                 context=context_goal,
                 example_args=arguments,
             )
@@ -263,20 +267,23 @@ class ToolMemoryManager(BaseModel):
         # Added keys
         added = success_keys - failed_keys
         if added:
-            delta["added"] = {k: success_args[k] for k in added}
+            delta[DeltaKey.ADDED] = {k: success_args[k] for k in added}
 
         # Removed keys
         removed = failed_keys - success_keys
         if removed:
-            delta["removed"] = list(removed)
+            delta[DeltaKey.REMOVED] = list(removed)
 
         # Changed values
         changed = {}
         for k in failed_keys & success_keys:
             if not self._values_equal(failed_args[k], success_args[k]):
-                changed[k] = {"from": failed_args[k], "to": success_args[k]}
+                changed[k] = {
+                    DeltaChangeKey.FROM: failed_args[k],
+                    DeltaChangeKey.TO: success_args[k],
+                }
         if changed:
-            delta["changed"] = changed
+            delta[DeltaKey.CHANGED] = changed
 
         return delta if delta else None
 
@@ -329,20 +336,20 @@ class ToolMemoryManager(BaseModel):
     def _classify_result(self, result: Any) -> str:
         """Classify the type of result."""
         if result is None:
-            return "null"
+            return ResultType.NULL.value
         if isinstance(result, bool):
-            return "boolean"
+            return ResultType.BOOLEAN.value
         if isinstance(result, (int, float)):
-            return "number"
+            return ResultType.NUMBER.value
         if isinstance(result, str):
-            return "string"
+            return ResultType.STRING.value
         if isinstance(result, list):
-            return "list"
+            return ResultType.LIST.value
         if isinstance(result, dict):
             if "status" in result:
-                return result.get("status", "object")
-            return "object"
-        return "unknown"
+                return result.get("status", ResultType.OBJECT.value)
+            return ResultType.OBJECT.value
+        return ResultType.UNKNOWN.value
 
     # --- Retrieval ---
 

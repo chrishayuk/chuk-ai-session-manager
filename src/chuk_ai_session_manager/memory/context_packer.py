@@ -192,7 +192,7 @@ class ContextPacker(BaseModel):
             return ContextPrefix.USER
         elif role == MessageRole.ASSISTANT.value:
             return ContextPrefix.ASSISTANT
-        elif role == MessageRole.TOOL.value or page_type == PageType.TOOL_RESULT.value:
+        elif role == MessageRole.TOOL.value or page_type == PageType.TRANSCRIPT.value:
             return ContextPrefix.TOOL
         elif (
             page_type == PageType.SUMMARY.value

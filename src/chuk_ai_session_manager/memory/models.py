@@ -105,12 +105,6 @@ class PageType(str, Enum):
     PROCEDURE = "procedure"  # Learned patterns for tool usage
     INDEX = "index"  # Page metadata for search
 
-    # Legacy aliases for backwards compatibility
-    MESSAGE = "transcript"  # Alias
-    TOOL_RESULT = "transcript"  # Alias
-    MEDIA = "artifact"  # Alias
-    CHECKPOINT = "index"  # Alias
-
 
 class FaultReason(str, Enum):
     """
@@ -302,14 +296,13 @@ PageContent = Union[
     AudioContent,
     VideoContent,
     StructuredContent,
-    Dict[str, Any],
 ]
 
 
 class PageMeta(BaseModel):
     """Metadata for a page in tool results."""
 
-    source_tier: str = Field(default="unknown")
+    source_tier: Optional[StorageTier] = Field(default=None)
     mime_type: Optional[str] = Field(default=None)
     size_bytes: Optional[int] = Field(default=None)
     dimensions: Optional[List[int]] = Field(default=None)
@@ -321,9 +314,9 @@ class PageData(BaseModel):
     """Page data in tool result envelope."""
 
     page_id: str
-    modality: str
-    level: int
-    tier: str
+    modality: Modality
+    level: CompressionLevel
+    tier: StorageTier
     content: PageContent
     meta: PageMeta = Field(default_factory=PageMeta)
 
@@ -340,9 +333,9 @@ class SearchResultEntry(BaseModel):
     """Single entry in search results."""
 
     page_id: str
-    modality: str
-    tier: str
-    levels: List[int] = Field(default_factory=list)
+    modality: Modality
+    tier: StorageTier
+    levels: List[CompressionLevel] = Field(default_factory=list)
     hint: str = Field(default="")
     relevance: float = Field(default=0.0)
 
@@ -441,9 +434,9 @@ class MemoryPage(BaseModel):
         default=None,
         description="page_id this is a compressed version of",
     )
-    representation_level: int = Field(
-        default=0,
-        description="0=full, 1=reduced, 2=abstract, 3=reference",
+    representation_level: CompressionLevel = Field(
+        default=CompressionLevel.FULL,
+        description="Compression level this representation is at",
     )
 
     # Location
@@ -893,9 +886,9 @@ class PageManifestEntry(BaseModel):
     """Entry in the memory manifest for a page."""
 
     page_id: str
-    modality: str
-    page_type: str  # transcript, summary, artifact, claim, procedure, index
-    compression_level: int
+    modality: Modality
+    page_type: PageType
+    compression_level: CompressionLevel
     tokens: int
     importance: float
     provenance: List[str] = Field(default_factory=list)  # source page_ids
@@ -934,12 +927,12 @@ class MemoryABI(BaseModel):
     )
 
     # Preferences
-    modality_weights: Dict[str, float] = Field(
+    modality_weights: Dict[Modality, float] = Field(
         default_factory=lambda: {
-            "text": 1.0,
-            "image": 0.8,
-            "audio": 0.6,
-            "video": 0.4,
+            Modality.TEXT: 1.0,
+            Modality.IMAGE: 0.8,
+            Modality.AUDIO: 0.6,
+            Modality.VIDEO: 0.4,
         }
     )
 

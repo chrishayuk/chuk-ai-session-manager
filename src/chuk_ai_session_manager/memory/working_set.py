@@ -13,6 +13,7 @@ Design principles:
 - Anti-thrash: Prevent evicting recently faulted pages
 """
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
@@ -520,8 +521,6 @@ class WorkingSetManager(BaseModel):
                 recency_score = 1.0 / (1.0 + age_seconds / 3600)  # Decay over hours
 
                 # Frequency score (log scale)
-                import math
-
                 frequency_score = math.log1p(page.access_count) / 10.0
                 frequency_score = min(1.0, frequency_score)
 

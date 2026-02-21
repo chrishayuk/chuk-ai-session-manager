@@ -28,6 +28,13 @@ from .models import (
 )
 from .page_table import PageTable
 
+# Tier hint constants for manifest generation
+_TIER_HINTS: Dict[StorageTier, str] = {
+    StorageTier.L2: "recent",
+    StorageTier.L3: "stored",
+    StorageTier.L4: "archived",
+}
+
 
 class WorkingSetEntry(BaseModel):
     """Entry for a page in the working set (already mapped)."""
@@ -291,12 +298,9 @@ def generate_simple_hint(entry: PageTableEntry) -> str:
         parts.append(entry.modality.value)
 
     # Tier (indicates recency/importance)
-    if entry.tier == StorageTier.L2:
-        parts.append(HintType.RECENT)
-    elif entry.tier == StorageTier.L3:
-        parts.append(HintType.STORED)
-    elif entry.tier == StorageTier.L4:
-        parts.append(HintType.ARCHIVED)
+    tier_hint = _TIER_HINTS.get(entry.tier)
+    if tier_hint:
+        parts.append(tier_hint)
 
     # Compression level
     if entry.compression_level == CompressionLevel.ABSTRACT:
