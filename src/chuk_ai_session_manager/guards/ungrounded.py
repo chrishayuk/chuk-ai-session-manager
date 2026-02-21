@@ -8,6 +8,7 @@ the result of prior computation. Enforces dataflow discipline.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +17,8 @@ from chuk_tool_processor.guards import BaseGuard, EnforcementLevel, GuardResult
 from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.guards.constants import REFERENCE_PATTERN
+
+log = logging.getLogger(__name__)
 
 
 class UngroundedGuardConfig(BaseModel):

@@ -51,8 +51,6 @@ __version__ = "0.8"
 # Set up package-level logger
 logger = logging.getLogger(__name__)
 
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
-
 # Core enums and constants
 # Simple API - The main interface most users will use
 from chuk_ai_session_manager.api.simple_api import (
@@ -64,6 +62,7 @@ from chuk_ai_session_manager.api.simple_api import (
     track_llm_call,
     track_tool_use,
 )
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Exception classes
 from chuk_ai_session_manager.exceptions import (
@@ -221,8 +220,8 @@ def get_storage_info() -> dict:
 
         return {
             "provider": os.getenv("SESSION_PROVIDER", "memory"),
-            "backend": stats.get("backend", "unknown"),
-            "sandbox_id": stats.get("sandbox_id", "unknown"),
+            "backend": stats.backend or "unknown",
+            "sandbox_id": stats.sandbox_id or "unknown",
             "redis_url": os.getenv("SESSION_REDIS_URL", "not_set"),
             "stats": stats,
         }

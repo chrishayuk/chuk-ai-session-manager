@@ -26,6 +26,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from typing import Protocol, runtime_checkable
@@ -33,6 +34,8 @@ from typing import Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from .models import CompressionLevel, MemoryPage, Modality
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Types

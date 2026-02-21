@@ -14,10 +14,13 @@ Design principles:
 - No magic strings: Uses constants for MIME types
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
+
+from chuk_ai_session_manager.exceptions import StorageError
 
 from .models import (
     MEMORY_PAGE_MIME_TYPE,
@@ -26,6 +29,8 @@ from .models import (
     StorageStats,
     StorageTier,
 )
+
+logger = logging.getLogger(__name__)
 
 # Try to import chuk-artifacts
 try:
@@ -238,7 +243,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             return await self._backend.store(page, tier)
         else:
-            raise RuntimeError("ArtifactsBridge not configured")
+            raise StorageError("ArtifactsBridge not configured")
 
     async def _store_with_artifacts(
         self,
@@ -299,7 +304,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             return await self._backend.load(artifact_id)
         else:
-            raise RuntimeError("ArtifactsBridge not configured")
+            raise StorageError("ArtifactsBridge not configured")
 
     async def _load_with_artifacts(
         self,
@@ -324,6 +329,7 @@ class ArtifactsBridge(BaseModel):
             else:
                 return None
         except Exception:
+            logger.warning("Failed to load artifact %s", artifact_id, exc_info=True)
             return None
 
     async def delete_page(
@@ -344,11 +350,12 @@ class ArtifactsBridge(BaseModel):
                 await self._artifact_store.delete(artifact_id)
                 return True
             except Exception:
+                logger.warning("Failed to delete artifact %s", artifact_id, exc_info=True)
                 return False
         elif self._backend:
             return await self._backend.delete(artifact_id)
         else:
-            raise RuntimeError("ArtifactsBridge not configured")
+            raise StorageError("ArtifactsBridge not configured")
 
     async def store_checkpoint(
         self,
@@ -411,7 +418,7 @@ class ArtifactsBridge(BaseModel):
                 checkpoint_id = f"checkpoint_{self._backend.counter}"
                 self._backend.pages[checkpoint_id] = manifest_data
                 return checkpoint_id
-            raise RuntimeError("ArtifactsBridge not configured")
+            raise StorageError("ArtifactsBridge not configured")
 
     async def load_checkpoint(
         self,
@@ -433,7 +440,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             manifest_data = self._backend.pages.get(checkpoint_id)
         else:
-            raise RuntimeError("ArtifactsBridge not configured")
+            raise StorageError("ArtifactsBridge not configured")
 
         if not manifest_data:
             return []

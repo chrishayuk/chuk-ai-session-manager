@@ -20,11 +20,12 @@ from chuk_tool_processor.core.processor import ToolProcessor
 from chuk_tool_processor.models.tool_call import ToolCall
 from chuk_tool_processor.models.tool_result import ToolResult
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+from chuk_ai_session_manager.exceptions import SessionNotFound
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +41,31 @@ class SessionAwareToolProcessor:
         enable_caching: bool = True,
         max_retries: int = 2,
         retry_delay: float = 1.0,
+        store: ChukSessionsStore | None = None,
     ) -> None:
         self.session_id = session_id
         self.enable_caching = enable_caching
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.cache: dict[str, ToolResult] = {}
+        self._store = store
 
         self._tp: ToolProcessor = ToolProcessor()
         if not hasattr(self._tp, "executor"):
             raise AttributeError("Installed chuk_tool_processor is too old - missing `.executor`")
 
+    def _get_store(self) -> ChukSessionsStore:
+        """Return the injected store or create one from the global backend."""
+        if self._store is not None:
+            return self._store
+        return ChukSessionsStore(get_backend())
+
     @classmethod
     async def create(cls, session_id: str, **kwargs):
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        store = kwargs.pop("store", None) or ChukSessionsStore(get_backend())
         if not await store.get(session_id):
-            raise ValueError(f"Session {session_id} not found")
-        return cls(session_id=session_id, **kwargs)
+            raise SessionNotFound(session_id)
+        return cls(session_id=session_id, store=store, **kwargs)
 
     # ─────────────────────────── internals ─────────────────────────────
     async def _maybe_await(self, val: Any) -> Any:
@@ -116,11 +124,10 @@ class SessionAwareToolProcessor:
 
     # ─────────────────────────── public API ────────────────────────────
     async def process_llm_message(self, llm_msg: dict[str, Any], _) -> list[ToolResult]:
-        backend = get_backend()
-        store = ChukSessionsStore(backend)
+        store = self._get_store()
         session = await store.get(self.session_id)
         if not session:
-            raise ValueError(f"Session {self.session_id} not found")
+            raise SessionNotFound(self.session_id)
 
         parent_evt = await SessionEvent.create_with_tokens(
             message=llm_msg,

@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from chuk_ai_session_manager.exceptions import SessionNotFound
 from chuk_ai_session_manager.infinite_conversation import (
     InfiniteConversationManager,
     SummarizationStrategy,
@@ -356,7 +357,7 @@ class TestInfiniteConversationEdgeCases:
                 "chuk_ai_session_manager.infinite_conversation.get_backend",
                 return_value=mock_store,
             ),
-            pytest.raises(ValueError, match="Session nonexistent not found"),
+            pytest.raises(SessionNotFound, match="Session not found: nonexistent"),
         ):
             await infinite_manager.process_message(
                 session_id="nonexistent",
@@ -384,7 +385,7 @@ class TestInfiniteConversationEdgeCases:
                 "chuk_ai_session_manager.infinite_conversation.get_backend",
                 return_value=mock_store,
             ),
-            pytest.raises(ValueError, match="Session nonexistent not found"),
+            pytest.raises(SessionNotFound, match="Session not found: nonexistent"),
         ):
             await infinite_manager.build_context_for_llm("nonexistent")
 

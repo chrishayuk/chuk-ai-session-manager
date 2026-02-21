@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
@@ -24,7 +25,6 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
 from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
 from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # ===========================================================================
 # EventSource tests

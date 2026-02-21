@@ -11,7 +11,7 @@ Keep it simple: no ML prediction required.
 """
 
 from collections import Counter
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -110,7 +110,7 @@ class SimplePrefetcher(BaseModel):
 
     def get_top_claims(
         self,
-        page_table: Optional["PageTable"] = None,
+        page_table: "PageTable | None" = None,
         limit: int | None = None,
     ) -> list[str]:
         """
@@ -141,7 +141,7 @@ class SimplePrefetcher(BaseModel):
     async def prefetch_on_turn_start(
         self,
         session_id: str,  # noqa: ARG002 — reserved for storage-backed prefetch
-        page_table: Optional["PageTable"] = None,
+        page_table: "PageTable | None" = None,
     ) -> list[str]:
         """
         Get pages to prefetch at the start of a turn.

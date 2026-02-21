@@ -15,7 +15,7 @@ Design principles:
 
 import math
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -419,7 +419,7 @@ class WorkingSetManager(BaseModel):
         self,
         tokens_needed: int = 0,
         from_tier: StorageTier = StorageTier.L0,
-        page_table: Optional["PageTable"] = None,
+        page_table: "PageTable | None" = None,
     ) -> list[tuple[str, float]]:
         """
         Get pages that are candidates for eviction, scored by priority.

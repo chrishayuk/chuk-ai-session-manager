@@ -33,6 +33,7 @@ from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.models.session_stats import SessionStats
 from chuk_ai_session_manager.session_storage import ChukSessionsStore
 
 logger = logging.getLogger(__name__)
@@ -720,7 +721,7 @@ class SessionManager:
         else:
             return [self.session_id]
 
-    async def get_stats(self, include_all_segments: bool | None = None) -> dict[str, Any]:
+    async def get_stats(self, include_all_segments: bool | None = None) -> SessionStats:
         """
         Get conversation statistics.
 
@@ -728,18 +729,7 @@ class SessionManager:
             include_all_segments: Include all segments (defaults to infinite_context setting).
 
         Returns:
-            Dictionary with conversation stats including:
-            - session_id: Current session ID
-            - total_messages: Total number of messages
-            - user_messages: Number of user messages
-            - ai_messages: Number of AI messages
-            - tool_calls: Number of tool calls
-            - total_tokens: Total tokens used
-            - estimated_cost: Estimated cost in USD
-            - created_at: Session creation time
-            - last_update: Last update time
-            - session_segments: Number of segments (infinite context)
-            - infinite_context: Whether infinite context is enabled
+            SessionStats with conversation statistics.
         """
         if include_all_segments is None:
             include_all_segments = self._infinite_context
@@ -768,8 +758,8 @@ class SessionManager:
                 self._total_segments = len(chain)
 
             # Calculate stats across all segments
-            user_messages = len([t for t in self._full_conversation if t["role"] == "user"])
-            ai_messages = len([t for t in self._full_conversation if t["role"] == "assistant"])
+            user_messages = len([t for t in self._full_conversation if t["role"] == MessageRole.USER.value])
+            ai_messages = len([t for t in self._full_conversation if t["role"] == MessageRole.ASSISTANT.value])
 
             # Get token/cost stats by loading all sessions in chain
             total_tokens = 0
@@ -797,21 +787,21 @@ class SessionManager:
                 except Exception as e:
                     logger.warning(f"Failed to load session {session_id} in chain: {e}")
 
-            return {
-                "session_id": self._session_id,
-                "session_segments": self._total_segments,
-                "session_chain": self._session_chain.copy(),
-                "total_messages": user_messages + ai_messages,
-                "total_events": total_events,
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": tool_calls,
-                "total_tokens": total_tokens,
-                "estimated_cost": total_cost,
-                "created_at": self._session.metadata.created_at.isoformat(),
-                "last_update": self._session.last_update_time.isoformat(),
-                "infinite_context": True,
-            }
+            return SessionStats(
+                session_id=self._session_id,
+                session_segments=self._total_segments,
+                session_chain=self._session_chain.copy(),
+                total_messages=user_messages + ai_messages,
+                total_events=total_events,
+                user_messages=user_messages,
+                ai_messages=ai_messages,
+                tool_calls=tool_calls,
+                total_tokens=total_tokens,
+                estimated_cost=total_cost,
+                created_at=self._session.metadata.created_at.isoformat(),
+                last_update=self._session.last_update_time.isoformat(),
+                infinite_context=True,
+            )
         else:
             # Current session stats only
             user_messages = sum(
@@ -822,20 +812,20 @@ class SessionManager:
             )
             tool_calls = sum(1 for e in self._session.events if e.type == EventType.TOOL_CALL)
 
-            return {
-                "session_id": self._session.id,
-                "session_segments": 1,
-                "total_messages": user_messages + ai_messages,
-                "total_events": len(self._session.events),
-                "user_messages": user_messages,
-                "ai_messages": ai_messages,
-                "tool_calls": tool_calls,
-                "total_tokens": self._session.total_tokens,
-                "estimated_cost": self._session.total_cost,
-                "created_at": self._session.metadata.created_at.isoformat(),
-                "last_update": self._session.last_update_time.isoformat(),
-                "infinite_context": self._infinite_context,
-            }
+            return SessionStats(
+                session_id=self._session.id,
+                session_segments=1,
+                total_messages=user_messages + ai_messages,
+                total_events=len(self._session.events),
+                user_messages=user_messages,
+                ai_messages=ai_messages,
+                tool_calls=tool_calls,
+                total_tokens=self._session.total_tokens,
+                estimated_cost=self._session.total_cost,
+                created_at=self._session.metadata.created_at.isoformat(),
+                last_update=self._session.last_update_time.isoformat(),
+                infinite_context=self._infinite_context,
+            )
 
     def set_summary_callback(self, callback: Callable[[list[dict]], str]) -> None:
         """

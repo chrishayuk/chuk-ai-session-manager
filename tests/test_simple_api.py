@@ -1,5 +1,4 @@
 # tests/test_simple_api.py
-from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Test suite for the simple API in chuk_ai_session_manager.
 
@@ -18,6 +17,7 @@ from chuk_ai_session_manager.api.simple_api import (
     track_infinite_conversation,
     track_llm_call,
 )
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
