@@ -26,17 +26,17 @@
 
 ## Current Status (v0.10)
 
-> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, demand paging, swappable eviction policies, and per-modality compression. 1704 tests passing.
+> **Shipped February 2025.** Full VM infrastructure with MemoryManager orchestrator, SessionManager integration, demand paging, swappable eviction policies, and per-modality compression. 1719 tests passing.
 
 ### What's Shipped
 
 | Component | Module | Status |
 |-----------|--------|--------|
-| MemoryPage, PageTableEntry, all enums | `models.py` | v0.8 |
-| PageType taxonomy + provenance | `models.py` | v0.8 |
-| FaultPolicy, FaultReason, FaultRecord | `models.py` | v0.8 |
-| MemoryABI, PageManifestEntry | `models.py` | v0.8 |
-| UserExperienceMetrics | `models.py` | v0.8 |
+| MemoryPage, PageTableEntry, all enums | `models/` | v0.8 |
+| PageType taxonomy + provenance | `models/` | v0.8 |
+| FaultPolicy, FaultReason, FaultRecord | `models/` | v0.8 |
+| MemoryABI, PageManifestEntry | `models/` | v0.8 |
+| UserExperienceMetrics | `models/` | v0.8 |
 | PageTable with dirty/tier/modality/type tracking | `page_table.py` | v0.8 |
 | PageTLB + TLBWithPageTable | `tlb.py` | v0.8 |
 | WorkingSetManager + PinnedSet + AntiThrash | `working_set.py` | v0.8 |
@@ -57,7 +57,7 @@
 | **EvictionPolicy protocol** (3 implementations) | `eviction_policy.py` | **v0.10** |
 | **CompressorRegistry** (text, image, passthrough) | `compressor.py` | **v0.10** |
 | **Compress-before-evict** in MemoryManager | `manager.py` | **v0.10** |
-| **VMMetrics compression tracking** | `models.py` | **v0.10** |
+| **VMMetrics compression tracking** | `models/` | **v0.10** |
 
 ### What's Next
 

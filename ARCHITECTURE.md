@@ -176,10 +176,10 @@ Errors are typed, contextual, and never swallowed silently.
 SessionManagerError (base)
 ├── SessionNotFound          (session_id)
 ├── SessionAlreadyExists     (session_id)
-├── InvalidSessionOperation  (session_id, operation)
+├── InvalidSessionOperation  (session_id, operation, reason)
 ├── TokenLimitExceeded       (limit, actual)
 ├── StorageError             (operation, backend)
-└── ToolProcessingError      (tool_name, details)
+└── ToolProcessingError      (tool_name, reason)
 ```
 
 **Rules:**
@@ -205,7 +205,7 @@ Every source file must have ≥ 90% line coverage individually.
 - Mock external dependencies (storage backends, LLM callbacks) — never hit real services in unit tests
 - Use `pytest.mark.unit`, `pytest.mark.integration`, `pytest.mark.slow` markers
 
-**Current status:** 99% aggregate, 1703 tests passing. All files ≥ 91%.
+**Current status:** 99% aggregate, 1719 tests passing. CI enforces ≥ 80% line coverage. All files ≥ 91%.
 
 ---
 
