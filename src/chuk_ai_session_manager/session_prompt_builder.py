@@ -21,6 +21,7 @@ from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.token_usage import TokenUsage
 from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ async def build_prompt_from_session(
     session: Session,
     strategy: PromptStrategy | str = PromptStrategy.MINIMAL,
     max_tokens: int | None = None,  # noqa: ARG001 — reserved for token-aware strategies
-    model: str = "gpt-3.5-turbo",  # noqa: ARG001 — reserved for model-specific tokenization
+    model: str = DEFAULT_TOKEN_MODEL,  # noqa: ARG001 — reserved for model-specific tokenization
     include_parent_context: bool = False,
     current_query: str | None = None,  # noqa: ARG001 — reserved for query-aware strategies
     max_history: int = 5,
@@ -435,7 +436,7 @@ async def _build_hierarchical_prompt(session: Session, include_parent_context: b
 async def truncate_prompt_to_token_limit(
     prompt: list[dict[str, Any]],
     max_tokens: int,
-    model: str = "gpt-3.5-turbo",
+    model: str = DEFAULT_TOKEN_MODEL,
 ) -> list[dict[str, Any]]:
     """
     Trim a prompt so its total token count is ≤ `max_tokens`.

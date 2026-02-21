@@ -1,3 +1,5 @@
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+
 # src/chuk_ai_session_manager/api/simple_api.py
 """
 Simple API convenience functions for the CHUK AI Session Manager.
@@ -15,7 +17,7 @@ Usage:
     await track_conversation(
         "What's the weather?",
         "It's sunny and 72°F",
-        model="gpt-4",
+        model=DEFAULT_TOKEN_MODEL,
         provider="openai"
     )
 
@@ -69,7 +71,7 @@ async def track_conversation(
         session_id = await track_conversation(
             "What's the capital of France?",
             "The capital of France is Paris.",
-            model="gpt-3.5-turbo",
+            model=DEFAULT_TOKEN_MODEL,
             provider="openai"
         )
         ```
@@ -122,7 +124,7 @@ async def track_llm_call(
         response, session_id = await track_llm_call(
             "Explain quantum computing",
             call_openai,
-            model="gpt-4",
+            model=DEFAULT_TOKEN_MODEL,
             provider="openai"
         )
         ```
@@ -186,7 +188,7 @@ async def quick_conversation(
         stats = await quick_conversation(
             "Hello!",
             "Hi there! How can I help you today?",
-            model="gpt-3.5-turbo"
+            model=DEFAULT_TOKEN_MODEL
         )
         print(f"Tokens used: {stats['total_tokens']}")
         print(f"Cost: ${stats['estimated_cost']:.4f}")
@@ -237,7 +239,7 @@ async def track_infinite_conversation(
         session_id = await track_infinite_conversation(
             "Tell me about the history of computing",
             "Computing history begins with...",
-            model="gpt-4"
+            model=DEFAULT_TOKEN_MODEL
         )
 
         # Continue the conversation
@@ -245,7 +247,7 @@ async def track_infinite_conversation(
             "What about quantum computers?",
             "Quantum computing represents...",
             session_id=session_id,
-            model="gpt-4"
+            model=DEFAULT_TOKEN_MODEL
         )
         ```
     """

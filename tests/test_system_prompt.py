@@ -6,6 +6,7 @@ Test suite for system prompt functionality in SessionManager.
 import pytest
 
 from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 
 class TestSystemPrompt:
@@ -176,12 +177,12 @@ class TestSystemPrompt:
 
         # Simulate conversation
         await sm.user_says("Hello there!")
-        await sm.ai_responds("Ahoy matey! Welcome aboard!", model="gpt-4o-mini")
+        await sm.ai_responds("Ahoy matey! Welcome aboard!", model=DEFAULT_TOKEN_MODEL)
 
         await sm.user_says("Tell me about the weather")
         await sm.ai_responds(
             "Arr, the skies be clear and the winds be favorable for sailing!",
-            model="gpt-4o-mini",
+            model=DEFAULT_TOKEN_MODEL,
         )
 
         # Check stats

@@ -19,6 +19,7 @@ from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Type for LLM function callbacks
 LLMCallbackAsync = Callable[[list[dict[str, str]], str], Any]
@@ -67,7 +68,7 @@ class InfiniteConversationManager:
         message: str,
         source: EventSource,
         llm_callback: LLMCallbackAsync,
-        model: str = "gpt-3.5-turbo",
+        model: str = DEFAULT_TOKEN_MODEL,
     ) -> str:
         """
         Process a new message in the conversation.

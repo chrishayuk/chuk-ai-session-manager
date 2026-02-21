@@ -1,4 +1,5 @@
 # tests/test_storage.py
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Test suite for session storage functionality in chuk_ai_session_manager.
 
@@ -361,14 +362,14 @@ class TestStorageIntegration:
         event1 = await SessionEvent.create_with_tokens(
             message="Hello",
             prompt="Hello",
-            model="gpt-3.5-turbo",
+            model=DEFAULT_TOKEN_MODEL,
             source=EventSource.USER,
         )
         event2 = await SessionEvent.create_with_tokens(
             message="Hi there!",
             prompt="",
             completion="Hi there!",
-            model="gpt-3.5-turbo",
+            model=DEFAULT_TOKEN_MODEL,
             source=EventSource.LLM,
         )
 

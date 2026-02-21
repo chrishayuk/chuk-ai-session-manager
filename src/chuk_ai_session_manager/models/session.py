@@ -12,6 +12,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, model_validator
 
 from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Import models that Session depends on
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
@@ -249,7 +250,9 @@ class Session(BaseModel, Generic[MessageT]):
 
         return result
 
-    async def count_message_tokens(self, message: str | dict[str, Any], model: str = "gpt-3.5-turbo") -> int:
+    async def count_message_tokens(
+        self, message: str | dict[str, Any], model: str = DEFAULT_TOKEN_MODEL
+    ) -> int:
         """
         Count tokens in a message asynchronously.
 

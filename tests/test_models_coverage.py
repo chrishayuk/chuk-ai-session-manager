@@ -24,6 +24,7 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
 from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
 from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # ===========================================================================
 # EventSource tests
@@ -260,7 +261,7 @@ class TestTokenUsageCoverage:
         usage = TokenUsage._from_text_sync("Hello world")
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens == 0
-        assert usage.model == "gpt-3.5-turbo"
+        assert usage.model == DEFAULT_TOKEN_MODEL
 
     def test_from_text_sync_prompt_and_completion(self):
         usage = TokenUsage._from_text_sync("Hello", "World", "gpt-4")

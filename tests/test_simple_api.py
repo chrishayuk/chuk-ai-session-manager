@@ -1,4 +1,5 @@
 # tests/test_simple_api.py
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Test suite for the simple API in chuk_ai_session_manager.
 
@@ -201,7 +202,7 @@ class TestSessionManager:
             sm = SessionManager()
             result_session_id = await sm.ai_responds(
                 "Hi there! How can I help?",
-                model="gpt-4",
+                model=DEFAULT_TOKEN_MODEL,
                 provider="openai",
                 key1="value1",
             )
@@ -210,7 +211,7 @@ class TestSessionManager:
             assert len(session.events) == 1
             assert session.events[0].message == "Hi there! How can I help?"
             assert session.events[0].source == EventSource.LLM
-            assert await session.events[0].get_metadata("model") == "gpt-4"
+            assert await session.events[0].get_metadata("model") == DEFAULT_TOKEN_MODEL
             assert await session.events[0].get_metadata("provider") == "openai"
             assert await session.events[0].get_metadata("key1") == "value1"
 
@@ -532,7 +533,7 @@ class TestConvenienceFunctions:
             session_id = await track_conversation(
                 user_message="Hello!",
                 ai_response="Hi there!",
-                model="gpt-4",
+                model=DEFAULT_TOKEN_MODEL,
                 provider="openai",
             )
 
@@ -565,7 +566,7 @@ class TestConvenienceFunctions:
             session_id = await track_infinite_conversation(
                 user_message="Hello!",
                 ai_response="Hi there!",
-                model="gpt-4",
+                model=DEFAULT_TOKEN_MODEL,
                 provider="openai",
                 token_threshold=2000,
             )
@@ -594,7 +595,7 @@ class TestConvenienceFunctions:
             response, session_id = await track_llm_call(
                 user_input="What's 2+2?",
                 llm_function=mock_llm_function,
-                model="gpt-3.5-turbo",
+                model=DEFAULT_TOKEN_MODEL,
                 provider="openai",
             )
 
@@ -624,7 +625,7 @@ class TestConvenienceFunctions:
             response, session_id = await track_llm_call(
                 user_input="Hello async!",
                 llm_function=mock_async_llm,
-                model="gpt-4",
+                model=DEFAULT_TOKEN_MODEL,
             )
 
             assert response == "Async LLM response to: Hello async!"
@@ -782,7 +783,7 @@ class TestSessionManagerInfiniteContext:
 
             # Add conversation
             await sm.user_says("Hello!")
-            await sm.ai_responds("Hi there!", model="gpt-4", provider="openai")
+            await sm.ai_responds("Hi there!", model=DEFAULT_TOKEN_MODEL, provider="openai")
             await sm.user_says("How are you?")
 
             # Check full conversation tracking
@@ -795,7 +796,7 @@ class TestSessionManagerInfiniteContext:
 
             assert conv[1]["role"] == "assistant"
             assert conv[1]["content"] == "Hi there!"
-            assert conv[1]["model"] == "gpt-4"
+            assert conv[1]["model"] == DEFAULT_TOKEN_MODEL
             assert conv[1]["provider"] == "openai"
 
             assert conv[2]["role"] == "user"
