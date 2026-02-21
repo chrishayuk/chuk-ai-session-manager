@@ -14,7 +14,6 @@ Full event-sourcing with time-travel comes in v0.15.
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -30,7 +29,7 @@ class ContextSnapshot(BaseModel):
     """Snapshot of what pages were in context at a given turn."""
 
     turn: int
-    page_ids: List[str] = Field(default_factory=list)
+    page_ids: list[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -47,15 +46,13 @@ class MutationLogLite(BaseModel):
     session_id: str = Field(default="")
 
     # Append-only mutation list
-    _mutations: List[PageMutation] = PrivateAttr(default_factory=list)
+    _mutations: list[PageMutation] = PrivateAttr(default_factory=list)
 
     # Index: page_id -> list of mutations
-    _by_page: Dict[str, List[PageMutation]] = PrivateAttr(
-        default_factory=lambda: defaultdict(list)
-    )
+    _by_page: dict[str, list[PageMutation]] = PrivateAttr(default_factory=lambda: defaultdict(list))
 
     # Context snapshots per turn
-    _context_snapshots: Dict[int, ContextSnapshot] = PrivateAttr(default_factory=dict)
+    _context_snapshots: dict[int, ContextSnapshot] = PrivateAttr(default_factory=dict)
 
     def append(self, mutation: PageMutation) -> None:
         """Append a mutation to the log."""
@@ -67,9 +64,9 @@ class MutationLogLite(BaseModel):
         page_id: str,
         mutation_type: MutationType,
         tier_after: StorageTier,
-        tier_before: Optional[StorageTier] = None,
+        tier_before: StorageTier | None = None,
         actor: Actor = Actor.SYSTEM,
-        cause: Optional[str] = None,
+        cause: str | None = None,
         turn: int = 0,
     ) -> PageMutation:
         """Create and append a mutation record."""
@@ -86,7 +83,7 @@ class MutationLogLite(BaseModel):
         self.append(mutation)
         return mutation
 
-    def record_context_at_turn(self, turn: int, page_ids: List[str]) -> None:
+    def record_context_at_turn(self, turn: int, page_ids: list[str]) -> None:
         """
         Snapshot the context (L0 pages) at a turn.
 
@@ -98,7 +95,7 @@ class MutationLogLite(BaseModel):
             page_ids=list(page_ids),
         )
 
-    def get_context_at_turn(self, turn: int) -> List[str]:
+    def get_context_at_turn(self, turn: int) -> list[str]:
         """
         Replay: what page_ids were in L0 at turn T?
 
@@ -109,47 +106,35 @@ class MutationLogLite(BaseModel):
             return snapshot.page_ids
         return []
 
-    def get_history(self, page_id: str) -> List[PageMutation]:
+    def get_history(self, page_id: str) -> list[PageMutation]:
         """All mutations for a page."""
         return list(self._by_page.get(page_id, []))
 
-    def get_mutations_by_actor(self, actor: Actor) -> List[PageMutation]:
+    def get_mutations_by_actor(self, actor: Actor) -> list[PageMutation]:
         """All mutations by a specific actor."""
         return [m for m in self._mutations if m.actor == actor]
 
-    def get_mutations_by_type(self, mutation_type: MutationType) -> List[PageMutation]:
+    def get_mutations_by_type(self, mutation_type: MutationType) -> list[PageMutation]:
         """All mutations of a specific type."""
         return [m for m in self._mutations if m.mutation_type == mutation_type]
 
-    def get_mutations_in_turn(self, turn: int) -> List[PageMutation]:
+    def get_mutations_in_turn(self, turn: int) -> list[PageMutation]:
         """All mutations in a specific turn."""
         return [m for m in self._mutations if m.turn == turn]
 
-    def get_pages_created_in_turn(self, turn: int) -> List[str]:
+    def get_pages_created_in_turn(self, turn: int) -> list[str]:
         """Get page IDs created in a specific turn."""
-        return [
-            m.page_id
-            for m in self._mutations
-            if m.turn == turn and m.mutation_type == MutationType.CREATE
-        ]
+        return [m.page_id for m in self._mutations if m.turn == turn and m.mutation_type == MutationType.CREATE]
 
-    def get_pages_faulted_in_turn(self, turn: int) -> List[str]:
+    def get_pages_faulted_in_turn(self, turn: int) -> list[str]:
         """Get page IDs faulted in during a specific turn."""
-        return [
-            m.page_id
-            for m in self._mutations
-            if m.turn == turn and m.mutation_type == MutationType.FAULT_IN
-        ]
+        return [m.page_id for m in self._mutations if m.turn == turn and m.mutation_type == MutationType.FAULT_IN]
 
-    def get_pages_evicted_in_turn(self, turn: int) -> List[str]:
+    def get_pages_evicted_in_turn(self, turn: int) -> list[str]:
         """Get page IDs evicted in a specific turn."""
-        return [
-            m.page_id
-            for m in self._mutations
-            if m.turn == turn and m.mutation_type == MutationType.EVICT
-        ]
+        return [m.page_id for m in self._mutations if m.turn == turn and m.mutation_type == MutationType.EVICT]
 
-    def get_all_mutations(self) -> List[PageMutation]:
+    def get_all_mutations(self) -> list[PageMutation]:
         """Get all mutations in chronological order."""
         return list(self._mutations)
 
@@ -167,9 +152,9 @@ class MutationLogLite(BaseModel):
         self._by_page.clear()
         self._context_snapshots.clear()
 
-    def get_summary(self) -> Dict[str, int]:
+    def get_summary(self) -> dict[str, int]:
         """Get summary statistics."""
-        by_type: Dict[MutationType, int] = defaultdict(int)
+        by_type: dict[MutationType, int] = defaultdict(int)
         for m in self._mutations:
             by_type[m.mutation_type] += 1
 

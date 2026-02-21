@@ -1,8 +1,10 @@
 # a2a_accounts/models/account.py
 from __future__ import annotations
+
+from typing import Any
 from uuid import uuid4
+
 from pydantic import BaseModel, Field
-from typing import Any, List
 
 
 class Account(BaseModel):
@@ -11,7 +13,7 @@ class Account(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     owner_user_id: str
-    project_ids: List[str] = Field(default_factory=list)
+    project_ids: list[str] = Field(default_factory=list)
 
     def add_project(self, project: Any) -> None:
         """Associate a Project with this Account."""

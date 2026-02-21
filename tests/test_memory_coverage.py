@@ -6,9 +6,27 @@ Covers: page_table, tlb, working_set, context_packer, vm_prompts,
 """
 
 import json
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
+
+from chuk_ai_session_manager.memory.artifacts_bridge import (
+    ArtifactsBridge,
+    InMemoryBackend,
+)
+from chuk_ai_session_manager.memory.context_packer import (
+    ContextPacker,
+    ContextPackerConfig,
+)
+from chuk_ai_session_manager.memory.manifest import (
+    AvailablePageEntry,
+    HintType,
+    ManifestBuilder,
+    ManifestPolicies,
+    VMManifest,
+    WorkingSetEntry,
+    generate_simple_hint,
+)
 from chuk_ai_session_manager.memory.models import (
     CompressionLevel,
     MemoryPage,
@@ -19,49 +37,31 @@ from chuk_ai_session_manager.memory.models import (
     StorageTier,
 )
 from chuk_ai_session_manager.memory.page_table import PageTable
+from chuk_ai_session_manager.memory.prefetcher import (
+    SimplePrefetcher,
+)
 from chuk_ai_session_manager.memory.tlb import PageTLB, TLBWithPageTable
-from chuk_ai_session_manager.memory.working_set import (
-    AntiThrashPolicy,
-    PinnedSet,
-    WorkingSetManager,
-    WorkingSetConfig,
-)
-from chuk_ai_session_manager.memory.context_packer import (
-    ContextPacker,
-    ContextPackerConfig,
-)
 from chuk_ai_session_manager.memory.vm_prompts import (
-    VM_STRICT_PROMPT,
-    VM_RELAXED_PROMPT,
+    PAGE_FAULT_TOOL,
+    SEARCH_PAGES_TOOL,
     VM_PASSIVE_PROMPT,
     VM_PROMPTS,
+    VM_RELAXED_PROMPT,
+    VM_STRICT_PROMPT,
     VM_TOOL_DEFINITIONS,
     VM_TOOLS,
+    VMMode,
     build_vm_developer_message,
     get_prompt_for_mode,
     get_vm_tools,
     get_vm_tools_as_dicts,
-    PAGE_FAULT_TOOL,
-    SEARCH_PAGES_TOOL,
-    VMMode,
 )
-from chuk_ai_session_manager.memory.manifest import (
-    ManifestBuilder,
-    VMManifest,
-    ManifestPolicies,
-    generate_simple_hint,
-    HintType,
-    WorkingSetEntry,
-    AvailablePageEntry,
+from chuk_ai_session_manager.memory.working_set import (
+    AntiThrashPolicy,
+    PinnedSet,
+    WorkingSetConfig,
+    WorkingSetManager,
 )
-from chuk_ai_session_manager.memory.artifacts_bridge import (
-    ArtifactsBridge,
-    InMemoryBackend,
-)
-from chuk_ai_session_manager.memory.prefetcher import (
-    SimplePrefetcher,
-)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -233,9 +233,7 @@ class TestPageTable:
     def test_update_location_with_compression(self):
         pt = PageTable()
         pt.register(make_page("p1"))
-        pt.update_location(
-            "p1", tier=StorageTier.L3, compression_level=CompressionLevel.ABSTRACT
-        )
+        pt.update_location("p1", tier=StorageTier.L3, compression_level=CompressionLevel.ABSTRACT)
         assert pt.lookup("p1").compression_level == CompressionLevel.ABSTRACT
 
     def test_update_location_not_found(self):
@@ -1624,9 +1622,7 @@ class TestVMManifest:
         assert len(manifest.working_set) == 1
 
     def test_manifest_with_available_pages(self):
-        ap = AvailablePageEntry(
-            page_id="p2", modality="image", tier="L3", hint="a picture"
-        )
+        ap = AvailablePageEntry(page_id="p2", modality="image", tier="L3", hint="a picture")
         manifest = VMManifest(session_id="sess_1", available_pages=[ap])
         assert len(manifest.available_pages) == 1
 
@@ -2085,9 +2081,7 @@ class TestSimplePrefetcher:
     def test_get_tool_prereq_pages(self):
         pf = SimplePrefetcher()
         pf.record_tool_call("weather", turn=1, pages_accessed_before=["loc_1"])
-        pf.record_tool_call(
-            "weather", turn=2, pages_accessed_before=["loc_1", "pref_1"]
-        )
+        pf.record_tool_call("weather", turn=2, pages_accessed_before=["loc_1", "pref_1"])
         prereqs = pf.get_tool_prereq_pages("weather")
         assert "loc_1" in prereqs
 

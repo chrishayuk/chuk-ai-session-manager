@@ -7,9 +7,11 @@ with proper async support.
 """
 
 from __future__ import annotations
-from typing import Dict, Optional, Union, Any
-from pydantic import BaseModel, Field, ConfigDict
+
 import asyncio
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # Try to import tiktoken, but make it optional
 try:
@@ -38,14 +40,12 @@ class TokenUsage(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = Field(default=0)
     model: str = ""
-    estimated_cost_usd: Optional[float] = None
+    estimated_cost_usd: float | None = None
 
     def __init__(self, **data):
         super().__init__(**data)
         # Auto-calculate total tokens if not explicitly provided
-        if self.total_tokens == 0 and (
-            self.prompt_tokens > 0 or self.completion_tokens > 0
-        ):
+        if self.total_tokens == 0 and (self.prompt_tokens > 0 or self.completion_tokens > 0):
             self.total_tokens = self.prompt_tokens + self.completion_tokens
 
         # Auto-calculate estimated cost if model is provided
@@ -124,9 +124,7 @@ class TokenUsage(BaseModel):
             self.estimated_cost_usd = await self.calculate_cost()
 
     @classmethod
-    def _from_text_sync(
-        cls, prompt: str, completion: Optional[str] = None, model: str = "gpt-3.5-turbo"
-    ) -> TokenUsage:
+    def _from_text_sync(cls, prompt: str, completion: str | None = None, model: str = "gpt-3.5-turbo") -> TokenUsage:
         """
         Synchronous implementation of from_text.
 
@@ -139,9 +137,7 @@ class TokenUsage(BaseModel):
             A TokenUsage instance with token counts
         """
         prompt_tokens = cls._count_tokens_sync(prompt, model)
-        completion_tokens = (
-            cls._count_tokens_sync(completion, model) if completion else 0
-        )
+        completion_tokens = cls._count_tokens_sync(completion, model) if completion else 0
 
         return cls(
             prompt_tokens=prompt_tokens,
@@ -150,9 +146,7 @@ class TokenUsage(BaseModel):
         )
 
     @classmethod
-    async def from_text(
-        cls, prompt: str, completion: Optional[str] = None, model: str = "gpt-3.5-turbo"
-    ) -> TokenUsage:
+    async def from_text(cls, prompt: str, completion: str | None = None, model: str = "gpt-3.5-turbo") -> TokenUsage:
         """
         Async version of from_text.
 
@@ -166,14 +160,10 @@ class TokenUsage(BaseModel):
         """
         # Run token counting in executor since it's CPU-bound
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, lambda: cls._from_text_sync(prompt, completion, model)
-        )
+        return await loop.run_in_executor(None, lambda: cls._from_text_sync(prompt, completion, model))
 
     @staticmethod
-    def _count_tokens_sync(
-        text: Optional[Union[str, Any]], model: str = "gpt-3.5-turbo"
-    ) -> int:
+    def _count_tokens_sync(text: str | Any | None, model: str = "gpt-3.5-turbo") -> int:
         """
         Synchronous implementation of count_tokens.
 
@@ -215,9 +205,7 @@ class TokenUsage(BaseModel):
         return int(len(text) / 4)
 
     @staticmethod
-    async def count_tokens(
-        text: Optional[Union[str, Any]], model: str = "gpt-3.5-turbo"
-    ) -> int:
+    async def count_tokens(text: str | Any | None, model: str = "gpt-3.5-turbo") -> int:
         """
         Async version of count_tokens.
 
@@ -230,9 +218,7 @@ class TokenUsage(BaseModel):
         """
         # Run in executor since token counting is CPU-bound
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, lambda: TokenUsage._count_tokens_sync(text, model)
-        )
+        return await loop.run_in_executor(None, lambda: TokenUsage._count_tokens_sync(text, model))
 
     def __add__(self, other: TokenUsage) -> TokenUsage:
         """
@@ -269,7 +255,7 @@ class TokenSummary(BaseModel):
     total_prompt_tokens: int = 0
     total_completion_tokens: int = 0
     total_tokens: int = 0
-    usage_by_model: Dict[str, TokenUsage] = Field(default_factory=dict)
+    usage_by_model: dict[str, TokenUsage] = Field(default_factory=dict)
     total_estimated_cost_usd: float = 0.0
 
     def _add_usage_sync(self, usage: TokenUsage) -> None:

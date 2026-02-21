@@ -10,9 +10,9 @@ These models represent:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -86,7 +86,7 @@ class ToolLogEntry(BaseModel):
 
     # Identity
     id: str  # call-001, call-002, ...
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Tool call details
     tool_name: str
@@ -94,23 +94,23 @@ class ToolLogEntry(BaseModel):
     arguments_hash: str = ""  # For quick comparison
 
     # Context at call time
-    context_goal: Optional[str] = None  # What was user trying to do?
-    preceding_call_id: Optional[str] = None  # Chain of calls in this turn
+    context_goal: str | None = None  # What was user trying to do?
+    preceding_call_id: str | None = None  # Chain of calls in this turn
 
     # Outcome
     outcome: ToolOutcome
     result_summary: str  # Compact summary, not full result
-    result_type: Optional[str] = None  # "sat", "list", "object", etc.
-    execution_time_ms: Optional[int] = None
+    result_type: str | None = None  # "sat", "list", "object", etc.
+    execution_time_ms: int | None = None
 
     # Error details (if failure)
-    error_type: Optional[str] = None  # "unsat", "timeout", "validation", etc.
-    error_message: Optional[str] = None
+    error_type: str | None = None  # "unsat", "timeout", "validation", etc.
+    error_message: str | None = None
 
     # Fix tracking
-    fixed_by: Optional[str] = None  # ID of call that fixed this failure
-    fix_for: Optional[str] = None  # ID of call this fixed
-    delta_args: Optional[dict[str, Any]] = Field(default=None)  # What changed to fix it
+    fixed_by: str | None = None  # ID of call that fixed this failure
+    fix_for: str | None = None  # ID of call this fixed
+    delta_args: dict[str, Any] | None = Field(default=None)  # What changed to fix it
 
     model_config = {"frozen": False}
 
@@ -159,23 +159,21 @@ class ErrorPattern(BaseModel):
 
     error_type: str
     count: int = 1
-    contexts: list[str] = Field(
-        default_factory=list
-    )  # Goal contexts where this occurred
-    example_args: Optional[dict[str, Any]] = None
-    typical_fix: Optional[str] = None  # Description of how it's usually fixed
-    fix_delta: Optional[dict[str, Any]] = None  # Actual arg changes that fixed it
+    contexts: list[str] = Field(default_factory=list)  # Goal contexts where this occurred
+    example_args: dict[str, Any] | None = None
+    typical_fix: str | None = None  # Description of how it's usually fixed
+    fix_delta: dict[str, Any] | None = None  # Actual arg changes that fixed it
 
 
 class SuccessPattern(BaseModel):
     """A pattern of successful usage for a tool."""
 
-    goal_match: Optional[str] = None  # What kind of goal this pattern works for
+    goal_match: str | None = None  # What kind of goal this pattern works for
     arg_hints: dict[str, Any] = Field(default_factory=dict)
     # arg_hints: {"must_include": [...], "typical_values": {...}}
-    notes: Optional[str] = None
-    example_call_id: Optional[str] = None
-    delta_that_fixed: Optional[dict[str, Any]] = None  # If this was a fix
+    notes: str | None = None
+    example_call_id: str | None = None
+    delta_that_fixed: dict[str, Any] | None = None  # If this was a fix
 
 
 class ToolPattern(BaseModel):
@@ -213,8 +211,8 @@ class ToolPattern(BaseModel):
     error_patterns: list[ErrorPattern] = Field(default_factory=list)
 
     # Timing
-    avg_execution_ms: Optional[float] = None
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    avg_execution_ms: float | None = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"frozen": False}
 
@@ -234,8 +232,7 @@ class ToolPattern(BaseModel):
             else:
                 # Running average
                 self.avg_execution_ms = (
-                    self.avg_execution_ms * (self.total_calls - 1)
-                    + entry.execution_time_ms
+                    self.avg_execution_ms * (self.total_calls - 1) + entry.execution_time_ms
                 ) / self.total_calls
 
         # Track common args
@@ -248,13 +245,13 @@ class ToolPattern(BaseModel):
                 if len(self.common_args[key]) > 5:
                     self.common_args[key].pop(0)
 
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def add_error_pattern(
         self,
         error_type: str,
-        context: Optional[str] = None,
-        example_args: Optional[dict] = None,
+        context: str | None = None,
+        example_args: dict | None = None,
     ) -> ErrorPattern:
         """Add or update an error pattern."""
         # Find existing
@@ -278,10 +275,10 @@ class ToolPattern(BaseModel):
 
     def add_success_pattern(
         self,
-        goal_match: Optional[str] = None,
-        arg_hints: Optional[dict] = None,
-        delta_that_fixed: Optional[dict] = None,
-        example_call_id: Optional[str] = None,
+        goal_match: str | None = None,
+        arg_hints: dict | None = None,
+        delta_that_fixed: dict | None = None,
+        example_call_id: str | None = None,
     ) -> SuccessPattern:
         """Add a success pattern."""
         pattern = SuccessPattern(
@@ -311,9 +308,7 @@ class ToolPattern(BaseModel):
         lines = []
 
         # Stats summary
-        lines.append(
-            f"Success rate: {self.success_rate:.0%} ({self.total_calls} calls)"
-        )
+        lines.append(f"Success rate: {self.success_rate:.0%} ({self.total_calls} calls)")
 
         # Error patterns
         if self.error_patterns:
@@ -354,8 +349,8 @@ class ProceduralMemory(BaseModel):
     fix_relations: list[ToolFixRelation] = Field(default_factory=list)
 
     # Metadata
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"frozen": False}
 
@@ -397,9 +392,7 @@ def _describe_fix(delta: dict[str, Any]) -> str:
     if DeltaKey.CHANGED in delta:
         changed = []
         for k, v in delta[DeltaKey.CHANGED].items():
-            changed.append(
-                f"{k}: {_abbrev(v[DeltaChangeKey.FROM])} -> {_abbrev(v[DeltaChangeKey.TO])}"
-            )
+            changed.append(f"{k}: {_abbrev(v[DeltaChangeKey.FROM])} -> {_abbrev(v[DeltaChangeKey.TO])}")
         parts.append(f"change {'; '.join(changed)}")
 
     return "; ".join(parts) if parts else "unknown changes"

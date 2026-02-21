@@ -14,8 +14,6 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 from .models import (
@@ -33,27 +31,17 @@ class PackedContext(BaseModel):
 
     content: str = Field(..., description="The VM:CONTEXT block content")
     tokens_est: int = Field(default=0, description="Estimated token count")
-    pages_included: List[str] = Field(
-        default_factory=list, description="Page IDs included"
-    )
-    pages_truncated: List[str] = Field(
-        default_factory=list, description="Page IDs that were truncated"
-    )
-    pages_omitted: List[str] = Field(
-        default_factory=list, description="Page IDs omitted due to budget"
-    )
+    pages_included: list[str] = Field(default_factory=list, description="Page IDs included")
+    pages_truncated: list[str] = Field(default_factory=list, description="Page IDs that were truncated")
+    pages_omitted: list[str] = Field(default_factory=list, description="Page IDs omitted due to budget")
 
 
 class ContextPackerConfig(BaseModel):
     """Configuration for context packing."""
 
-    include_page_ids: bool = Field(
-        default=True, description="Include page IDs in output"
-    )
+    include_page_ids: bool = Field(default=True, description="Include page IDs in output")
     include_timestamps: bool = Field(default=False, description="Include timestamps")
-    max_text_length: int = Field(
-        default=0, description="Max chars per text page (0=unlimited)"
-    )
+    max_text_length: int = Field(default=0, description="Max chars per text page (0=unlimited)")
 
 
 class ContextPacker(BaseModel):
@@ -78,8 +66,8 @@ class ContextPacker(BaseModel):
 
     def pack(
         self,
-        pages: List[MemoryPage],
-        token_budget: Optional[int] = None,
+        pages: list[MemoryPage],
+        token_budget: int | None = None,
     ) -> PackedContext:
         """
         Pack a list of pages into VM:CONTEXT format.
@@ -91,10 +79,10 @@ class ContextPacker(BaseModel):
         Returns:
             PackedContext with the formatted content
         """
-        lines: List[str] = []
-        pages_included: List[str] = []
-        pages_truncated: List[str] = []
-        pages_omitted: List[str] = []
+        lines: list[str] = []
+        pages_included: list[str] = []
+        pages_truncated: list[str] = []
+        pages_omitted: list[str] = []
         tokens_used = 0
 
         for page in pages:
@@ -132,7 +120,7 @@ class ContextPacker(BaseModel):
     def _format_page(
         self,
         page: MemoryPage,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ) -> FormattedPage:
         """
         Format a single page for VM:CONTEXT.
@@ -155,7 +143,7 @@ class ContextPacker(BaseModel):
     def _format_text(
         self,
         page: MemoryPage,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ) -> FormattedPage:
         """Format a text page."""
         content = page.content or ""
@@ -194,10 +182,7 @@ class ContextPacker(BaseModel):
             return ContextPrefix.ASSISTANT
         elif role == MessageRole.TOOL.value or page_type == PageType.TRANSCRIPT.value:
             return ContextPrefix.TOOL
-        elif (
-            page_type == PageType.SUMMARY.value
-            or PageType.SUMMARY.value in page.page_id
-        ):
+        elif page_type == PageType.SUMMARY.value or PageType.SUMMARY.value in page.page_id:
             return ContextPrefix.SUMMARY
         else:
             return ContextPrefix.USER  # Default
@@ -294,7 +279,7 @@ class ContextPacker(BaseModel):
     def _format_structured(
         self,
         page: MemoryPage,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
     ) -> FormattedPage:
         """Format a structured (JSON) page."""
         import json
@@ -332,8 +317,8 @@ class ContextPacker(BaseModel):
 
     def pack_with_wrapper(
         self,
-        pages: List[MemoryPage],
-        token_budget: Optional[int] = None,
+        pages: list[MemoryPage],
+        token_budget: int | None = None,
     ) -> PackedContext:
         """
         Pack pages and wrap with VM:CONTEXT tags.

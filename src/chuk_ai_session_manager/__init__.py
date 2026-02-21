@@ -52,42 +52,41 @@ __version__ = "0.8"
 logger = logging.getLogger(__name__)
 
 # Core enums and constants
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
+# Simple API - The main interface most users will use
+from chuk_ai_session_manager.api.simple_api import (
+    get_conversation_history,
+    get_session_stats,
+    quick_conversation,
+    track_conversation,
+    track_infinite_conversation,
+    track_llm_call,
+    track_tool_use,
+)
 
 # Exception classes
 from chuk_ai_session_manager.exceptions import (
+    InvalidSessionOperation,
+    SessionAlreadyExists,
     SessionManagerError,
     SessionNotFound,
-    SessionAlreadyExists,
-    InvalidSessionOperation,
-    TokenLimitExceeded,
     StorageError,
+    TokenLimitExceeded,
     ToolProcessingError,
 )
 
-# Core models
-from chuk_ai_session_manager.models.session_metadata import SessionMetadata
-from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
-from chuk_ai_session_manager.models.token_usage import TokenUsage, TokenSummary
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.session import Session
-
-# Storage backend
-from chuk_ai_session_manager.session_storage import setup_chuk_sessions_storage
-
-# High-level session manager
-from chuk_ai_session_manager.session_manager import SessionManager
-
-# Simple API - The main interface most users will use
-from chuk_ai_session_manager.api.simple_api import (
-    track_conversation,
-    track_llm_call,
-    quick_conversation,
-    track_infinite_conversation,
-    track_tool_use,
-    get_session_stats,
-    get_conversation_history,
+# Guards and state management
+from chuk_ai_session_manager.guards import (
+    BindingManager,
+    ResultCache,
+    RuntimeLimits,
+    RuntimeMode,
+    ToolClassification,
+    ToolStateManager,
+    UngroundedGuard,
+    UngroundedGuardConfig,
+    ValueBinding,
+    get_tool_state,
+    reset_tool_state,
 )
 
 # Advanced components
@@ -95,48 +94,44 @@ from chuk_ai_session_manager.infinite_conversation import (
     InfiniteConversationManager,
     SummarizationStrategy,
 )
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
 
+# Core models
+from chuk_ai_session_manager.models.session_metadata import SessionMetadata
+from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
+from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
+
+# Procedural memory
+from chuk_ai_session_manager.procedural_memory import (
+    FormatterConfig,
+    ProceduralContextFormatter,
+    ProceduralMemory,
+    ToolLogEntry,
+    ToolMemoryManager,
+    ToolOutcome,
+    ToolPattern,
+)
 from chuk_ai_session_manager.session_aware_tool_processor import (
     SessionAwareToolProcessor,
 )
 
+# High-level session manager
+from chuk_ai_session_manager.session_manager import SessionManager
 from chuk_ai_session_manager.session_prompt_builder import (
-    build_prompt_from_session,
     PromptStrategy,
+    build_prompt_from_session,
     truncate_prompt_to_token_limit,
 )
 
-# Procedural memory
-from chuk_ai_session_manager.procedural_memory import (
-    ToolMemoryManager,
-    ToolOutcome,
-    ToolLogEntry,
-    ToolPattern,
-    ProceduralMemory,
-    ProceduralContextFormatter,
-    FormatterConfig,
-)
-
-# Guards and state management
-from chuk_ai_session_manager.guards import (
-    ToolStateManager,
-    get_tool_state,
-    reset_tool_state,
-    BindingManager,
-    ResultCache,
-    UngroundedGuard,
-    UngroundedGuardConfig,
-    RuntimeLimits,
-    RuntimeMode,
-    ValueBinding,
-    ToolClassification,
-)
+# Storage backend
+from chuk_ai_session_manager.session_storage import setup_chuk_sessions_storage
 
 
 # Configuration functions
-def configure_storage(
-    sandbox_id: str = "chuk-ai-session-manager", default_ttl_hours: int = 24
-) -> bool:
+def configure_storage(sandbox_id: str = "chuk-ai-session-manager", default_ttl_hours: int = 24) -> bool:
     """
     Configure the storage backend.
 
@@ -153,9 +148,7 @@ def configure_storage(
         - redis: Persistent, requires pip install chuk-ai-session-manager[redis]
     """
     try:
-        setup_chuk_sessions_storage(
-            sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours
-        )
+        setup_chuk_sessions_storage(sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours)
         logger.info(f"Storage configured with sandbox_id='{sandbox_id}'")
         return True
     except Exception as e:
@@ -217,6 +210,7 @@ def get_storage_info() -> dict:
         Dictionary with storage configuration details
     """
     import os
+
     from chuk_ai_session_manager.session_storage import get_backend
 
     try:
@@ -312,8 +306,6 @@ except Exception as e:
 try:
     storage_info = get_storage_info()
     provider = storage_info.get("provider", "unknown")
-    logger.debug(
-        f"CHUK AI Session Manager v{__version__} imported successfully (storage: {provider})"
-    )
+    logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully (storage: {provider})")
 except Exception:
     logger.debug(f"CHUK AI Session Manager v{__version__} imported successfully")

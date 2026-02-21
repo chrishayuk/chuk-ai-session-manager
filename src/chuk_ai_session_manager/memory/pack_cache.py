@@ -18,7 +18,6 @@ Cache is keyed by: (session_id, model_id, token_budget, working_set_hash)
 import hashlib
 from collections import OrderedDict
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -31,7 +30,7 @@ class PackedContext(BaseModel):
     vm_manifest_json: str = Field(..., description="The VM:MANIFEST_JSON content")
 
     # Metadata
-    page_ids: List[str] = Field(default_factory=list, description="Pages included")
+    page_ids: list[str] = Field(default_factory=list, description="Pages included")
     tokens_used: int = Field(default=0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -81,9 +80,7 @@ class ContextPackCache:
         return hashlib.sha256(key_str.encode()).hexdigest()[:16]
 
     @staticmethod
-    def compute_working_set_hash(
-        page_ids: List[str], versions: Optional[Dict[str, int]] = None
-    ) -> str:
+    def compute_working_set_hash(page_ids: list[str], versions: dict[str, int] | None = None) -> str:
         """
         Compute a hash of the working set for cache key.
 
@@ -97,11 +94,7 @@ class ContextPackCache:
         # Sort for consistency
         sorted_ids = sorted(page_ids)
 
-        if versions:
-            # Include versions in hash
-            parts = [f"{pid}:{versions.get(pid, 0)}" for pid in sorted_ids]
-        else:
-            parts = sorted_ids
+        parts = [f"{pid}:{versions.get(pid, 0)}" for pid in sorted_ids] if versions else sorted_ids
 
         content = "|".join(parts)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
@@ -112,7 +105,7 @@ class ContextPackCache:
         model_id: str,
         token_budget: int,
         working_set_hash: str,
-    ) -> Optional[PackedContext]:
+    ) -> PackedContext | None:
         """
         O(1) lookup for cached pack.
 
@@ -166,11 +159,7 @@ class ContextPackCache:
         Called when working set changes.
         Returns number of entries invalidated.
         """
-        keys_to_remove = [
-            key
-            for key, entry in self._cache.items()
-            if entry.packed.session_id == session_id
-        ]
+        keys_to_remove = [key for key, entry in self._cache.items() if entry.packed.session_id == session_id]
 
         for key in keys_to_remove:
             del self._cache[key]
@@ -197,7 +186,7 @@ class ContextPackCache:
             return 0.0
         return self._stats["hits"] / total
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get cache statistics."""
         return {
             **self._stats,

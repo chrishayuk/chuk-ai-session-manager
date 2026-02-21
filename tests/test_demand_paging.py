@@ -17,7 +17,6 @@ from chuk_ai_session_manager.memory.models import (
 )
 from chuk_ai_session_manager.memory.page_table import PageTable
 
-
 # ===========================================================================
 # TestRecallSignalDetection
 # ===========================================================================
@@ -68,10 +67,7 @@ class TestRecallSignalDetection:
 
     def test_detects_go_back_to(self):
         pager = DemandPagingPrePass()
-        assert (
-            pager.has_recall_signal("Let's go back to the architecture discussion")
-            is True
-        )
+        assert pager.has_recall_signal("Let's go back to the architecture discussion") is True
 
     def test_detects_revisit(self):
         pager = DemandPagingPrePass()
@@ -87,9 +83,7 @@ class TestRecallSignalDetection:
 
     def test_detects_you_recommended(self):
         pager = DemandPagingPrePass()
-        assert (
-            pager.has_recall_signal("You recommended a microservices approach") is True
-        )
+        assert pager.has_recall_signal("You recommended a microservices approach") is True
 
     def test_detects_refresh_my_memory(self):
         pager = DemandPagingPrePass()
@@ -97,17 +91,11 @@ class TestRecallSignalDetection:
 
     def test_detects_that_decision_about(self):
         pager = DemandPagingPrePass()
-        assert (
-            pager.has_recall_signal("What about that decision about the database?")
-            is True
-        )
+        assert pager.has_recall_signal("What about that decision about the database?") is True
 
     def test_detects_that_plan_for(self):
         pager = DemandPagingPrePass()
-        assert (
-            pager.has_recall_signal("Can we reconsider that plan for deployment?")
-            is True
-        )
+        assert pager.has_recall_signal("Can we reconsider that plan for deployment?") is True
 
     def test_detects_return_to(self):
         pager = DemandPagingPrePass()
@@ -119,9 +107,7 @@ class TestRecallSignalDetection:
 
     def test_no_signal_technical_question(self):
         pager = DemandPagingPrePass()
-        assert (
-            pager.has_recall_signal("How do I configure nginx reverse proxy?") is False
-        )
+        assert pager.has_recall_signal("How do I configure nginx reverse proxy?") is False
 
     def test_no_signal_greeting(self):
         pager = DemandPagingPrePass()

@@ -121,9 +121,7 @@ class ResultCache(BaseModel):
 
         return "\n".join(lines) if lines else ""
 
-    def format_duplicate_message(
-        self, tool_name: str, arguments: dict[str, Any]
-    ) -> str:
+    def format_duplicate_message(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Generate message when duplicate call is detected."""
         cached = self.get(tool_name, arguments)
         if not cached:

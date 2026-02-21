@@ -123,10 +123,7 @@ class TestSystemPrompt:
         await sm.user_says("I have a headache")
 
         # Should be stored in session
-        assert (
-            sm._session.metadata.properties.get("system_prompt")
-            == "You are a medical assistant."
-        )
+        assert sm._session.metadata.properties.get("system_prompt") == "You are a medical assistant."
 
     async def test_system_prompt_in_metadata_init(self):
         """Test passing system prompt through metadata."""

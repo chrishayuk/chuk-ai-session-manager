@@ -7,19 +7,21 @@ session segments, with automatic summarization and context building.
 """
 
 from __future__ import annotations
-from enum import Enum
-from typing import List, Dict, Any, Callable, Tuple
-import logging
 
+import logging
+from collections.abc import Callable
+from enum import Enum
+from typing import Any
+
+from chuk_ai_session_manager.memory.models import MessageRole
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
-from chuk_ai_session_manager.memory.models import MessageRole
+from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
 
 # Type for LLM function callbacks
-LLMCallbackAsync = Callable[[List[Dict[str, str]], str], Any]
+LLMCallbackAsync = Callable[[list[dict[str, str]], str], Any]
 
 logger = logging.getLogger(__name__)
 
@@ -107,17 +109,13 @@ class InfiniteConversationManager:
 
         # Check if we've exceeded the token threshold
         if await self._should_create_new_segment(session):
-            logger.info(
-                f"Token threshold exceeded for session {session_id}. Creating new segment."
-            )
+            logger.info(f"Token threshold exceeded for session {session_id}. Creating new segment.")
 
             # Create a summary of the current session
             summary = await self._create_summary(session, llm_callback)
 
             # Add the summary to the current session
-            summary_event = SessionEvent(
-                message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY
-            )
+            summary_event = SessionEvent(message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY)
             await session.add_event_and_save(summary_event)
 
             # Create a new session with the current as parent
@@ -145,14 +143,9 @@ class InfiniteConversationManager:
 
         # Check turn count
         message_events = [e for e in session.events if e.type == EventType.MESSAGE]
-        if len(message_events) >= self.max_turns_per_segment:
-            return True
+        return len(message_events) >= self.max_turns_per_segment
 
-        return False
-
-    async def _create_summary(
-        self, session: Session, llm_callback: LLMCallbackAsync
-    ) -> str:
+    async def _create_summary(self, session: Session, llm_callback: LLMCallbackAsync) -> str:
         """
         Create a summary of the session.
 
@@ -175,11 +168,7 @@ class InfiniteConversationManager:
 
         # Add the conversation history
         for event in message_events:
-            role = (
-                MessageRole.USER.value
-                if event.source == EventSource.USER
-                else MessageRole.ASSISTANT.value
-            )
+            role = MessageRole.USER.value if event.source == EventSource.USER else MessageRole.ASSISTANT.value
             content = event.message
             messages.append({"role": role, "content": content})
 
@@ -211,7 +200,7 @@ class InfiniteConversationManager:
 
     async def build_context_for_llm(
         self, session_id: str, max_messages: int = 10, include_summaries: bool = True
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Build context for an LLM call from the current session and its ancestors.
 
@@ -244,11 +233,7 @@ class InfiniteConversationManager:
             summaries = []
             for ancestor in ancestors:
                 summary_event = next(
-                    (
-                        e
-                        for e in reversed(ancestor.events)
-                        if e.type == EventType.SUMMARY
-                    ),
+                    (e for e in reversed(ancestor.events) if e.type == EventType.SUMMARY),
                     None,
                 )
                 if summary_event:
@@ -259,32 +244,23 @@ class InfiniteConversationManager:
                 context.append(
                     {
                         "role": MessageRole.SYSTEM.value,
-                        "content": "Previous conversation context: "
-                        + " ".join(summaries),
+                        "content": "Previous conversation context: " + " ".join(summaries),
                     }
                 )
 
         # Get recent messages from the current session
         message_events = [e for e in session.events if e.type == EventType.MESSAGE]
-        recent_messages = (
-            message_events[-max_messages:]
-            if len(message_events) > max_messages
-            else message_events
-        )
+        recent_messages = message_events[-max_messages:] if len(message_events) > max_messages else message_events
 
         # Add messages to context
         for event in recent_messages:
-            role = (
-                MessageRole.USER.value
-                if event.source == EventSource.USER
-                else MessageRole.ASSISTANT.value
-            )
+            role = MessageRole.USER.value if event.source == EventSource.USER else MessageRole.ASSISTANT.value
             content = event.message
             context.append({"role": role, "content": content})
 
         return context
 
-    async def get_session_chain(self, session_id: str) -> List[Session]:
+    async def get_session_chain(self, session_id: str) -> list[Session]:
         """
         Return sessions from root → … → current.
 
@@ -303,9 +279,7 @@ class InfiniteConversationManager:
         ancestors = list(reversed(ancestors))
         return ancestors + [session]
 
-    async def get_full_conversation_history(
-        self, session_id: str
-    ) -> List[Tuple[str, EventSource, str]]:
+    async def get_full_conversation_history(self, session_id: str) -> list[tuple[str, EventSource, str]]:
         """
         Get the full conversation history across all session segments.
 
@@ -328,11 +302,7 @@ class InfiniteConversationManager:
 
             # Add to history
             for event in message_events:
-                role = (
-                    MessageRole.USER.value
-                    if event.source == EventSource.USER
-                    else MessageRole.ASSISTANT.value
-                )
+                role = MessageRole.USER.value if event.source == EventSource.USER else MessageRole.ASSISTANT.value
                 content = event.message
                 history.append((role, event.source, content))
 

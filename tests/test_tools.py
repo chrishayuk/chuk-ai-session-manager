@@ -5,8 +5,9 @@ Test suite for tool processing functionality in chuk_ai_session_manager.
 Tests SessionAwareToolProcessor and sample tools integration.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from chuk_tool_processor.models.tool_result import ToolResult
 
 from chuk_ai_session_manager.models.event_source import EventSource
@@ -106,12 +107,14 @@ class TestSessionAwareToolProcessor:
         if hasattr(mock_processor, "executor"):
             delattr(mock_processor, "executor")
 
-        with patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor",
-            return_value=mock_processor,
+        with (
+            patch(
+                "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor",
+                return_value=mock_processor,
+            ),
+            pytest.raises(AttributeError, match="missing `.executor`"),
         ):
-            with pytest.raises(AttributeError, match="missing `.executor`"):
-                SessionAwareToolProcessor(session_id="test-session")
+            SessionAwareToolProcessor(session_id="test-session")
 
     async def test_tool_processor_create_method(self):
         """Test the create class method."""
@@ -131,9 +134,7 @@ class TestSessionAwareToolProcessor:
         store = ChukSessionsStore(None)
         store.get = AsyncMock(return_value=mock_session)
 
-        with patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor"
-        ) as mock_tp:
+        with patch("chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor") as mock_tp:
             mock_tp.return_value.executor = AsyncMock()
 
             processor = await SessionAwareToolProcessor.create("test-session")
@@ -251,9 +252,7 @@ class TestSessionAwareToolProcessor:
         llm_message = {
             "role": "assistant",
             "content": "Searching...",
-            "tool_calls": [
-                {"function": {"name": "search", "arguments": '{"query": "test"}'}}
-            ],
+            "tool_calls": [{"function": {"name": "search", "arguments": '{"query": "test"}'}}],
         }
 
         results = await processor.process_llm_message(llm_message, None)
@@ -272,9 +271,7 @@ class TestSessionAwareToolProcessor:
         llm_message = {
             "role": "assistant",
             "content": "Searching...",
-            "tool_calls": [
-                {"function": {"name": "search", "arguments": '{"query": "test"}'}}
-            ],
+            "tool_calls": [{"function": {"name": "search", "arguments": '{"query": "test"}'}}],
         }
 
         results = await processor.process_llm_message(llm_message, None)
@@ -290,9 +287,7 @@ class TestSessionAwareToolProcessor:
         """Test tool call with invalid JSON arguments."""
         processor, mock_session, mock_store = tool_processor
 
-        mock_result = ToolResult(
-            tool="calculator", result={"processed": True}, error=None
-        )
+        mock_result = ToolResult(tool="calculator", result={"processed": True}, error=None)
         processor._tp.executor.execute.return_value = [mock_result]
 
         llm_message = {
@@ -319,9 +314,7 @@ class TestSessionAwareToolProcessor:
         """Test that tool calls are properly logged as events."""
         processor, mock_session, mock_store = tool_processor
 
-        mock_result = ToolResult(
-            tool="weather", result={"temperature": "75°F"}, error=None
-        )
+        mock_result = ToolResult(tool="weather", result={"temperature": "75°F"}, error=None)
         processor._tp.executor.execute.return_value = [mock_result]
 
         llm_message = {
@@ -412,23 +405,17 @@ class TestSessionAwareToolProcessor:
         store = ChukSessionsStore(None)
         store.get = AsyncMock(return_value=mock_session)
 
-        with patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor"
-        ) as mock_tp:
+        with patch("chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor") as mock_tp:
             mock_tp.return_value.executor = AsyncMock()
             mock_result = ToolResult(tool="test", result="result", error=None)
             mock_tp.return_value.executor.execute.return_value = [mock_result]
 
-            processor = SessionAwareToolProcessor(
-                session_id="test-session", enable_caching=False
-            )
+            processor = SessionAwareToolProcessor(session_id="test-session", enable_caching=False)
 
             llm_message = {
                 "role": "assistant",
                 "content": "Testing...",
-                "tool_calls": [
-                    {"function": {"name": "test", "arguments": '{"param": "value"}'}}
-                ],
+                "tool_calls": [{"function": {"name": "test", "arguments": '{"param": "value"}'}}],
             }
 
             # Call twice
@@ -492,9 +479,7 @@ class TestToolProcessorIntegration:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return [
-                    ToolResult(tool="success_tool", result={"data": "ok"}, error=None)
-                ]
+                return [ToolResult(tool="success_tool", result={"data": "ok"}, error=None)]
             else:
                 raise Exception("Tool failed")
 
@@ -547,13 +532,9 @@ class TestToolProcessorIntegration:
 
         store.get = AsyncMock(side_effect=get_session)
 
-        with patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor"
-        ) as mock_tp:
+        with patch("chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor") as mock_tp:
             mock_tp.return_value.executor = AsyncMock()
-            mock_tp.return_value.executor.execute.return_value = [
-                ToolResult(tool="test", result="result", error=None)
-            ]
+            mock_tp.return_value.executor.execute.return_value = [ToolResult(tool="test", result="result", error=None)]
 
             processor1 = SessionAwareToolProcessor(session_id="session-1")
             processor2 = SessionAwareToolProcessor(session_id="session-2")

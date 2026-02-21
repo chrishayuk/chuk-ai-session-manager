@@ -17,7 +17,8 @@ Design principles:
 """
 
 import time
-from typing import Callable, Dict, List, Optional, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -50,8 +51,8 @@ class PageLoader(Protocol):
         self,
         page_id: str,
         tier: StorageTier,
-        artifact_id: Optional[str] = None,
-    ) -> Optional[MemoryPage]:
+        artifact_id: str | None = None,
+    ) -> MemoryPage | None:
         """Load a page from storage."""
         ...
 
@@ -72,9 +73,9 @@ class FaultResult(BaseModel):
     """Result of a page fault resolution."""
 
     success: bool
-    page: Optional[MemoryPage] = None
-    error: Optional[str] = None
-    source_tier: Optional[StorageTier] = None
+    page: MemoryPage | None = None
+    error: str | None = None
+    source_tier: StorageTier | None = None
     latency_ms: float = 0.0
     was_compressed: bool = False
 
@@ -98,7 +99,7 @@ class VMToolError(BaseModel):
     """Error response for VM tool calls."""
 
     error: str
-    page_id: Optional[str] = None
+    page_id: str | None = None
 
 
 class PageFaultHandler(BaseModel):
@@ -110,34 +111,32 @@ class PageFaultHandler(BaseModel):
     """
 
     # Dependencies (set after construction)
-    page_table: Optional[PageTable] = None
-    tlb: Optional[PageTLB] = None
+    page_table: PageTable | None = None
+    tlb: PageTLB | None = None
 
     # Page storage (maps page_id -> MemoryPage for L2+ pages)
     # In a deployed system, this would be replaced by ArtifactsBridge
-    page_store: Dict[str, MemoryPage] = Field(default_factory=dict)
+    page_store: dict[str, MemoryPage] = Field(default_factory=dict)
 
     # Metrics
     metrics: VMMetrics = Field(default_factory=VMMetrics)
 
     # Configuration
-    max_faults_per_turn: int = Field(
-        default=2, description="Maximum faults allowed per turn"
-    )
+    max_faults_per_turn: int = Field(default=2, description="Maximum faults allowed per turn")
     faults_this_turn: int = Field(default=0, description="Faults issued this turn")
 
     # Optional async loader/compressor (private attrs)
-    _loader: Optional[PageLoader] = PrivateAttr(default=None)
-    _compressor: Optional[PageCompressor] = PrivateAttr(default=None)
+    _loader: PageLoader | None = PrivateAttr(default=None)
+    _compressor: PageCompressor | None = PrivateAttr(default=None)
 
     model_config = {"arbitrary_types_allowed": True}
 
     def configure(
         self,
         page_table: PageTable,
-        tlb: Optional[PageTLB] = None,
-        loader: Optional[PageLoader] = None,
-        compressor: Optional[PageCompressor] = None,
+        tlb: PageTLB | None = None,
+        loader: PageLoader | None = None,
+        compressor: PageCompressor | None = None,
     ) -> None:
         """Configure the handler with dependencies."""
         self.page_table = page_table
@@ -243,8 +242,8 @@ class PageFaultHandler(BaseModel):
         self,
         page_id: str,
         tier: StorageTier,
-        artifact_id: Optional[str],
-    ) -> Optional[MemoryPage]:
+        artifact_id: str | None,
+    ) -> MemoryPage | None:
         """Load a page from storage."""
         # Use custom loader if available
         if self._loader:
@@ -274,7 +273,7 @@ class PageFaultHandler(BaseModel):
     def build_tool_result(
         self,
         fault_result: FaultResult,
-        evictions: Optional[List[str]] = None,
+        evictions: list[str] | None = None,
     ) -> VMToolResult:
         """
         Build the canonical tool result envelope for a fault result.
@@ -361,9 +360,7 @@ class PageFaultHandler(BaseModel):
             return result
 
         elif page.modality == Modality.STRUCTURED:
-            return StructuredContent(
-                data=page.content if isinstance(page.content, dict) else {}
-            )
+            return StructuredContent(data=page.content if isinstance(page.content, dict) else {})
 
         else:
             return TextContent(text=str(page.content) if page.content else "")
@@ -409,7 +406,7 @@ class PageFaultHandler(BaseModel):
 class SearchResult(BaseModel):
     """Result of a page search operation."""
 
-    results: List[SearchResultEntry] = Field(default_factory=list)
+    results: list[SearchResultEntry] = Field(default_factory=list)
     total_available: int = 0
 
     def to_json(self) -> str:
@@ -424,20 +421,20 @@ class PageSearchHandler(BaseModel):
     Searches available pages by query and returns metadata (not content).
     """
 
-    page_table: Optional[PageTable] = None
+    page_table: PageTable | None = None
 
     # Optional search function
-    _search_fn: Optional[Callable] = PrivateAttr(default=None)
+    _search_fn: Callable | None = PrivateAttr(default=None)
 
     # Page hints (for simple text search)
-    page_hints: Dict[str, str] = Field(default_factory=dict)
+    page_hints: dict[str, str] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
 
     def configure(
         self,
         page_table: PageTable,
-        search_fn: Optional[Callable] = None,
+        search_fn: Callable | None = None,
     ) -> None:
         """Configure the search handler."""
         self.page_table = page_table
@@ -450,7 +447,7 @@ class PageSearchHandler(BaseModel):
     async def search(
         self,
         query: str,
-        modality: Optional[str] = None,
+        modality: str | None = None,
         limit: int = 5,
     ) -> SearchResult:
         """
@@ -472,7 +469,7 @@ class PageSearchHandler(BaseModel):
             return await self._search_fn(query, modality, limit)
 
         # Default: simple text matching on hints
-        results: List[SearchResultEntry] = []
+        results: list[SearchResultEntry] = []
         query_lower = query.lower()
 
         for page_id, entry in self.page_table.entries.items():

@@ -34,10 +34,10 @@ class TestBasicImports:
     def test_import_convenience_functions(self):
         """Test importing convenience functions."""
         from chuk_ai_session_manager import (
-            track_conversation,
-            track_llm_call,
             quick_conversation,
+            track_conversation,
             track_infinite_conversation,
+            track_llm_call,
         )
 
         assert track_conversation is not None
@@ -106,9 +106,7 @@ class TestBasicFunctionality:
         user_session_id = await sm.user_says("Hello!")
 
         # Then AI response
-        ai_session_id = await sm.ai_responds(
-            "Hi there! How can I help?", model="gpt-4", provider="openai"
-        )
+        ai_session_id = await sm.ai_responds("Hi there! How can I help?", model="gpt-4", provider="openai")
 
         assert isinstance(ai_session_id, str)
         assert len(ai_session_id) > 0
@@ -250,9 +248,7 @@ class TestModelsWork:
         """Test TokenUsage model."""
         from chuk_ai_session_manager.models.token_usage import TokenUsage
 
-        usage = TokenUsage(
-            prompt_tokens=100, completion_tokens=50, model="gpt-3.5-turbo"
-        )
+        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-3.5-turbo")
 
         assert usage.total_tokens == 150
         assert usage.estimated_cost_usd > 0
@@ -262,9 +258,7 @@ class TestModelsWork:
         """Test TokenUsage.from_text async method."""
         from chuk_ai_session_manager.models.token_usage import TokenUsage
 
-        usage = await TokenUsage.from_text(
-            prompt="Hello, world!", completion="Hi there!", model="gpt-3.5-turbo"
-        )
+        usage = await TokenUsage.from_text(prompt="Hello, world!", completion="Hi there!", model="gpt-3.5-turbo")
 
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
@@ -273,11 +267,9 @@ class TestModelsWork:
 
     async def test_session_event(self):
         """Test SessionEvent model."""
-        from chuk_ai_session_manager import SessionEvent, EventSource, EventType
+        from chuk_ai_session_manager import EventSource, EventType, SessionEvent
 
-        event = SessionEvent(
-            message="Test message", source=EventSource.USER, type=EventType.MESSAGE
-        )
+        event = SessionEvent(message="Test message", source=EventSource.USER, type=EventType.MESSAGE)
 
         assert event.message == "Test message"
         assert event.source == EventSource.USER
@@ -287,7 +279,7 @@ class TestModelsWork:
 
     async def test_session_event_with_tokens(self):
         """Test SessionEvent with token counting."""
-        from chuk_ai_session_manager import SessionEvent, EventSource, EventType
+        from chuk_ai_session_manager import EventSource, EventType, SessionEvent
 
         event = await SessionEvent.create_with_tokens(
             message="Test message",
@@ -306,11 +298,9 @@ class TestModelsWork:
 
     async def test_session_event_metadata(self):
         """Test SessionEvent metadata operations."""
-        from chuk_ai_session_manager import SessionEvent, EventSource, EventType
+        from chuk_ai_session_manager import EventSource, EventType, SessionEvent
 
-        event = SessionEvent(
-            message="Test message", source=EventSource.USER, type=EventType.MESSAGE
-        )
+        event = SessionEvent(message="Test message", source=EventSource.USER, type=EventType.MESSAGE)
 
         # Test metadata operations
         await event.set_metadata("test_key", "test_value")
@@ -330,9 +320,7 @@ class TestStorageWorks:
         from chuk_ai_session_manager import setup_chuk_sessions_storage
 
         # Should not raise an error
-        backend = setup_chuk_sessions_storage(
-            sandbox_id="test-sandbox", default_ttl_hours=1
-        )
+        backend = setup_chuk_sessions_storage(sandbox_id="test-sandbox", default_ttl_hours=1)
 
         assert backend is not None
         assert hasattr(backend, "sandbox_id")
@@ -514,12 +502,10 @@ class TestIntegrationScenarios:
 
     async def test_convenience_function_integration(self):
         """Test integration using convenience functions."""
-        from chuk_ai_session_manager import track_conversation, quick_conversation
+        from chuk_ai_session_manager import quick_conversation, track_conversation
 
         # Use track_conversation
-        session_id1 = await track_conversation(
-            "What's 2+2?", "2+2 equals 4", model="gpt-4"
-        )
+        session_id1 = await track_conversation("What's 2+2?", "2+2 equals 4", model="gpt-4")
 
         # Use quick_conversation
         stats = await quick_conversation("Hello!", "Hi there!")

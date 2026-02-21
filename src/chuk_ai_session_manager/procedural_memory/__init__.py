@@ -38,19 +38,19 @@ Usage:
     context = formatter.format_for_tools(manager, ["solver_solve_plan"])
 """
 
-from chuk_ai_session_manager.procedural_memory.models import (
-    ToolOutcome,
-    ToolLogEntry,
-    ToolPattern,
-    ToolFixRelation,
-    ProceduralMemory,
-    ErrorPattern,
-    SuccessPattern,
+from chuk_ai_session_manager.procedural_memory.formatter import (
+    FormatterConfig,
+    ProceduralContextFormatter,
 )
 from chuk_ai_session_manager.procedural_memory.manager import ToolMemoryManager
-from chuk_ai_session_manager.procedural_memory.formatter import (
-    ProceduralContextFormatter,
-    FormatterConfig,
+from chuk_ai_session_manager.procedural_memory.models import (
+    ErrorPattern,
+    ProceduralMemory,
+    SuccessPattern,
+    ToolFixRelation,
+    ToolLogEntry,
+    ToolOutcome,
+    ToolPattern,
 )
 
 __all__ = [

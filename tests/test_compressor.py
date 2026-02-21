@@ -21,17 +21,16 @@ from chuk_ai_session_manager.memory.compressor import (
     PassthroughCompressor,
     TextCompressor,
 )
+from chuk_ai_session_manager.memory.manager import MemoryManager
 from chuk_ai_session_manager.memory.models import (
     CompressionLevel,
     MemoryPage,
     Modality,
     MutationType,
     PageType,
+    TokenBudget,
 )
-from chuk_ai_session_manager.memory.manager import MemoryManager
-from chuk_ai_session_manager.memory.models import TokenBudget
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -145,9 +144,7 @@ class TestTextCompressor:
 
     @pytest.mark.asyncio
     async def test_full_to_abstract(self):
-        page = _text_page(
-            content="The quick brown fox. Jumped over the lazy dog. " * 20
-        )
+        page = _text_page(content="The quick brown fox. Jumped over the lazy dog. " * 20)
         compressor = TextCompressor()
         result = await compressor.compress(page, CompressionLevel.ABSTRACT)
 
@@ -157,9 +154,7 @@ class TestTextCompressor:
 
     @pytest.mark.asyncio
     async def test_full_to_reference(self):
-        page = _text_page(
-            content="Important discussion about memory management.\nMore details follow."
-        )
+        page = _text_page(content="Important discussion about memory management.\nMore details follow.")
         compressor = TextCompressor()
         result = await compressor.compress(page, CompressionLevel.REFERENCE)
 
@@ -270,9 +265,7 @@ class TestPassthroughCompressor:
 
     @pytest.mark.asyncio
     async def test_updates_level(self):
-        page = _text_page(
-            content="Audio transcript stub", compression_level=CompressionLevel.FULL
-        )
+        page = _text_page(content="Audio transcript stub", compression_level=CompressionLevel.FULL)
         compressor = PassthroughCompressor(modality=Modality.AUDIO)
         result = await compressor.compress(page, CompressionLevel.REDUCED)
 
@@ -295,20 +288,9 @@ class TestPassthroughCompressor:
 
     def test_can_compress(self):
         compressor = PassthroughCompressor(modality=Modality.AUDIO)
-        assert (
-            compressor.can_compress(CompressionLevel.FULL, CompressionLevel.REDUCED)
-            is True
-        )
-        assert (
-            compressor.can_compress(CompressionLevel.REDUCED, CompressionLevel.FULL)
-            is False
-        )
-        assert (
-            compressor.can_compress(
-                CompressionLevel.ABSTRACT, CompressionLevel.ABSTRACT
-            )
-            is False
-        )
+        assert compressor.can_compress(CompressionLevel.FULL, CompressionLevel.REDUCED) is True
+        assert compressor.can_compress(CompressionLevel.REDUCED, CompressionLevel.FULL) is False
+        assert compressor.can_compress(CompressionLevel.ABSTRACT, CompressionLevel.ABSTRACT) is False
 
 
 # ===========================================================================
@@ -466,9 +448,7 @@ class TestManagerCompression:
             session_id="s1",
             compressor_registry=CompressorRegistry.default(),
         )
-        page = mgr.create_page(
-            "Content for table test. " * 80, page_type=PageType.TRANSCRIPT
-        )
+        page = mgr.create_page("Content for table test. " * 80, page_type=PageType.TRANSCRIPT)
         await mgr.add_to_working_set(page)
 
         await mgr.compress_page(page.page_id, CompressionLevel.ABSTRACT)
@@ -483,17 +463,13 @@ class TestManagerCompression:
             session_id="s1",
             compressor_registry=CompressorRegistry.default(),
         )
-        page = mgr.create_page(
-            "Log mutation test. " * 80, page_type=PageType.TRANSCRIPT
-        )
+        page = mgr.create_page("Log mutation test. " * 80, page_type=PageType.TRANSCRIPT)
         await mgr.add_to_working_set(page)
 
         await mgr.compress_page(page.page_id, CompressionLevel.REDUCED)
 
         mutations = mgr._mutation_log.get_all_mutations()
-        compress_mutations = [
-            m for m in mutations if m.mutation_type == MutationType.COMPRESS
-        ]
+        compress_mutations = [m for m in mutations if m.mutation_type == MutationType.COMPRESS]
         assert len(compress_mutations) >= 1
         assert compress_mutations[-1].page_id == page.page_id
         assert "compress_reduced" in (compress_mutations[-1].cause or "")
@@ -523,9 +499,7 @@ class TestManagerCompression:
             session_id="s1",
             compressor_registry=CompressorRegistry.default(),
         )
-        page = mgr.create_page(
-            "Metrics tracking test. " * 80, page_type=PageType.TRANSCRIPT
-        )
+        page = mgr.create_page("Metrics tracking test. " * 80, page_type=PageType.TRANSCRIPT)
         await mgr.add_to_working_set(page)
 
         assert mgr.metrics.compressions_total == 0
@@ -617,15 +591,11 @@ class TestTextCompressorProperties:
 
     def test_can_compress_same(self):
         c = TextCompressor()
-        assert (
-            c.can_compress(CompressionLevel.REDUCED, CompressionLevel.REDUCED) is False
-        )
+        assert c.can_compress(CompressionLevel.REDUCED, CompressionLevel.REDUCED) is False
 
     def test_can_compress_lower(self):
         c = TextCompressor()
-        assert (
-            c.can_compress(CompressionLevel.ABSTRACT, CompressionLevel.REDUCED) is False
-        )
+        assert c.can_compress(CompressionLevel.ABSTRACT, CompressionLevel.REDUCED) is False
 
     @pytest.mark.asyncio
     async def test_abstract_with_summarize_fn(self):
@@ -656,9 +626,7 @@ class TestImageCompressorProperties:
 
     def test_can_compress_same(self):
         c = ImageCompressor()
-        assert (
-            c.can_compress(CompressionLevel.REDUCED, CompressionLevel.REDUCED) is False
-        )
+        assert c.can_compress(CompressionLevel.REDUCED, CompressionLevel.REDUCED) is False
 
     @pytest.mark.asyncio
     async def test_noop_when_at_target(self):

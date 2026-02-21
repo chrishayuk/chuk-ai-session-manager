@@ -4,18 +4,21 @@ Session model for the chuk session manager with improved async support.
 """
 
 from __future__ import annotations
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Generic, TypeVar, Union
+from typing import Any, Generic, TypeVar
 from uuid import uuid4
+
 from pydantic import BaseModel, Field, model_validator
+
+from chuk_ai_session_manager.models.session_event import SessionEvent
 
 # Import models that Session depends on
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.token_usage import TokenUsage, TokenSummary
 
 # Import SessionRun and RunStatus directly to avoid circular import
-from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
+from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
+from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
 
 MessageT = TypeVar("MessageT")
 
@@ -26,13 +29,13 @@ class Session(BaseModel, Generic[MessageT]):
     id: str = Field(default_factory=lambda: str(uuid4()))
     metadata: SessionMetadata = Field(default_factory=SessionMetadata)
 
-    parent_id: Optional[str] = None
-    child_ids: List[str] = Field(default_factory=list)
+    parent_id: str | None = None
+    child_ids: list[str] = Field(default_factory=list)
 
-    task_ids: List[str] = Field(default_factory=list)
-    runs: List[SessionRun] = Field(default_factory=list)
-    events: List[SessionEvent[MessageT]] = Field(default_factory=list)
-    state: Dict[str, Any] = Field(default_factory=dict)
+    task_ids: list[str] = Field(default_factory=list)
+    runs: list[SessionRun] = Field(default_factory=list)
+    events: list[SessionEvent[MessageT]] = Field(default_factory=list)
+    state: dict[str, Any] = Field(default_factory=dict)
 
     # Token tracking
     token_summary: TokenSummary = Field(default_factory=TokenSummary)
@@ -58,8 +61,8 @@ class Session(BaseModel, Generic[MessageT]):
         if self.parent_id:
             # Import here to avoid circular import
             from chuk_ai_session_manager.session_storage import (
-                get_backend,
                 ChukSessionsStore,
+                get_backend,
             )
 
             backend = get_backend()
@@ -77,7 +80,7 @@ class Session(BaseModel, Generic[MessageT]):
         return max(evt.timestamp for evt in self.events)
 
     @property
-    def active_run(self) -> Optional[SessionRun]:
+    def active_run(self) -> SessionRun | None:
         """Return the currently running SessionRun, if any."""
         for run in reversed(self.runs):
             if run.status == RunStatus.RUNNING:
@@ -100,8 +103,8 @@ class Session(BaseModel, Generic[MessageT]):
             self.child_ids.append(child_id)
             # Save the updated session
             from chuk_ai_session_manager.session_storage import (
-                get_backend,
                 ChukSessionsStore,
+                get_backend,
             )
 
             backend = get_backend()
@@ -114,23 +117,23 @@ class Session(BaseModel, Generic[MessageT]):
             self.child_ids.remove(child_id)
             # Save the updated session
             from chuk_ai_session_manager.session_storage import (
-                get_backend,
                 ChukSessionsStore,
+                get_backend,
             )
 
             backend = get_backend()
             store = ChukSessionsStore(backend)
             await store.save(self)
 
-    async def ancestors(self) -> List[Session]:
+    async def ancestors(self) -> list[Session]:
         """Fetch ancestor sessions from store asynchronously."""
-        result: List[Session] = []
+        result: list[Session] = []
         current = self.parent_id
 
         # Import here to avoid circular import
         from chuk_ai_session_manager.session_storage import (
-            get_backend,
             ChukSessionsStore,
+            get_backend,
         )
 
         backend = get_backend()
@@ -144,15 +147,15 @@ class Session(BaseModel, Generic[MessageT]):
             current = parent.parent_id
         return result
 
-    async def descendants(self) -> List[Session]:
+    async def descendants(self) -> list[Session]:
         """Fetch all descendant sessions from store in DFS order asynchronously."""
-        result: List[Session] = []
+        result: list[Session] = []
         stack = list(self.child_ids)
 
         # Import here to avoid circular import
         from chuk_ai_session_manager.session_storage import (
-            get_backend,
             ChukSessionsStore,
+            get_backend,
         )
 
         backend = get_backend()
@@ -192,33 +195,29 @@ class Session(BaseModel, Generic[MessageT]):
 
         # Save the session
         from chuk_ai_session_manager.session_storage import (
-            get_backend,
             ChukSessionsStore,
+            get_backend,
         )
 
         backend = get_backend()
         store = ChukSessionsStore(backend)
         await store.save(self)
 
-    async def get_token_usage_by_source(self) -> Dict[str, TokenSummary]:
+    async def get_token_usage_by_source(self) -> dict[str, TokenSummary]:
         """
         Get token usage statistics grouped by event source asynchronously.
 
         Returns:
             A dictionary mapping event sources to token summaries
         """
-        result: Dict[str, TokenSummary] = {}
+        result: dict[str, TokenSummary] = {}
 
         for event in self.events:
             if not event.token_usage:
                 continue
 
             # Use the string value of the enum for the key
-            source = (
-                event.source.value
-                if hasattr(event.source, "value")
-                else str(event.source)
-            )
+            source = event.source.value if hasattr(event.source, "value") else str(event.source)
             if source not in result:
                 result[source] = TokenSummary()
 
@@ -226,14 +225,14 @@ class Session(BaseModel, Generic[MessageT]):
 
         return result
 
-    async def get_token_usage_by_run(self) -> Dict[str, TokenSummary]:
+    async def get_token_usage_by_run(self) -> dict[str, TokenSummary]:
         """
         Get token usage statistics grouped by run asynchronously.
 
         Returns:
             A dictionary mapping run IDs to token summaries
         """
-        result: Dict[str, TokenSummary] = {}
+        result: dict[str, TokenSummary] = {}
 
         # Add an entry for events without a run
         result["no_run"] = TokenSummary()
@@ -250,9 +249,7 @@ class Session(BaseModel, Generic[MessageT]):
 
         return result
 
-    async def count_message_tokens(
-        self, message: Union[str, Dict[str, Any]], model: str = "gpt-3.5-turbo"
-    ) -> int:
+    async def count_message_tokens(self, message: str | dict[str, Any], model: str = "gpt-3.5-turbo") -> int:
         """
         Count tokens in a message asynchronously.
 
@@ -332,9 +329,7 @@ class Session(BaseModel, Generic[MessageT]):
             # await store.save(self)
 
     @classmethod
-    async def create(
-        cls, session_id: Optional[str] = None, parent_id: Optional[str] = None, **kwargs
-    ) -> Session:
+    async def create(cls, session_id: str | None = None, parent_id: str | None = None, **kwargs) -> Session:
         """
         Create a new session asynchronously, handling parent-child relationships.
 
@@ -356,8 +351,8 @@ class Session(BaseModel, Generic[MessageT]):
 
         # Save the new session
         from chuk_ai_session_manager.session_storage import (
-            get_backend,
             ChukSessionsStore,
+            get_backend,
         )
 
         backend = get_backend()

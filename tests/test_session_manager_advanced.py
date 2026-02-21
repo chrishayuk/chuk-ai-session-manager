@@ -10,14 +10,15 @@ Tests advanced features and edge cases including:
 - Error recovery
 """
 
-import pytest
 import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from chuk_ai_session_manager import SessionManager
-from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
 
 
 class TestInfiniteContextAdvanced:
@@ -56,9 +57,7 @@ class TestInfiniteContextAdvanced:
         session3_id = sm3.session_id
 
         # Create manager with infinite context and load chain
-        sm_infinite = SessionManager(
-            session_id=session3_id, infinite_context=True, store=mock_store
-        )
+        sm_infinite = SessionManager(session_id=session3_id, infinite_context=True, store=mock_store)
 
         # Initialize and load the chain
         await sm_infinite._ensure_initialized()
@@ -134,9 +133,7 @@ class TestInfiniteContextAdvanced:
     async def test_complex_session_chain_stats(self):
         """Test statistics across complex session chains."""
         # Need to mock the store to track all sessions
-        with patch(
-            "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-        ) as mock_store_class:
+        with patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store_class:
             sessions_db = {}
 
             async def mock_save(session):
@@ -277,9 +274,7 @@ class TestPerformanceAndMemory:
 
     async def test_memory_efficiency_with_infinite_context(self):
         """Test memory efficiency in infinite context mode."""
-        sm = SessionManager(
-            infinite_context=True, token_threshold=500, max_turns_per_segment=10
-        )
+        sm = SessionManager(infinite_context=True, token_threshold=500, max_turns_per_segment=10)
 
         # Add many messages across segments
         for i in range(50):
@@ -352,9 +347,7 @@ class TestErrorRecoveryAndResilience:
         # Create event with minimal data
         from chuk_ai_session_manager.models.session_event import SessionEvent
 
-        minimal_event = SessionEvent(
-            message="Minimal", source=EventSource.USER, type=EventType.MESSAGE
-        )
+        minimal_event = SessionEvent(message="Minimal", source=EventSource.USER, type=EventType.MESSAGE)
 
         # Add directly to session
         await sm._ensure_initialized()
@@ -514,16 +507,11 @@ class TestSpecialScenarios:
         for i, sm in enumerate(sessions):
             expected_category = "support" if i % 2 == 0 else "sales"
             actual_category = sm._session.metadata.properties.get("category")
-            assert actual_category == expected_category, (
-                f"Session {i} has wrong category: {actual_category}"
-            )
+            assert actual_category == expected_category, f"Session {i} has wrong category: {actual_category}"
 
         # In a real implementation, you could search sessions by metadata
         support_sessions = [
-            sm
-            for sm in sessions
-            if sm._session
-            and sm._session.metadata.properties.get("category") == "support"
+            sm for sm in sessions if sm._session and sm._session.metadata.properties.get("category") == "support"
         ]
 
         assert len(support_sessions) == 3  # 0, 2, 4

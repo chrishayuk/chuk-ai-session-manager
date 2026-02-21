@@ -1,6 +1,6 @@
 # a2a_accounts/models/access_control.py
 from __future__ import annotations
-from typing import Set
+
 from pydantic import BaseModel, Field
 
 # session mananager imports
@@ -12,7 +12,7 @@ class AccessControlled(BaseModel):
 
     account_id: str
     access_level: AccessLevel = AccessLevel.PRIVATE
-    shared_with: Set[str] = Field(default_factory=set)
+    shared_with: set[str] = Field(default_factory=set)
 
     @property
     def is_public(self) -> bool:
@@ -28,6 +28,4 @@ class AccessControlled(BaseModel):
             return True
         if account_id == self.account_id:
             return True
-        if self.is_shared and account_id in self.shared_with:
-            return True
-        return False
+        return self.is_shared and account_id in self.shared_with

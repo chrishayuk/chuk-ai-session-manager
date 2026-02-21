@@ -8,18 +8,19 @@ and hierarchical context awareness.
 """
 
 from __future__ import annotations
+
+import asyncio
 import json
 import logging
-from typing import List, Dict, Any, Optional, Union
 from enum import Enum
-import asyncio
+from typing import Any
 
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.token_usage import TokenUsage
-from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
 from chuk_ai_session_manager.memory.models import MessageRole
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.token_usage import TokenUsage
+from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +37,13 @@ class PromptStrategy(str, Enum):
 
 async def build_prompt_from_session(
     session: Session,
-    strategy: Union[PromptStrategy, str] = PromptStrategy.MINIMAL,
-    max_tokens: Optional[int] = None,
-    model: str = "gpt-3.5-turbo",
+    strategy: PromptStrategy | str = PromptStrategy.MINIMAL,
+    max_tokens: int | None = None,  # noqa: ARG001 — reserved for token-aware strategies
+    model: str = "gpt-3.5-turbo",  # noqa: ARG001 — reserved for model-specific tokenization
     include_parent_context: bool = False,
-    current_query: Optional[str] = None,
-    max_history: int = 5,  # Add this parameter for conversation strategy
-) -> List[Dict[str, Any]]:
+    current_query: str | None = None,  # noqa: ARG001 — reserved for query-aware strategies
+    max_history: int = 5,
+) -> list[dict[str, Any]]:
     """
     Build a prompt for the next LLM call from a Session asynchronously.
 
@@ -85,7 +86,7 @@ async def build_prompt_from_session(
         return await _build_minimal_prompt(session)
 
 
-async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
+async def _build_minimal_prompt(session: Session) -> list[dict[str, Any]]:
     """
     Build a minimal prompt from a session.
 
@@ -97,21 +98,13 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
     """
     # First USER message
     first_user = next(
-        (
-            e
-            for e in session.events
-            if e.type == EventType.MESSAGE and e.source == EventSource.USER
-        ),
+        (e for e in session.events if e.type == EventType.MESSAGE and e.source == EventSource.USER),
         None,
     )
 
     # Latest assistant MESSAGE
     assistant_msg = next(
-        (
-            ev
-            for ev in reversed(session.events)
-            if ev.type == EventType.MESSAGE and ev.source != EventSource.USER
-        ),
+        (ev for ev in reversed(session.events) if ev.type == EventType.MESSAGE and ev.source != EventSource.USER),
         None,
     )
 
@@ -129,16 +122,12 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
         )
 
     # Children of that assistant
-    children = [
-        e
-        for e in session.events
-        if e.metadata.get("parent_event_id") == assistant_msg.id
-    ]
+    children = [e for e in session.events if e.metadata.get("parent_event_id") == assistant_msg.id]
     tool_calls = [c for c in children if c.type == EventType.TOOL_CALL]
     summaries = [c for c in children if c.type == EventType.SUMMARY]
 
     # Assemble prompt
-    prompt: List[Dict[str, Any]] = []
+    prompt: list[dict[str, Any]] = []
     if first_user:
         prompt.append(
             {
@@ -155,9 +144,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
             # Extract relevant information from the tool call
             # Handle both new and legacy formats
             if isinstance(tc.message, dict):
-                tool_name = tc.message.get(
-                    "tool_name", tc.message.get("tool", "unknown")
-                )
+                tool_name = tc.message.get("tool_name", tc.message.get("tool", "unknown"))
                 tool_result = tc.message.get("result", {})
             else:
                 # Legacy format or unexpected type
@@ -175,14 +162,10 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
         # Use the latest summary
         summary = summaries[-1]
         if isinstance(summary.message, dict) and "note" in summary.message:
-            prompt.append(
-                {"role": MessageRole.SYSTEM.value, "content": summary.message["note"]}
-            )
+            prompt.append({"role": MessageRole.SYSTEM.value, "content": summary.message["note"]})
         else:
             # Handle legacy or unexpected format
-            prompt.append(
-                {"role": MessageRole.SYSTEM.value, "content": str(summary.message)}
-            )
+            prompt.append({"role": MessageRole.SYSTEM.value, "content": str(summary.message)})
 
     return prompt
 
@@ -205,7 +188,7 @@ def _extract_content(message: Any) -> str:
         return str(message)
 
 
-async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
+async def _build_task_focused_prompt(session: Session) -> list[dict[str, Any]]:
     """
     Build a task-focused prompt.
 
@@ -215,11 +198,7 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     - Includes only the most recent and successful tool results
     """
     # Get first and most recent user messages
-    user_messages = [
-        e
-        for e in session.events
-        if e.type == EventType.MESSAGE and e.source == EventSource.USER
-    ]
+    user_messages = [e for e in session.events if e.type == EventType.MESSAGE and e.source == EventSource.USER]
 
     if not user_messages:
         return []
@@ -229,16 +208,12 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
     # Latest assistant MESSAGE
     assistant_msg = next(
-        (
-            ev
-            for ev in reversed(session.events)
-            if ev.type == EventType.MESSAGE and ev.source != EventSource.USER
-        ),
+        (ev for ev in reversed(session.events) if ev.type == EventType.MESSAGE and ev.source != EventSource.USER),
         None,
     )
 
     # Build prompt
-    prompt: List[Dict[str, Any]] = []
+    prompt: list[dict[str, Any]] = []
 
     # Always include the first user message (the main task)
     prompt.append(
@@ -262,27 +237,18 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
         prompt.append({"role": MessageRole.ASSISTANT.value, "content": None})
 
         # Find successful tool calls
-        children = [
-            e
-            for e in session.events
-            if e.metadata.get("parent_event_id") == assistant_msg.id
-        ]
+        children = [e for e in session.events if e.metadata.get("parent_event_id") == assistant_msg.id]
         tool_calls = [c for c in children if c.type == EventType.TOOL_CALL]
 
         # Only include successful tool results
         for tc in tool_calls:
             # Extract and check if result indicates success
             if isinstance(tc.message, dict):
-                tool_name = tc.message.get(
-                    "tool_name", tc.message.get("tool", "unknown")
-                )
+                tool_name = tc.message.get("tool_name", tc.message.get("tool", "unknown"))
                 tool_result = tc.message.get("result", {})
 
                 # Skip error results
-                if (
-                    isinstance(tool_result, dict)
-                    and tool_result.get("status") == "error"
-                ):
+                if isinstance(tool_result, dict) and tool_result.get("status") == "error":
                     continue
 
                 prompt.append(
@@ -296,7 +262,7 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     return prompt
 
 
-async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
+async def _build_tool_focused_prompt(session: Session) -> list[dict[str, Any]]:
     """
     Build a tool-focused prompt.
 
@@ -307,11 +273,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     """
     # Get the latest user message
     latest_user = next(
-        (
-            e
-            for e in reversed(session.events)
-            if e.type == EventType.MESSAGE and e.source == EventSource.USER
-        ),
+        (e for e in reversed(session.events) if e.type == EventType.MESSAGE and e.source == EventSource.USER),
         None,
     )
 
@@ -320,16 +282,12 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
     # Get the latest assistant message
     assistant_msg = next(
-        (
-            ev
-            for ev in reversed(session.events)
-            if ev.type == EventType.MESSAGE and ev.source != EventSource.USER
-        ),
+        (ev for ev in reversed(session.events) if ev.type == EventType.MESSAGE and ev.source != EventSource.USER),
         None,
     )
 
     # Build prompt
-    prompt: List[Dict[str, Any]] = []
+    prompt: list[dict[str, Any]] = []
 
     # Include user message
     prompt.append(
@@ -344,19 +302,13 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
         prompt.append({"role": MessageRole.ASSISTANT.value, "content": None})
 
         # Get all tool calls for this assistant
-        children = [
-            e
-            for e in session.events
-            if e.metadata.get("parent_event_id") == assistant_msg.id
-        ]
+        children = [e for e in session.events if e.metadata.get("parent_event_id") == assistant_msg.id]
         tool_calls = [c for c in children if c.type == EventType.TOOL_CALL]
 
         # Add all tool calls with status information
         for tc in tool_calls:
             if isinstance(tc.message, dict):
-                tool_name = tc.message.get(
-                    "tool_name", tc.message.get("tool", "unknown")
-                )
+                tool_name = tc.message.get("tool_name", tc.message.get("tool", "unknown"))
                 tool_result = tc.message.get("result", {})
                 error = tc.message.get("error", None)
 
@@ -376,9 +328,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
     return prompt
 
 
-async def _build_conversation_prompt(
-    session: Session, max_history: int = 5
-) -> List[Dict[str, Any]]:
+async def _build_conversation_prompt(session: Session, max_history: int = 5) -> list[dict[str, Any]]:
     """
     Build a conversation-style prompt with recent history.
 
@@ -391,28 +341,16 @@ async def _build_conversation_prompt(
     message_events = [e for e in session.events if e.type == EventType.MESSAGE]
 
     # Take the most recent messages
-    recent_messages = (
-        message_events[-max_history:]
-        if len(message_events) > max_history
-        else message_events
-    )
+    recent_messages = message_events[-max_history:] if len(message_events) > max_history else message_events
 
     # Build the conversation history
-    prompt: List[Dict[str, Any]] = []
-    for i, msg in enumerate(recent_messages):
-        role = (
-            MessageRole.USER.value
-            if msg.source == EventSource.USER
-            else MessageRole.ASSISTANT.value
-        )
+    prompt: list[dict[str, Any]] = []
+    for _i, msg in enumerate(recent_messages):
+        role = MessageRole.USER.value if msg.source == EventSource.USER else MessageRole.ASSISTANT.value
         content = _extract_content(msg.message)
 
         # For the last assistant message, set content to None and add tool calls
-        if (
-            role == MessageRole.ASSISTANT.value
-            and msg == recent_messages[-1]
-            and msg.source != EventSource.USER
-        ):
+        if role == MessageRole.ASSISTANT.value and msg == recent_messages[-1] and msg.source != EventSource.USER:
             # Add the message first with None content
             prompt.append({"role": role, "content": None})
 
@@ -420,16 +358,13 @@ async def _build_conversation_prompt(
             tool_calls = [
                 e
                 for e in session.events
-                if e.type == EventType.TOOL_CALL
-                and e.metadata.get("parent_event_id") == msg.id
+                if e.type == EventType.TOOL_CALL and e.metadata.get("parent_event_id") == msg.id
             ]
 
             # Add tool results
             for tc in tool_calls:
                 if isinstance(tc.message, dict):
-                    tool_name = tc.message.get(
-                        "tool_name", tc.message.get("tool", "unknown")
-                    )
+                    tool_name = tc.message.get("tool_name", tc.message.get("tool", "unknown"))
                     tool_result = tc.message.get("result", {})
 
                     prompt.append(
@@ -446,9 +381,7 @@ async def _build_conversation_prompt(
     return prompt
 
 
-async def _build_hierarchical_prompt(
-    session: Session, include_parent_context: bool = True
-) -> List[Dict[str, Any]]:
+async def _build_hierarchical_prompt(session: Session, include_parent_context: bool = True) -> list[dict[str, Any]]:
     """
     Build a prompt that includes hierarchical context.
 
@@ -479,10 +412,7 @@ async def _build_hierarchical_prompt(
                     summary_content = summary_event.message
                     if isinstance(summary_content, dict) and "note" in summary_content:
                         summary_content = summary_content["note"]
-                    elif (
-                        isinstance(summary_content, dict)
-                        and "content" in summary_content
-                    ):
+                    elif isinstance(summary_content, dict) and "content" in summary_content:
                         summary_content = summary_content["content"]
                     else:
                         summary_content = str(summary_content)
@@ -497,18 +427,16 @@ async def _build_hierarchical_prompt(
                     )
         except Exception as e:
             # If we can't load parent context, just continue with minimal prompt
-            logger.warning(
-                f"Could not load parent context for session {session.parent_id}: {e}"
-            )
+            logger.warning(f"Could not load parent context for session {session.parent_id}: {e}")
 
     return prompt
 
 
 async def truncate_prompt_to_token_limit(
-    prompt: List[Dict[str, Any]],
+    prompt: list[dict[str, Any]],
     max_tokens: int,
     model: str = "gpt-3.5-turbo",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Trim a prompt so its total token count is ≤ `max_tokens`.
 
@@ -524,9 +452,7 @@ async def truncate_prompt_to_token_limit(
 
     # ------------------------------------------------------------------ #
     # quick overall count
-    text = "\n".join(
-        f"{m.get('role', 'unknown')}: {m.get('content') or ''}" for m in prompt
-    )
+    text = "\n".join(f"{m.get('role', 'unknown')}: {m.get('content') or ''}" for m in prompt)
     total = TokenUsage.count_tokens(text, model)
     total = await total if asyncio.iscoroutine(total) else total
     if total <= max_tokens:
@@ -534,19 +460,13 @@ async def truncate_prompt_to_token_limit(
 
     # ------------------------------------------------------------------ #
     # decide which messages to keep
-    first_user_idx = next(
-        (i for i, m in enumerate(prompt) if m["role"] == MessageRole.USER.value), None
-    )
+    first_user_idx = next((i for i, m in enumerate(prompt) if m["role"] == MessageRole.USER.value), None)
     last_asst_idx = next(
-        (
-            len(prompt) - 1 - i
-            for i, m in enumerate(reversed(prompt))
-            if m["role"] == MessageRole.ASSISTANT.value
-        ),
+        (len(prompt) - 1 - i for i, m in enumerate(reversed(prompt)) if m["role"] == MessageRole.ASSISTANT.value),
         None,
     )
 
-    kept: List[Dict[str, Any]] = []
+    kept: list[dict[str, Any]] = []
     if first_user_idx is not None:
         kept.append(prompt[first_user_idx])
     if last_asst_idx is not None:
@@ -561,9 +481,7 @@ async def truncate_prompt_to_token_limit(
         # remove any tool messages we just added
         kept = [m for m in kept if m["role"] != MessageRole.TOOL.value]
         # but guarantee at least one tool message (the first) if it'll fit
-        first_tool = next(
-            (m for m in prompt if m["role"] == MessageRole.TOOL.value), None
-        )
+        first_tool = next((m for m in prompt if m["role"] == MessageRole.TOOL.value), None)
         if first_tool:
             kept.append(first_tool)
 

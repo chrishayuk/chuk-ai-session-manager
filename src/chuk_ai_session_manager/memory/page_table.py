@@ -15,7 +15,6 @@ Design principles:
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -41,16 +40,12 @@ class PageTable(BaseModel):
     """
 
     # Core mapping
-    entries: Dict[str, PageTableEntry] = Field(default_factory=dict)
+    entries: dict[str, PageTableEntry] = Field(default_factory=dict)
 
     # Indexes for fast lookup - use PrivateAttr for internal state
-    _by_tier: Dict[StorageTier, Set[str]] = PrivateAttr(
-        default_factory=lambda: {t: set() for t in StorageTier}
-    )
-    _by_modality: Dict[Modality, Set[str]] = PrivateAttr(
-        default_factory=lambda: {m: set() for m in Modality}
-    )
-    _dirty_pages: Set[str] = PrivateAttr(default_factory=set)
+    _by_tier: dict[StorageTier, set[str]] = PrivateAttr(default_factory=lambda: {t: set() for t in StorageTier})
+    _by_modality: dict[Modality, set[str]] = PrivateAttr(default_factory=lambda: {m: set() for m in Modality})
+    _dirty_pages: set[str] = PrivateAttr(default_factory=set)
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -60,7 +55,7 @@ class PageTable(BaseModel):
     def __contains__(self, page_id: str) -> bool:
         return page_id in self.entries
 
-    def lookup(self, page_id: str) -> Optional[PageTableEntry]:
+    def lookup(self, page_id: str) -> PageTableEntry | None:
         """
         Look up a page entry by ID.
 
@@ -125,7 +120,7 @@ class PageTable(BaseModel):
         if entry.dirty:
             self._dirty_pages.add(page_id)
 
-    def remove(self, page_id: str) -> Optional[PageTableEntry]:
+    def remove(self, page_id: str) -> PageTableEntry | None:
         """
         Remove a page from the table.
 
@@ -142,8 +137,8 @@ class PageTable(BaseModel):
         self,
         page_id: str,
         tier: StorageTier,
-        artifact_id: Optional[str] = None,
-        compression_level: Optional[CompressionLevel] = None,
+        artifact_id: str | None = None,
+        compression_level: CompressionLevel | None = None,
     ) -> bool:
         """
         Update a page's location (tier movement).
@@ -227,25 +222,25 @@ class PageTable(BaseModel):
         self._dirty_pages.discard(page_id)
         return True
 
-    def get_by_tier(self, tier: StorageTier) -> List[PageTableEntry]:
+    def get_by_tier(self, tier: StorageTier) -> list[PageTableEntry]:
         """Get all entries in a specific tier."""
         page_ids = self._by_tier.get(tier, set())
         return [self.entries[pid] for pid in page_ids if pid in self.entries]
 
-    def get_by_modality(self, modality: Modality) -> List[PageTableEntry]:
+    def get_by_modality(self, modality: Modality) -> list[PageTableEntry]:
         """Get all entries of a specific modality."""
         page_ids = self._by_modality.get(modality, set())
         return [self.entries[pid] for pid in page_ids if pid in self.entries]
 
-    def get_by_type(self, page_type: PageType) -> List[PageTableEntry]:
+    def get_by_type(self, page_type: PageType) -> list[PageTableEntry]:
         """Get all entries of a specific page type."""
         return [e for e in self.entries.values() if e.page_type == page_type]
 
-    def get_dirty_pages(self) -> List[PageTableEntry]:
+    def get_dirty_pages(self) -> list[PageTableEntry]:
         """Get all dirty (modified) pages."""
         return [self.entries[pid] for pid in self._dirty_pages if pid in self.entries]
 
-    def get_working_set(self) -> List[PageTableEntry]:
+    def get_working_set(self) -> list[PageTableEntry]:
         """Get all pages in L0 and L1 (the working set)."""
         l0 = self.get_by_tier(StorageTier.L0)
         l1 = self.get_by_tier(StorageTier.L1)
@@ -255,7 +250,7 @@ class PageTable(BaseModel):
         self,
         tier: StorageTier = StorageTier.L1,
         limit: int = 10,
-    ) -> List[PageTableEntry]:
+    ) -> list[PageTableEntry]:
         """
         Get pages that are candidates for eviction, sorted by LRU.
 
@@ -272,12 +267,10 @@ class PageTable(BaseModel):
             total_pages=len(self.entries),
             dirty_pages=len(self._dirty_pages),
             pages_by_tier={t: len(self._by_tier.get(t, set())) for t in StorageTier},
-            pages_by_modality={
-                m: len(self._by_modality.get(m, set())) for m in Modality
-            },
+            pages_by_modality={m: len(self._by_modality.get(m, set())) for m in Modality},
         )
 
-    def get_total_tokens(self, tiers: Optional[List[StorageTier]] = None) -> int:
+    def get_total_tokens(self, tiers: list[StorageTier] | None = None) -> int:
         """
         Get total estimated tokens across specified tiers.
 

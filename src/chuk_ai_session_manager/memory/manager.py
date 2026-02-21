@@ -16,8 +16,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from .artifacts_bridge import ArtifactsBridge
+from .compressor import CompressionResult, CompressorRegistry
+from .context_packer import ContextPacker
+from .demand_paging import DemandPagingPrePass
+from .fault_handler import (
+    FaultResult,
+    PageFaultHandler,
+    PageSearchHandler,
+    SearchResult,
+)
+from .manifest import ManifestBuilder
 from .models import (
     Actor,
     CompressionLevel,
@@ -30,33 +41,22 @@ from .models import (
     VMMetrics,
     VMMode,
 )
-from .page_table import PageTable
-from .tlb import PageTLB, TLBWithPageTable
-from .working_set import WorkingSetConfig, WorkingSetManager
-from .fault_handler import (
-    FaultResult,
-    PageFaultHandler,
-    PageSearchHandler,
-    SearchResult,
-)
-from .compressor import CompressorRegistry, CompressionResult
-from .demand_paging import DemandPagingPrePass
-from .context_packer import ContextPacker
-from .manifest import ManifestBuilder
-from .artifacts_bridge import ArtifactsBridge
 from .mutation_log import MutationLogLite
-from .prefetcher import SimplePrefetcher
 from .pack_cache import ContextPackCache
+from .page_table import PageTable
+from .prefetcher import SimplePrefetcher
+from .tlb import PageTLB, TLBWithPageTable
 from .vm_prompts import build_vm_developer_message, get_vm_tools_as_dicts
+from .working_set import WorkingSetConfig, WorkingSetManager
 
 logger = logging.getLogger(__name__)
 
 
 def event_to_page(
     message: str,
-    role: str,
+    role: str,  # noqa: ARG001 — kept for future role-based page metadata
     session_id: str,
-    event_id: Optional[str] = None,
+    event_id: str | None = None,
     page_type: PageType = PageType.TRANSCRIPT,
     importance: float = 0.5,
 ) -> MemoryPage:
@@ -109,11 +109,11 @@ class MemoryManager:
     def __init__(
         self,
         session_id: str = "",
-        config: Optional[WorkingSetConfig] = None,
-        fault_policy: Optional[FaultPolicy] = None,
+        config: WorkingSetConfig | None = None,
+        fault_policy: FaultPolicy | None = None,
         mode: VMMode = VMMode.STRICT,
-        eviction_policy: Optional[Any] = None,
-        compressor_registry: Optional[CompressorRegistry] = None,
+        eviction_policy: Any | None = None,
+        compressor_registry: CompressorRegistry | None = None,
     ) -> None:
         self._session_id = session_id or str(uuid.uuid4())
         self._mode = mode
@@ -151,10 +151,10 @@ class MemoryManager:
         self._bridge_configured = False
 
         # In-memory page store (pages with content loaded)
-        self._page_store: Dict[str, MemoryPage] = {}
+        self._page_store: dict[str, MemoryPage] = {}
 
         # Page hints for search
-        self._page_hints: Dict[str, str] = {}
+        self._page_hints: dict[str, str] = {}
 
         # Search handler
         self._search_handler = PageSearchHandler()
@@ -205,9 +205,9 @@ class MemoryManager:
     async def load(
         self,
         page_id: str,
-        tier: StorageTier,
-        artifact_id: Optional[str] = None,
-    ) -> Optional[MemoryPage]:
+        tier: StorageTier,  # noqa: ARG002 — part of PageLoader protocol
+        artifact_id: str | None = None,
+    ) -> MemoryPage | None:
         """PageLoader protocol — load a page from the appropriate tier."""
         # Check in-memory store first
         page = self._page_store.get(page_id)
@@ -226,8 +226,8 @@ class MemoryManager:
 
     async def configure_bridge(
         self,
-        artifact_store: Optional[Any] = None,
-        session_id: Optional[str] = None,
+        artifact_store: Any | None = None,
+        session_id: str | None = None,
     ) -> None:
         """Configure ArtifactsBridge for persistent storage."""
         await self._bridge.configure(
@@ -246,10 +246,10 @@ class MemoryManager:
         page_type: PageType = PageType.TRANSCRIPT,
         modality: Modality = Modality.TEXT,
         importance: float = 0.5,
-        provenance: Optional[List[str]] = None,
-        page_id: Optional[str] = None,
-        size_tokens: Optional[int] = None,
-        hint: Optional[str] = None,
+        provenance: list[str] | None = None,
+        page_id: str | None = None,
+        size_tokens: int | None = None,
+        hint: str | None = None,
     ) -> MemoryPage:
         """
         Create a new MemoryPage, register in page table, store in page_store.
@@ -342,9 +342,7 @@ class MemoryManager:
         self._working_set.remove_from_l0(page_id, page)
 
         # Update page table
-        self._page_table.update_location(
-            page_id, tier=target_tier, artifact_id=artifact_id
-        )
+        self._page_table.update_location(page_id, tier=target_tier, artifact_id=artifact_id)
         self._tlb.invalidate(page_id)
 
         # Update page
@@ -375,7 +373,7 @@ class MemoryManager:
         self,
         page_id: str,
         target_level: CompressionLevel,
-    ) -> Optional[CompressionResult]:
+    ) -> CompressionResult | None:
         """
         Compress a page to the target compression level.
 
@@ -423,9 +421,9 @@ class MemoryManager:
 
         return result
 
-    async def _run_eviction(self, tokens_needed: int) -> List[str]:
+    async def _run_eviction(self, tokens_needed: int) -> list[str]:
         """Run eviction to free tokens. Returns evicted page IDs."""
-        evicted_ids: List[str] = []
+        evicted_ids: list[str] = []
         tokens_freed = 0
         target = self._working_set.calculate_eviction_target(tokens_needed)
 
@@ -446,10 +444,7 @@ class MemoryManager:
             page_tokens = page.size_tokens or page.estimate_tokens()
 
             # Try compression before eviction
-            if (
-                self._compressor_registry is not None
-                and page.compression_level < CompressionLevel.ABSTRACT
-            ):
+            if self._compressor_registry is not None and page.compression_level < CompressionLevel.ABSTRACT:
                 next_level = CompressionLevel(page.compression_level + 1)
                 result = await self.compress_page(page_id, next_level)
                 if result and result.tokens_saved > 0:
@@ -465,14 +460,14 @@ class MemoryManager:
     async def evict_segment_pages(
         self,
         target_tier: StorageTier = StorageTier.L2,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Evict all non-pinned L0 pages to target tier.
 
         Used on segment rollover to clear old transcript pages
         while preserving pinned pages (summaries, claims).
         """
-        evicted: List[str] = []
+        evicted: list[str] = []
         for page_id in list(self._working_set.get_l0_page_ids()):
             if self._working_set.is_pinned(page_id):
                 continue
@@ -487,7 +482,7 @@ class MemoryManager:
     async def search_pages(
         self,
         query: str,
-        modality: Optional[str] = None,
+        modality: str | None = None,
         limit: int = 5,
     ) -> SearchResult:
         """Search for pages matching a query using hints."""
@@ -497,7 +492,7 @@ class MemoryManager:
     # Demand paging
     # ------------------------------------------------------------------
 
-    async def demand_pre_pass(self, user_message: str) -> List[str]:
+    async def demand_pre_pass(self, user_message: str) -> list[str]:
         """
         Run DemandPagingPrePass and fault candidate pages into L0.
 
@@ -515,7 +510,7 @@ class MemoryManager:
             page_hints=self._page_hints,
             working_set_ids=set(self._working_set.get_l0_page_ids()),
         )
-        faulted: List[str] = []
+        faulted: list[str] = []
         for page_id in candidates:
             result = await self.handle_fault(page_id)
             if result.success:
@@ -583,7 +578,7 @@ class MemoryManager:
     # Context building
     # ------------------------------------------------------------------
 
-    def get_l0_pages(self) -> List[MemoryPage]:
+    def get_l0_pages(self) -> list[MemoryPage]:
         """Get all pages currently in L0 (context window), in order."""
         pages = []
         for page_id in self._working_set.get_l0_page_ids():
@@ -594,11 +589,11 @@ class MemoryManager:
 
     def build_context(
         self,
-        mode: Optional[VMMode] = None,
+        mode: VMMode | None = None,
         system_prompt: str = "",
-        model_id: str = "",
-        token_budget: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        model_id: str = "",  # noqa: ARG002 — reserved for model-specific context
+        token_budget: int | None = None,
+    ) -> dict[str, Any]:
         """
         Build the complete VM context for an LLM call.
 
@@ -689,7 +684,7 @@ class MemoryManager:
     # Stats
     # ------------------------------------------------------------------
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive stats across all subsystems."""
         return {
             "session_id": self._session_id,

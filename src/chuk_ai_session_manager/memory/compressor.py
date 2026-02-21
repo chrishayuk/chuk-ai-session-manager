@@ -27,12 +27,12 @@ Usage::
 from __future__ import annotations
 
 import re
-from typing import Awaitable, Callable, Dict, Optional, Protocol, runtime_checkable
+from collections.abc import Awaitable, Callable
+from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
 from .models import CompressionLevel, MemoryPage, Modality
-
 
 # =============================================================================
 # Types
@@ -110,13 +110,9 @@ class Compressor(Protocol):
 class TextCompressorConfig(BaseModel):
     """Configuration for text compression."""
 
-    reduced_ratio: float = Field(
-        default=0.5, description="Keep this fraction of chars for REDUCED"
-    )
+    reduced_ratio: float = Field(default=0.5, description="Keep this fraction of chars for REDUCED")
     abstract_max_tokens: int = Field(default=200, description="Max tokens for ABSTRACT")
-    reference_max_tokens: int = Field(
-        default=50, description="Max tokens for REFERENCE"
-    )
+    reference_max_tokens: int = Field(default=50, description="Max tokens for REFERENCE")
 
 
 class TextCompressor:
@@ -129,8 +125,8 @@ class TextCompressor:
 
     def __init__(
         self,
-        config: Optional[TextCompressorConfig] = None,
-        summarize_fn: Optional[SummarizeFn] = None,
+        config: TextCompressorConfig | None = None,
+        summarize_fn: SummarizeFn | None = None,
     ) -> None:
         self.config = config or TextCompressorConfig()
         self._summarize_fn = summarize_fn
@@ -263,9 +259,7 @@ class ImageCompressor:
 
         if target_level == CompressionLevel.REDUCED:
             # Images are already stored by reference; no real compression
-            new_page = page.model_copy(
-                update={"compression_level": CompressionLevel.REDUCED}
-            )
+            new_page = page.model_copy(update={"compression_level": CompressionLevel.REDUCED})
             return CompressionResult(
                 page=new_page,
                 original_tokens=original_tokens,
@@ -375,9 +369,9 @@ class CompressorRegistry:
 
     def __init__(
         self,
-        compressors: Optional[Dict[Modality, Compressor]] = None,
+        compressors: dict[Modality, Compressor] | None = None,
     ) -> None:
-        self._compressors: Dict[Modality, Compressor] = compressors or {}
+        self._compressors: dict[Modality, Compressor] = compressors or {}
 
     def register(self, modality: Modality, compressor: Compressor) -> None:
         """Register a compressor for a modality."""

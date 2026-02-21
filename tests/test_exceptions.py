@@ -8,12 +8,12 @@ Tests custom exceptions and error conditions.
 import pytest
 
 from chuk_ai_session_manager.exceptions import (
+    InvalidSessionOperation,
+    SessionAlreadyExists,
     SessionManagerError,
     SessionNotFound,
-    SessionAlreadyExists,
-    InvalidSessionOperation,
-    TokenLimitExceeded,
     StorageError,
+    TokenLimitExceeded,
     ToolProcessingError,
 )
 
@@ -81,9 +81,7 @@ class TestSessionManagerExceptions:
 
     def test_invalid_session_operation_with_reason(self):
         """Test InvalidSessionOperation with operation and reason."""
-        error = InvalidSessionOperation(
-            operation="close_session", reason="Session is already closed"
-        )
+        error = InvalidSessionOperation(operation="close_session", reason="Session is already closed")
         assert "close_session" in str(error)
         assert "Session is already closed" in str(error)
         assert error.operation == "close_session"
@@ -309,9 +307,7 @@ class TestExceptionUsageScenarios:
                     )
                 elif tool_name == "broken_tool":
                     # Simulate permanent error
-                    raise ToolProcessingError(
-                        tool_name=tool_name, reason="Tool configuration invalid"
-                    )
+                    raise ToolProcessingError(tool_name=tool_name, reason="Tool configuration invalid")
                 else:
                     return f"success_result_for_{tool_name}"
 

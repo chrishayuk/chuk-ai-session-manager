@@ -11,16 +11,17 @@ Tests all core functionality including:
 - Persistence and loading
 """
 
-import pytest
 import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
+
 from chuk_ai_session_manager import SessionManager
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
 
 
 class TestSessionManagerBasics:
@@ -137,9 +138,7 @@ class TestMessageTracking:
         """Test adding metadata to messages."""
         sm = SessionManager()
 
-        await sm.user_says(
-            "Hello", request_id="req-123", channel="web", user_agent="Mozilla/5.0"
-        )
+        await sm.user_says("Hello", request_id="req-123", channel="web", user_agent="Mozilla/5.0")
 
         event = sm._session.events[0]
         assert event.metadata.get("request_id") == "req-123"
@@ -286,9 +285,7 @@ class TestInfiniteContext:
 
     async def test_infinite_context_initialization(self):
         """Test creating SessionManager with infinite context."""
-        sm = SessionManager(
-            infinite_context=True, token_threshold=1000, max_turns_per_segment=10
-        )
+        sm = SessionManager(infinite_context=True, token_threshold=1000, max_turns_per_segment=10)
 
         assert sm.is_infinite is True
         assert sm._token_threshold == 1000
@@ -339,9 +336,7 @@ class TestInfiniteContext:
 
         # Add messages to exceed token threshold
         # Use longer messages to ensure we hit the threshold
-        long_message = (
-            "This is a much longer message that should use up many more tokens. " * 5
-        )
+        long_message = "This is a much longer message that should use up many more tokens. " * 5
         await sm.user_says(long_message)
         await sm.ai_responds(long_message)
         first_id = sm.session_id
@@ -460,9 +455,7 @@ class TestSessionPersistence:
 
     async def test_session_saves_automatically(self):
         """Test that sessions are saved automatically."""
-        with patch(
-            "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-        ) as mock_store_class:
+        with patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store_class:
             mock_store = AsyncMock()
             mock_store.save = AsyncMock()
             mock_store.get = AsyncMock(return_value=None)
@@ -571,9 +564,7 @@ class TestIntegration:
         await sm.user_says("What's the capital of France?")
 
         # AI responds
-        await sm.ai_responds(
-            "The capital of France is Paris.", model="gpt-3.5-turbo", provider="openai"
-        )
+        await sm.ai_responds("The capital of France is Paris.", model="gpt-3.5-turbo", provider="openai")
 
         # User asks follow-up
         await sm.user_says("Tell me more about it")
@@ -586,15 +577,11 @@ class TestIntegration:
         )
 
         # AI responds with tool result
-        await sm.ai_responds(
-            "Paris is the capital and largest city of France...", model="gpt-3.5-turbo"
-        )
+        await sm.ai_responds("Paris is the capital and largest city of France...", model="gpt-3.5-turbo")
 
         # Check conversation
         conversation = await sm.get_conversation()
-        assert (
-            len(conversation) == 4
-        )  # 2 user, 2 AI (tools not included in conversation)
+        assert len(conversation) == 4  # 2 user, 2 AI (tools not included in conversation)
 
         # Check stats
         stats = await sm.get_stats()

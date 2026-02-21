@@ -8,12 +8,12 @@ the result of prior computation. Enforces dataflow discipline.
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
-
-from pydantic import BaseModel, Field
+from collections.abc import Callable
+from typing import Any
 
 # Import base classes from chuk-tool-processor
 from chuk_tool_processor.guards import BaseGuard, EnforcementLevel, GuardResult
+from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.guards.constants import REFERENCE_PATTERN
 
@@ -92,9 +92,9 @@ class UngroundedGuard(BaseGuard):
         has_bindings = bool(bindings)
 
         # Build message
-        arg_names = ", ".join(f"`{name}`" for name in numeric_args.keys())
+        arg_names = ", ".join(f"`{name}`" for name in numeric_args)
         if has_bindings:
-            available = [f"${bid}" for bid in bindings.keys()]
+            available = [f"${bid}" for bid in bindings]
             message = (
                 f"Ungrounded call: `{tool_name}` has numeric arguments ({arg_names}) "
                 f"but no $vN references. Available values: {', '.join(available)}. "
@@ -107,10 +107,7 @@ class UngroundedGuard(BaseGuard):
             )
 
         # Check enforcement level
-        if (
-            self.config.mode == EnforcementLevel.BLOCK
-            and self._ungrounded_count > self.config.grace_calls
-        ):
+        if self.config.mode == EnforcementLevel.BLOCK and self._ungrounded_count > self.config.grace_calls:
             return self.block(
                 reason=message,
                 ungrounded_count=self._ungrounded_count,
@@ -121,9 +118,7 @@ class UngroundedGuard(BaseGuard):
             return self.warn(
                 reason=message,
                 ungrounded_count=self._ungrounded_count,
-                grace_remaining=max(
-                    0, self.config.grace_calls - self._ungrounded_count + 1
-                ),
+                grace_remaining=max(0, self.config.grace_calls - self._ungrounded_count + 1),
                 numeric_args=numeric_args,
                 has_bindings=has_bindings,
             )

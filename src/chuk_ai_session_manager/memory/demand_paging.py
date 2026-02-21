@@ -13,13 +13,12 @@ faults relevant pages before the model even sees the message.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Set
 
 from .models import PageType
 from .page_table import PageTable
 
 # Default recall signal patterns (case-insensitive)
-DEFAULT_RECALL_SIGNALS: List[str] = [
+DEFAULT_RECALL_SIGNALS: list[str] = [
     r"(as we|what did we|earlier|previously|remember when)",
     r"(that (decision|choice|plan|approach) (about|for|regarding))",
     r"(go back to|revisit|return to)",
@@ -49,13 +48,11 @@ class DemandPagingPrePass:
 
     def __init__(
         self,
-        recall_signals: Optional[List[str]] = None,
+        recall_signals: list[str] | None = None,
         max_prefetch_pages: int = 5,
     ) -> None:
         signals = recall_signals or DEFAULT_RECALL_SIGNALS
-        self._recall_patterns = [
-            re.compile(pattern, re.IGNORECASE) for pattern in signals
-        ]
+        self._recall_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in signals]
         self._max_prefetch_pages = max_prefetch_pages
 
     # ------------------------------------------------------------------
@@ -64,16 +61,13 @@ class DemandPagingPrePass:
 
     def has_recall_signal(self, message: str) -> bool:
         """Check if the message contains any recall signal patterns."""
-        for pattern in self._recall_patterns:
-            if pattern.search(message):
-                return True
-        return False
+        return any(pattern.search(message) for pattern in self._recall_patterns)
 
     # ------------------------------------------------------------------
     # Topic extraction
     # ------------------------------------------------------------------
 
-    def extract_topics(self, message: str) -> List[str]:
+    def extract_topics(self, message: str) -> list[str]:
         """
         Extract candidate topic keywords from the message.
 
@@ -92,9 +86,9 @@ class DemandPagingPrePass:
         self,
         message: str,
         page_table: PageTable,
-        page_hints: Dict[str, str],
-        working_set_ids: Set[str],
-    ) -> List[str]:
+        page_hints: dict[str, str],
+        working_set_ids: set[str],
+    ) -> list[str]:
         """
         Analyze user message and return page IDs to prefetch into L0.
 
@@ -113,8 +107,8 @@ class DemandPagingPrePass:
         Returns:
             List of page_ids to fault into L0.
         """
-        candidates: List[str] = []
-        seen: Set[str] = set()
+        candidates: list[str] = []
+        seen: set[str] = set()
 
         def _add(page_id: str) -> None:
             if page_id not in seen and page_id not in working_set_ids:

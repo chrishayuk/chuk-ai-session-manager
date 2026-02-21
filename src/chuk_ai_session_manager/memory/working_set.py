@@ -15,7 +15,7 @@ Design principles:
 
 import math
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -29,7 +29,6 @@ from .models import (
     TokenBudget,
     WorkingSetStats,
 )
-
 
 # =============================================================================
 # Pinned Set
@@ -50,19 +49,15 @@ class PinnedSet(BaseModel):
     """
 
     # Explicitly pinned pages
-    pinned: Set[str] = Field(default_factory=set)
+    pinned: set[str] = Field(default_factory=set)
 
     # Auto-pin configuration
-    auto_pin_last_n_turns: int = Field(
-        default=3, description="Auto-pin last N user+assistant turn pairs"
-    )
+    auto_pin_last_n_turns: int = Field(default=3, description="Auto-pin last N user+assistant turn pairs")
     auto_pin_system_prompt: bool = Field(default=True)
-    auto_pin_claims: bool = Field(
-        default=True, description="Auto-pin claim pages (high-value)"
-    )
+    auto_pin_claims: bool = Field(default=True, description="Auto-pin claim pages (high-value)")
 
     # Pages auto-pinned (tracked separately for debugging)
-    auto_pinned: Set[str] = Field(default_factory=set)
+    auto_pinned: set[str] = Field(default_factory=set)
 
     def pin(self, page_id: str) -> None:
         """Explicitly pin a page."""
@@ -85,7 +80,7 @@ class PinnedSet(BaseModel):
         """Clear all auto-pins (before recalculating)."""
         self.auto_pinned.clear()
 
-    def get_all_pinned(self) -> Set[str]:
+    def get_all_pinned(self) -> set[str]:
         """Get all pinned pages (explicit + auto)."""
         return self.pinned | self.auto_pinned
 
@@ -114,8 +109,8 @@ class AntiThrashPolicy(BaseModel):
     fault_protection_turns: int = Field(default=2)
 
     # Track eviction/fault history: page_id -> turn number
-    _eviction_history: Dict[str, int] = PrivateAttr(default_factory=dict)
-    _fault_history: Dict[str, int] = PrivateAttr(default_factory=dict)
+    _eviction_history: dict[str, int] = PrivateAttr(default_factory=dict)
+    _fault_history: dict[str, int] = PrivateAttr(default_factory=dict)
 
     def record_eviction(self, page_id: str, turn: int) -> None:
         """Record that a page was evicted at this turn."""
@@ -168,15 +163,9 @@ class AntiThrashPolicy(BaseModel):
 
     def cleanup_old_history(self, current_turn: int, max_age: int = 20) -> None:
         """Remove old history entries to prevent memory growth."""
-        self._fault_history = {
-            pid: turn
-            for pid, turn in self._fault_history.items()
-            if current_turn - turn <= max_age
-        }
+        self._fault_history = {pid: turn for pid, turn in self._fault_history.items() if current_turn - turn <= max_age}
         self._eviction_history = {
-            pid: turn
-            for pid, turn in self._eviction_history.items()
-            if current_turn - turn <= max_age
+            pid: turn for pid, turn in self._eviction_history.items() if current_turn - turn <= max_age
         }
 
 
@@ -184,9 +173,7 @@ class WorkingSetConfig(BaseModel):
     """Configuration for working set management."""
 
     # Token limits
-    max_l0_tokens: int = Field(
-        default=128_000, description="Maximum tokens in L0 (context window)"
-    )
+    max_l0_tokens: int = Field(default=128_000, description="Maximum tokens in L0 (context window)")
     max_l1_pages: int = Field(default=100, description="Maximum pages in L1 cache")
 
     # Eviction thresholds
@@ -196,14 +183,10 @@ class WorkingSetConfig(BaseModel):
         le=1.0,
         description="Trigger eviction when utilization exceeds this",
     )
-    target_utilization: float = Field(
-        default=0.70, ge=0.0, le=1.0, description="Target utilization after eviction"
-    )
+    target_utilization: float = Field(default=0.70, ge=0.0, le=1.0, description="Target utilization after eviction")
 
     # Reserved tokens
-    reserved_tokens: int = Field(
-        default=4000, description="Reserved for system prompt, tools, etc."
-    )
+    reserved_tokens: int = Field(default=4000, description="Reserved for system prompt, tools, etc.")
 
 
 class WorkingSetManager(BaseModel):
@@ -224,19 +207,13 @@ class WorkingSetManager(BaseModel):
     budget: TokenBudget = Field(default_factory=TokenBudget)
 
     # L0 pages (in context) - ordered by position
-    l0_pages: List[str] = Field(
-        default_factory=list, description="Page IDs in L0, ordered"
-    )
+    l0_pages: list[str] = Field(default_factory=list, description="Page IDs in L0, ordered")
 
     # L1 pages (hot cache) - maps page_id -> MemoryPage
-    l1_cache: Dict[str, MemoryPage] = Field(
-        default_factory=dict, description="Pages in L1 cache"
-    )
+    l1_cache: dict[str, MemoryPage] = Field(default_factory=dict, description="Pages in L1 cache")
 
     # Page importance overrides
-    importance_overrides: Dict[str, float] = Field(
-        default_factory=dict, description="Manual importance adjustments"
-    )
+    importance_overrides: dict[str, float] = Field(default_factory=dict, description="Manual importance adjustments")
 
     # Pinned set - pages that are never evicted
     pinned_set: PinnedSet = Field(default_factory=PinnedSet)
@@ -351,7 +328,7 @@ class WorkingSetManager(BaseModel):
 
         return True
 
-    def remove(self, page_id: str) -> Optional[MemoryPage]:
+    def remove(self, page_id: str) -> MemoryPage | None:
         """
         Remove a page from the working set entirely.
 
@@ -404,7 +381,7 @@ class WorkingSetManager(BaseModel):
 
         return self.add_to_l1(page)
 
-    def get_page(self, page_id: str) -> Optional[MemoryPage]:
+    def get_page(self, page_id: str) -> MemoryPage | None:
         """Get a page from L1 cache (L0 pages are tracked by ID only)."""
         return self.l1_cache.get(page_id)
 
@@ -443,7 +420,7 @@ class WorkingSetManager(BaseModel):
         tokens_needed: int = 0,
         from_tier: StorageTier = StorageTier.L0,
         page_table: Optional["PageTable"] = None,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Get pages that are candidates for eviction, scored by priority.
 
@@ -474,9 +451,7 @@ class WorkingSetManager(BaseModel):
                 anti_thrash=self.anti_thrash,
                 page_table=page_table,
             )
-            candidates = self._eviction_policy.score_candidates(
-                context, from_tier, tokens_needed
-            )
+            candidates = self._eviction_policy.score_candidates(context, from_tier, tokens_needed)
             return [(c.page_id, c.score) for c in candidates]
 
         candidates = []
@@ -497,9 +472,7 @@ class WorkingSetManager(BaseModel):
                 importance = self.importance_overrides.get(page_id, 0.5)
 
                 # Add anti-thrash penalty (higher penalty = higher score = less likely to evict)
-                thrash_penalty = self.anti_thrash.get_eviction_penalty(
-                    page_id, self.current_turn
-                )
+                thrash_penalty = self.anti_thrash.get_eviction_penalty(page_id, self.current_turn)
 
                 # Combine position, importance, and anti-thrash
                 score = position_score * 0.4 + importance * 0.4 + thrash_penalty * 0.2
@@ -528,17 +501,10 @@ class WorkingSetManager(BaseModel):
                 importance = self.importance_overrides.get(page_id, page.importance)
 
                 # Add anti-thrash penalty
-                thrash_penalty = self.anti_thrash.get_eviction_penalty(
-                    page_id, self.current_turn
-                )
+                thrash_penalty = self.anti_thrash.get_eviction_penalty(page_id, self.current_turn)
 
                 # Combined score (higher = keep longer)
-                score = (
-                    recency_score * 0.3
-                    + frequency_score * 0.2
-                    + importance * 0.3
-                    + thrash_penalty * 0.2
-                )
+                score = recency_score * 0.3 + frequency_score * 0.2 + importance * 0.3 + thrash_penalty * 0.2
                 candidates.append((page_id, score))
 
         # Sort by score (lowest first = evict first)
@@ -600,11 +566,11 @@ class WorkingSetManager(BaseModel):
         """Remove importance override for a page."""
         self.importance_overrides.pop(page_id, None)
 
-    def get_l0_page_ids(self) -> List[str]:
+    def get_l0_page_ids(self) -> list[str]:
         """Get all page IDs in L0, in order."""
         return list(self.l0_pages)
 
-    def get_l1_pages(self) -> List[MemoryPage]:
+    def get_l1_pages(self) -> list[MemoryPage]:
         """Get all pages in L1."""
         return list(self.l1_cache.values())
 

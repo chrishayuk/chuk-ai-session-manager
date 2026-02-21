@@ -15,7 +15,7 @@ Design principles:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -53,7 +53,7 @@ class StorageBackend(Protocol):
     async def load(
         self,
         artifact_id: str,
-    ) -> Optional[MemoryPage]:
+    ) -> MemoryPage | None:
         """Load a page by artifact_id."""
         ...
 
@@ -72,7 +72,7 @@ class PageMetadata(BaseModel):
     modality: str
     compression_level: int
     tier: str
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class CheckpointMetadata(BaseModel):
@@ -80,7 +80,7 @@ class CheckpointMetadata(BaseModel):
 
     checkpoint_name: str
     page_count: int
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class CheckpointEntry(BaseModel):
@@ -97,7 +97,7 @@ class CheckpointManifest(BaseModel):
     name: str
     created_at: datetime
     page_count: int
-    pages: List[CheckpointEntry] = Field(default_factory=list)
+    pages: list[CheckpointEntry] = Field(default_factory=list)
 
 
 class InMemoryBackend(BaseModel):
@@ -107,7 +107,7 @@ class InMemoryBackend(BaseModel):
     Not persistent - pages are lost when process exits.
     """
 
-    pages: Dict[str, bytes] = Field(default_factory=dict)
+    pages: dict[str, bytes] = Field(default_factory=dict)
     counter: int = Field(default=0)
 
     model_config = {"arbitrary_types_allowed": True}
@@ -130,7 +130,7 @@ class InMemoryBackend(BaseModel):
     async def load(
         self,
         artifact_id: str,
-    ) -> Optional[MemoryPage]:
+    ) -> MemoryPage | None:
         """Load a page from memory."""
         data = self.pages.get(artifact_id)
         if not data:
@@ -178,17 +178,17 @@ class ArtifactsBridge(BaseModel):
     """
 
     # Configuration
-    session_id: Optional[str] = None
-    _backend: Optional[InMemoryBackend] = None
-    _artifact_store: Optional[Any] = None
+    session_id: str | None = None
+    _backend: InMemoryBackend | None = None
+    _artifact_store: Any | None = None
     _using_artifacts: bool = False
 
     model_config = {"arbitrary_types_allowed": True}
 
     async def configure(
         self,
-        artifact_store: Optional[Any] = None,
-        session_id: Optional[str] = None,
+        artifact_store: Any | None = None,
+        session_id: str | None = None,
     ) -> None:
         """
         Configure the bridge with a storage backend.
@@ -203,8 +203,7 @@ class ArtifactsBridge(BaseModel):
 
         if artifact_store and not ARTIFACTS_AVAILABLE:
             raise ImportError(
-                "chuk-artifacts is required for artifact bridge. "
-                "Install with: pip install chuk-artifacts"
+                "chuk-artifacts is required for artifact bridge. Install with: pip install chuk-artifacts"
             )
 
         if artifact_store and ARTIFACTS_AVAILABLE:
@@ -249,17 +248,14 @@ class ArtifactsBridge(BaseModel):
         """Store using chuk-artifacts."""
         if not ARTIFACTS_AVAILABLE:
             raise ImportError(
-                "chuk-artifacts is required for artifact bridge. "
-                "Install with: pip install chuk-artifacts"
+                "chuk-artifacts is required for artifact bridge. Install with: pip install chuk-artifacts"
             )
         # Serialize page
         data = page.model_dump_json().encode("utf-8")
 
         # Determine scope based on tier
         if StorageScope:
-            scope = (
-                StorageScope.SESSION if tier == StorageTier.L3 else StorageScope.SANDBOX
-            )
+            scope = StorageScope.SESSION if tier == StorageTier.L3 else StorageScope.SANDBOX
         else:
             scope = "session"
 
@@ -288,7 +284,7 @@ class ArtifactsBridge(BaseModel):
     async def load_page(
         self,
         artifact_id: str,
-    ) -> Optional[MemoryPage]:
+    ) -> MemoryPage | None:
         """
         Load a page by artifact ID.
 
@@ -308,12 +304,11 @@ class ArtifactsBridge(BaseModel):
     async def _load_with_artifacts(
         self,
         artifact_id: str,
-    ) -> Optional[MemoryPage]:
+    ) -> MemoryPage | None:
         """Load using chuk-artifacts."""
         if not ARTIFACTS_AVAILABLE:
             raise ImportError(
-                "chuk-artifacts is required for artifact bridge. "
-                "Install with: pip install chuk-artifacts"
+                "chuk-artifacts is required for artifact bridge. Install with: pip install chuk-artifacts"
             )
         try:
             # Get artifact data
@@ -357,7 +352,7 @@ class ArtifactsBridge(BaseModel):
 
     async def store_checkpoint(
         self,
-        pages: List[MemoryPage],
+        pages: list[MemoryPage],
         checkpoint_name: str,
     ) -> str:
         """
@@ -393,10 +388,7 @@ class ArtifactsBridge(BaseModel):
         manifest_data = manifest.model_dump_json().encode("utf-8")
 
         if self._using_artifacts and self._artifact_store:
-            if StorageScope:
-                scope = StorageScope.SESSION
-            else:
-                scope = "session"
+            scope = StorageScope.SESSION if StorageScope else "session"
 
             checkpoint_metadata = CheckpointMetadata(
                 checkpoint_name=checkpoint_name,
@@ -424,7 +416,7 @@ class ArtifactsBridge(BaseModel):
     async def load_checkpoint(
         self,
         checkpoint_id: str,
-    ) -> List[MemoryPage]:
+    ) -> list[MemoryPage]:
         """
         Load all pages from a checkpoint.
 
@@ -435,7 +427,7 @@ class ArtifactsBridge(BaseModel):
             List of MemoryPages
         """
         # Load manifest
-        manifest_data: Optional[bytes] = None
+        manifest_data: bytes | None = None
         if self._using_artifacts and self._artifact_store:
             manifest_data = await self._artifact_store.retrieve(checkpoint_id)
         elif self._backend:
@@ -446,15 +438,12 @@ class ArtifactsBridge(BaseModel):
         if not manifest_data:
             return []
 
-        if isinstance(manifest_data, bytes):
-            manifest_str = manifest_data.decode("utf-8")
-        else:
-            manifest_str = manifest_data
+        manifest_str = manifest_data.decode("utf-8") if isinstance(manifest_data, bytes) else manifest_data
 
         manifest = CheckpointManifest.model_validate_json(manifest_str)
 
         # Load each page
-        pages: List[MemoryPage] = []
+        pages: list[MemoryPage] = []
         for entry in manifest.pages:
             page = await self.load_page(entry.artifact_id)
             if page:

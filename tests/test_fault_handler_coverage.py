@@ -1,8 +1,9 @@
 # tests/test_fault_handler_coverage.py
 """Tests for memory/fault_handler.py to achieve >90% coverage."""
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from chuk_ai_session_manager.memory.fault_handler import (
     FaultResult,
@@ -131,9 +132,7 @@ class TestHandleFault:
     def handler_with_table(self):
         handler = PageFaultHandler()
         pt = PageTable()
-        page = _make_page(
-            "pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2
-        )
+        page = _make_page("pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2)
         handler.store_page(page)
         pt.register(page)
         handler.configure(pt)
@@ -237,9 +236,7 @@ class TestHandleFault:
     async def test_custom_compressor(self):
         handler = PageFaultHandler()
         pt = PageTable()
-        page = _make_page(
-            "pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2
-        )
+        page = _make_page("pg1", compression_level=CompressionLevel.FULL, storage_tier=StorageTier.L2)
         handler.store_page(page)
         pt.register(page)
 
@@ -269,9 +266,7 @@ class TestBuildToolResult:
     def test_success_text(self):
         handler = PageFaultHandler()
         page = _make_page("pg1", content="hello", size_tokens=50)
-        fr = FaultResult(
-            success=True, page=page, source_tier=StorageTier.L2, latency_ms=5.0
-        )
+        fr = FaultResult(success=True, page=page, source_tier=StorageTier.L2, latency_ms=5.0)
         tr = handler.build_tool_result(fr, evictions=["old1"])
         assert tr.page.page_id == "pg1"
         assert tr.effects.promoted_to_working_set
@@ -319,9 +314,7 @@ class TestFormatContentForModality:
 
     def test_image_base64(self):
         handler = PageFaultHandler()
-        page = _make_page(
-            "p1", modality=Modality.IMAGE, content="data:image/png;base64,abc"
-        )
+        page = _make_page("p1", modality=Modality.IMAGE, content="data:image/png;base64,abc")
         result = handler._format_content_for_modality(page)
         assert isinstance(result, ImageContent)
         assert result.base64 == "data:image/png;base64,abc"

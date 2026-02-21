@@ -29,7 +29,8 @@ Usage:
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union, Callable
+from collections.abc import Callable
+from typing import Any
 
 from chuk_ai_session_manager.session_manager import SessionManager
 
@@ -41,7 +42,7 @@ async def track_conversation(
     ai_response: str,
     model: str = "unknown",
     provider: str = "unknown",
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     infinite_context: bool = False,
     token_threshold: int = 4000,
 ) -> str:
@@ -85,11 +86,11 @@ async def track_conversation(
 
 async def track_llm_call(
     user_input: str,
-    llm_function: Callable[[str], Union[str, Any]],
+    llm_function: Callable[[str], str | Any],
     model: str = "unknown",
     provider: str = "unknown",
-    session_manager: Optional[SessionManager] = None,
-    session_id: Optional[str] = None,
+    session_manager: SessionManager | None = None,
+    session_id: str | None = None,
     infinite_context: bool = False,
     token_threshold: int = 4000,
 ) -> tuple[str, str]:
@@ -152,9 +153,7 @@ async def track_llm_call(
         # Plain string or other
         response_text = str(ai_response)
 
-    session_id = await session_manager.ai_responds(
-        response_text, model=model, provider=provider
-    )
+    session_id = await session_manager.ai_responds(response_text, model=model, provider=provider)
 
     return response_text, session_id
 
@@ -165,7 +164,7 @@ async def quick_conversation(
     model: str = "unknown",
     provider: str = "unknown",
     infinite_context: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Quickest way to track a conversation and get basic stats.
 
@@ -209,9 +208,9 @@ async def track_infinite_conversation(
     ai_response: str,
     model: str = "unknown",
     provider: str = "unknown",
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     token_threshold: int = 4000,
-    max_turns: int = 20,
+    max_turns: int = 20,  # noqa: ARG001 — reserved for turn-based segmentation
 ) -> str:
     """
     Track a conversation with infinite context support.
@@ -263,10 +262,10 @@ async def track_infinite_conversation(
 
 async def track_tool_use(
     tool_name: str,
-    arguments: Dict[str, Any],
+    arguments: dict[str, Any],
     result: Any,
-    session_id: Optional[str] = None,
-    error: Optional[str] = None,
+    session_id: str | None = None,
+    error: str | None = None,
     **metadata,
 ) -> str:
     """
@@ -294,14 +293,10 @@ async def track_tool_use(
         ```
     """
     sm = SessionManager(session_id=session_id)
-    return await sm.tool_used(
-        tool_name=tool_name, arguments=arguments, result=result, error=error, **metadata
-    )
+    return await sm.tool_used(tool_name=tool_name, arguments=arguments, result=result, error=error, **metadata)
 
 
-async def get_session_stats(
-    session_id: str, include_all_segments: bool = False
-) -> Dict[str, Any]:
+async def get_session_stats(session_id: str, include_all_segments: bool = False) -> dict[str, Any]:
     """
     Get statistics for an existing session.
 
@@ -323,9 +318,7 @@ async def get_session_stats(
     return await sm.get_stats(include_all_segments=include_all_segments)
 
 
-async def get_conversation_history(
-    session_id: str, include_all_segments: bool = False
-) -> List[Dict[str, Any]]:
+async def get_conversation_history(session_id: str, include_all_segments: bool = False) -> list[dict[str, Any]]:
     """
     Get the conversation history for a session.
 

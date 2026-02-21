@@ -32,9 +32,7 @@ class SessionNotFound(SessionManagerError):
 
     def __init__(self, session_id=None, message=None):
         self.session_id = session_id
-        default_message = (
-            f"Session not found: {session_id}" if session_id else "Session not found"
-        )
+        default_message = f"Session not found: {session_id}" if session_id else "Session not found"
         super().__init__(message or default_message)
 
 
@@ -49,11 +47,7 @@ class SessionAlreadyExists(SessionManagerError):
 
     def __init__(self, session_id=None, message=None):
         self.session_id = session_id
-        default_message = (
-            f"Session already exists: {session_id}"
-            if session_id
-            else "Session already exists"
-        )
+        default_message = f"Session already exists: {session_id}" if session_id else "Session already exists"
         super().__init__(message or default_message)
 
 

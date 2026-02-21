@@ -14,7 +14,7 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ from .models import (
 from .page_table import PageTable
 
 # Tier hint constants for manifest generation
-_TIER_HINTS: Dict[StorageTier, str] = {
+_TIER_HINTS: dict[StorageTier, str] = {
     StorageTier.L2: "recent",
     StorageTier.L3: "stored",
     StorageTier.L4: "archived",
@@ -52,7 +52,7 @@ class AvailablePageEntry(BaseModel):
     page_id: str
     modality: str
     tier: str = Field(..., description="Current storage tier")
-    levels: List[int] = Field(
+    levels: list[int] = Field(
         default_factory=lambda: list(ALL_COMPRESSION_LEVELS),
         description="Available compression levels",
     )
@@ -65,7 +65,7 @@ class ManifestPolicies(BaseModel):
     faults_allowed: bool = True
     max_faults_per_turn: int = 2
     upgrade_budget_tokens: int = 4096
-    prefer_levels: List[int] = Field(
+    prefer_levels: list[int] = Field(
         default_factory=lambda: [
             CompressionLevel.ABSTRACT.value,
             CompressionLevel.REDUCED.value,
@@ -83,15 +83,15 @@ class VMManifest(BaseModel):
     """
 
     session_id: str
-    working_set: List[WorkingSetEntry] = Field(default_factory=list)
-    available_pages: List[AvailablePageEntry] = Field(default_factory=list)
+    working_set: list[WorkingSetEntry] = Field(default_factory=list)
+    available_pages: list[AvailablePageEntry] = Field(default_factory=list)
     policies: ManifestPolicies = Field(default_factory=ManifestPolicies)
 
-    def to_json(self, indent: Optional[int] = None) -> str:
+    def to_json(self, indent: int | None = None) -> str:
         """Serialize to JSON string."""
         return self.model_dump_json(indent=indent)
 
-    def to_wrapped_json(self, indent: Optional[int] = None) -> str:
+    def to_wrapped_json(self, indent: int | None = None) -> str:
         """Serialize wrapped with VM:MANIFEST_JSON tags."""
         json_str = self.to_json(indent=indent)
         return f"<VM:MANIFEST_JSON>\n{json_str}\n</VM:MANIFEST_JSON>"
@@ -115,19 +115,17 @@ class ManifestBuilder(BaseModel):
     default_policies: ManifestPolicies = Field(default_factory=ManifestPolicies)
 
     # Maximum available pages to include
-    max_available_pages: int = Field(
-        default=50, description="Limit available_pages to prevent manifest bloat"
-    )
+    max_available_pages: int = Field(default=50, description="Limit available_pages to prevent manifest bloat")
 
     def build(
         self,
         session_id: str,
         page_table: PageTable,
-        working_set_ids: List[str],
-        working_set_tokens: Optional[Dict[str, int]] = None,
-        working_set_importance: Optional[Dict[str, float]] = None,
-        hint_generator: Optional[Callable[[PageTableEntry], str]] = None,
-        policies: Optional[ManifestPolicies] = None,
+        working_set_ids: list[str],
+        working_set_tokens: dict[str, int] | None = None,
+        working_set_importance: dict[str, float] | None = None,
+        hint_generator: Callable[[PageTableEntry], str] | None = None,
+        policies: ManifestPolicies | None = None,
     ) -> VMManifest:
         """
         Build a complete VM manifest.
@@ -144,8 +142,8 @@ class ManifestBuilder(BaseModel):
         Returns:
             VMManifest ready for serialization
         """
-        working_set: List[WorkingSetEntry] = []
-        available_pages: List[AvailablePageEntry] = []
+        working_set: list[WorkingSetEntry] = []
+        available_pages: list[AvailablePageEntry] = []
 
         working_set_tokens = working_set_tokens or {}
         working_set_importance = working_set_importance or {}
@@ -158,9 +156,7 @@ class ManifestBuilder(BaseModel):
                     page_id=page_id,
                     modality=entry.modality.value,
                     level=entry.compression_level,
-                    tokens_est=working_set_tokens.get(
-                        page_id, entry.size_tokens or 100
-                    ),
+                    tokens_est=working_set_tokens.get(page_id, entry.size_tokens or 100),
                     importance=working_set_importance.get(page_id, 0.5),
                 )
                 working_set.append(ws_entry)
@@ -202,10 +198,10 @@ class ManifestBuilder(BaseModel):
     def build_from_pages(
         self,
         session_id: str,
-        working_set_pages: List[MemoryPage],
-        available_entries: List[PageTableEntry],
-        hint_generator: Optional[Callable[[PageTableEntry], str]] = None,
-        policies: Optional[ManifestPolicies] = None,
+        working_set_pages: list[MemoryPage],
+        available_entries: list[PageTableEntry],
+        hint_generator: Callable[[PageTableEntry], str] | None = None,
+        policies: ManifestPolicies | None = None,
     ) -> VMManifest:
         """
         Build manifest directly from page objects (alternative API).
@@ -220,16 +216,14 @@ class ManifestBuilder(BaseModel):
         Returns:
             VMManifest
         """
-        working_set: List[WorkingSetEntry] = []
-        available_pages: List[AvailablePageEntry] = []
+        working_set: list[WorkingSetEntry] = []
+        available_pages: list[AvailablePageEntry] = []
 
         # Build working set from pages
         for page in working_set_pages:
             ws_entry = WorkingSetEntry(
                 page_id=page.page_id,
-                modality=page.modality.value
-                if hasattr(page.modality, "value")
-                else str(page.modality),
+                modality=page.modality.value if hasattr(page.modality, "value") else str(page.modality),
                 level=page.compression_level
                 if isinstance(page.compression_level, int)
                 else page.compression_level.value,
@@ -253,12 +247,8 @@ class ManifestBuilder(BaseModel):
 
             available_entry = AvailablePageEntry(
                 page_id=entry.page_id,
-                modality=entry.modality.value
-                if hasattr(entry.modality, "value")
-                else str(entry.modality),
-                tier=entry.tier.value
-                if hasattr(entry.tier, "value")
-                else str(entry.tier),
+                modality=entry.modality.value if hasattr(entry.modality, "value") else str(entry.modality),
+                tier=entry.tier.value if hasattr(entry.tier, "value") else str(entry.tier),
                 levels=ALL_COMPRESSION_LEVELS,
                 hint=hint,
             )
@@ -291,7 +281,7 @@ def generate_simple_hint(entry: PageTableEntry) -> str:
     This is a basic implementation - real systems would use
     summaries, embeddings, or other content-aware hints.
     """
-    parts: List[str] = []
+    parts: list[str] = []
 
     # Modality
     if entry.modality != Modality.TEXT:

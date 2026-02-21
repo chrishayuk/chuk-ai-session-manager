@@ -15,6 +15,19 @@ import logging
 import re
 from typing import Any
 
+# Import guards from chuk-tool-processor
+from chuk_tool_processor.guards import (
+    BudgetGuard,
+    BudgetGuardConfig,
+    GuardResult,
+    GuardVerdict,
+    PerToolGuard,
+    PerToolGuardConfig,
+    PreconditionGuard,
+    PreconditionGuardConfig,
+    RunawayGuard,
+    RunawayGuardConfig,
+)
 from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.guards.bindings import BindingManager
@@ -39,20 +52,6 @@ from chuk_ai_session_manager.guards.models import (
 from chuk_ai_session_manager.guards.ungrounded import (
     UngroundedGuard,
     UngroundedGuardConfig,
-)
-
-# Import guards from chuk-tool-processor
-from chuk_tool_processor.guards import (
-    BudgetGuard,
-    BudgetGuardConfig,
-    GuardResult,
-    GuardVerdict,
-    PerToolGuard,
-    PerToolGuardConfig,
-    PreconditionGuard,
-    PreconditionGuardConfig,
-    RunawayGuard,
-    RunawayGuardConfig,
 )
 
 log = logging.getLogger(__name__)
@@ -127,9 +126,7 @@ class ToolStateManager(BaseModel):
         )
 
         self.runaway_guard = RunawayGuard(config=RunawayGuardConfig())
-        self.per_tool_guard = PerToolGuard(
-            config=PerToolGuardConfig(default_limit=self.limits.per_tool_cap)
-        )
+        self.per_tool_guard = PerToolGuard(config=PerToolGuardConfig(default_limit=self.limits.per_tool_cap))
 
     # =========================================================================
     # Configuration
@@ -224,11 +221,7 @@ class ToolStateManager(BaseModel):
 
         # Only consider $vN-style references (e.g. v1, v2), not arbitrary $identifiers
         vn_missing = [ref for ref in missing if re.fullmatch(r"v\d+", ref)]
-        vn_resolved = {
-            f"${ref}": val
-            for ref, val in resolved.items()
-            if re.fullmatch(r"v\d+", ref)
-        }
+        vn_resolved = {f"${ref}": val for ref, val in resolved.items() if re.fullmatch(r"v\d+", ref)}
 
         if vn_missing:
             return ReferenceCheckResult(
@@ -284,9 +277,7 @@ class ToolStateManager(BaseModel):
         """Get cache statistics."""
         return self.cache.get_stats()
 
-    def format_duplicate_message(
-        self, tool_name: str, arguments: dict[str, Any]
-    ) -> str:
+    def format_duplicate_message(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Format message for duplicate tool call."""
         return self.cache.format_duplicate_message(tool_name, arguments)
 
@@ -314,9 +305,7 @@ class ToolStateManager(BaseModel):
 
     def set_budget(self, budget: int) -> None:
         """Set the total tool budget."""
-        self.limits = RuntimeLimits(
-            tool_budget_total=budget, execution_budget=budget, discovery_budget=budget
-        )
+        self.limits = RuntimeLimits(tool_budget_total=budget, execution_budget=budget, discovery_budget=budget)
         self._init_guards()
 
     def get_discovery_status(self) -> dict[str, int]:
@@ -430,7 +419,7 @@ class ToolStateManager(BaseModel):
         """Check if tool requires computed values."""
         return ToolClassification.is_parameterized_tool(tool_name)
 
-    def classify_by_result(self, tool_name: str, result: Any) -> None:
+    def classify_by_result(self, tool_name: str, result: Any) -> None:  # noqa: ARG002
         """Classify a tool based on its result shape."""
         if isinstance(result, dict):
             if "results" in result and isinstance(result["results"], list):
@@ -460,9 +449,8 @@ class ToolStateManager(BaseModel):
         if result.blocked or result.verdict == GuardVerdict.WARN:
             numeric_args = []
             for k, v in arguments.items():
-                if isinstance(v, (int, float)):
-                    if v not in self.user_literals:
-                        numeric_args.append(f"{k}={v}")
+                if isinstance(v, (int, float)) and v not in self.user_literals:
+                    numeric_args.append(f"{k}={v}")
 
             return UngroundedCallResult(
                 is_ungrounded=bool(numeric_args),
@@ -502,10 +490,7 @@ class ToolStateManager(BaseModel):
                 if isinstance(v, (int, float)) and v not in self.user_literals:
                     numeric_args.append(f"{k}={v}")
             if not numeric_args or not self.bindings.bindings:
-                fallback = (
-                    f"Cannot call {tool_name} with literal values. "
-                    f"Please compute the required values first."
-                )
+                fallback = f"Cannot call {tool_name} with literal values. Please compute the required values first."
                 return False, None, fallback
         else:
             return False, None, None
@@ -518,22 +503,18 @@ class ToolStateManager(BaseModel):
                 try:
                     val = float(val_str)
                     for binding in self.bindings.bindings.values():
-                        if isinstance(binding.raw_value, (int, float)):
-                            if abs(binding.raw_value - val) < 1e-9:
-                                repaired[key] = f"${binding.id}"
-                                log.info(f"Repaired {key}={val} -> ${binding.id}")
-                                any_repaired = True
-                                break
+                        if isinstance(binding.raw_value, (int, float)) and abs(binding.raw_value - val) < 1e-9:
+                            repaired[key] = f"${binding.id}"
+                            log.info(f"Repaired {key}={val} -> ${binding.id}")
+                            any_repaired = True
+                            break
                 except ValueError:
                     pass
 
         if any_repaired:
             return True, repaired, None
         else:
-            fallback = (
-                f"Cannot auto-repair call to {tool_name}. "
-                f"No matching bindings found for {numeric_args}."
-            )
+            fallback = f"Cannot auto-repair call to {tool_name}. No matching bindings found for {numeric_args}."
             return False, None, fallback
 
     # =========================================================================
@@ -559,9 +540,7 @@ class ToolStateManager(BaseModel):
         count = self.get_tool_call_count(tool_name)
 
         # If per_tool_limit is 0 or negative, limits are disabled
-        requires_justification = (
-            self.per_tool_limit > 0 and count >= self.per_tool_limit
-        )
+        requires_justification = self.per_tool_limit > 0 and count >= self.per_tool_limit
 
         return PerToolCallStatus(
             tool_name=base_name,
@@ -745,9 +724,7 @@ class ToolStateManager(BaseModel):
                     aliases=[var_name],
                 )
                 new_bindings.append(binding)
-                log.debug(
-                    f"Extracted binding: ${binding.id} = {value} (alias: {var_name})"
-                )
+                log.debug(f"Extracted binding: ${binding.id} = {value} (alias: {var_name})")
 
             except ValueError:
                 continue
