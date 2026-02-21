@@ -128,11 +128,11 @@ class VMToolResult(BaseModel):
 ```python
 class PageData(BaseModel):
     page_id: str
-    modality: str     # "text", "image", etc.
-    level: int        # Compression level
-    tier: str         # Current tier
-    content: PageContent  # Modality-specific content
-    meta: PageMeta    # Additional metadata
+    modality: Modality           # Modality enum
+    level: CompressionLevel      # CompressionLevel enum
+    tier: StorageTier            # StorageTier enum
+    content: PageContent         # Modality-specific content
+    meta: PageMeta               # Additional metadata
 ```
 
 **FaultEffects structure:**
@@ -264,9 +264,9 @@ class SearchResult(BaseModel):
 
 class SearchResultEntry(BaseModel):
     page_id: str
-    modality: str
-    tier: str
-    levels: List[int]
+    modality: Modality
+    tier: StorageTier
+    levels: List[CompressionLevel]
     hint: str
     relevance: float  # 0.0-1.0
 ```

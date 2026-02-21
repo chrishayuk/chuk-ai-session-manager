@@ -120,7 +120,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
         return (
             [
                 {
-                    "role": MessageRole.USER,
+                    "role": MessageRole.USER.value,
                     "content": _extract_content(first_user.message),
                 }
             ]
@@ -141,11 +141,14 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
     prompt: List[Dict[str, Any]] = []
     if first_user:
         prompt.append(
-            {"role": MessageRole.USER, "content": _extract_content(first_user.message)}
+            {
+                "role": MessageRole.USER.value,
+                "content": _extract_content(first_user.message),
+            }
         )
 
     # ALWAYS add the assistant marker - but strip its free text
-    prompt.append({"role": MessageRole.ASSISTANT, "content": None})
+    prompt.append({"role": MessageRole.ASSISTANT.value, "content": None})
 
     if tool_calls:
         for tc in tool_calls:
@@ -163,7 +166,7 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
 
             prompt.append(
                 {
-                    "role": MessageRole.TOOL,
+                    "role": MessageRole.TOOL.value,
                     "name": tool_name,
                     "content": json.dumps(tool_result, default=str),
                 }
@@ -173,11 +176,13 @@ async def _build_minimal_prompt(session: Session) -> List[Dict[str, Any]]:
         summary = summaries[-1]
         if isinstance(summary.message, dict) and "note" in summary.message:
             prompt.append(
-                {"role": MessageRole.SYSTEM, "content": summary.message["note"]}
+                {"role": MessageRole.SYSTEM.value, "content": summary.message["note"]}
             )
         else:
             # Handle legacy or unexpected format
-            prompt.append({"role": MessageRole.SYSTEM, "content": str(summary.message)})
+            prompt.append(
+                {"role": MessageRole.SYSTEM.value, "content": str(summary.message)}
+            )
 
     return prompt
 
@@ -237,18 +242,24 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
     # Always include the first user message (the main task)
     prompt.append(
-        {"role": MessageRole.USER, "content": _extract_content(first_user.message)}
+        {
+            "role": MessageRole.USER.value,
+            "content": _extract_content(first_user.message),
+        }
     )
 
     # Include the latest user message if different from the first
     if latest_user and latest_user.id != first_user.id:
         prompt.append(
-            {"role": MessageRole.USER, "content": _extract_content(latest_user.message)}
+            {
+                "role": MessageRole.USER.value,
+                "content": _extract_content(latest_user.message),
+            }
         )
 
     # Include assistant response placeholder
     if assistant_msg:
-        prompt.append({"role": MessageRole.ASSISTANT, "content": None})
+        prompt.append({"role": MessageRole.ASSISTANT.value, "content": None})
 
         # Find successful tool calls
         children = [
@@ -276,7 +287,7 @@ async def _build_task_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
                 prompt.append(
                     {
-                        "role": MessageRole.TOOL,
+                        "role": MessageRole.TOOL.value,
                         "name": tool_name,
                         "content": json.dumps(tool_result, default=str),
                     }
@@ -322,12 +333,15 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
     # Include user message
     prompt.append(
-        {"role": MessageRole.USER, "content": _extract_content(latest_user.message)}
+        {
+            "role": MessageRole.USER.value,
+            "content": _extract_content(latest_user.message),
+        }
     )
 
     # Include assistant placeholder
     if assistant_msg:
-        prompt.append({"role": MessageRole.ASSISTANT, "content": None})
+        prompt.append({"role": MessageRole.ASSISTANT.value, "content": None})
 
         # Get all tool calls for this assistant
         children = [
@@ -353,7 +367,7 @@ async def _build_tool_focused_prompt(session: Session) -> List[Dict[str, Any]]:
 
                 prompt.append(
                     {
-                        "role": MessageRole.TOOL,
+                        "role": MessageRole.TOOL.value,
                         "name": tool_name,
                         "content": json.dumps(content, default=str),
                     }
@@ -387,15 +401,15 @@ async def _build_conversation_prompt(
     prompt: List[Dict[str, Any]] = []
     for i, msg in enumerate(recent_messages):
         role = (
-            MessageRole.USER
+            MessageRole.USER.value
             if msg.source == EventSource.USER
-            else MessageRole.ASSISTANT
+            else MessageRole.ASSISTANT.value
         )
         content = _extract_content(msg.message)
 
         # For the last assistant message, set content to None and add tool calls
         if (
-            role == MessageRole.ASSISTANT
+            role == MessageRole.ASSISTANT.value
             and msg == recent_messages[-1]
             and msg.source != EventSource.USER
         ):
@@ -420,7 +434,7 @@ async def _build_conversation_prompt(
 
                     prompt.append(
                         {
-                            "role": MessageRole.TOOL,
+                            "role": MessageRole.TOOL.value,
                             "name": tool_name,
                             "content": json.dumps(tool_result, default=str),
                         }
@@ -477,7 +491,7 @@ async def _build_hierarchical_prompt(
                     prompt.insert(
                         0,
                         {
-                            "role": MessageRole.SYSTEM,
+                            "role": MessageRole.SYSTEM.value,
                             "content": f"Context from previous conversation: {summary_content}",
                         },
                     )
@@ -521,13 +535,13 @@ async def truncate_prompt_to_token_limit(
     # ------------------------------------------------------------------ #
     # decide which messages to keep
     first_user_idx = next(
-        (i for i, m in enumerate(prompt) if m["role"] == MessageRole.USER), None
+        (i for i, m in enumerate(prompt) if m["role"] == MessageRole.USER.value), None
     )
     last_asst_idx = next(
         (
             len(prompt) - 1 - i
             for i, m in enumerate(reversed(prompt))
-            if m["role"] == MessageRole.ASSISTANT
+            if m["role"] == MessageRole.ASSISTANT.value
         ),
         None,
     )
@@ -545,9 +559,11 @@ async def truncate_prompt_to_token_limit(
 
     if remaining > max_tokens:
         # remove any tool messages we just added
-        kept = [m for m in kept if m["role"] != MessageRole.TOOL]
+        kept = [m for m in kept if m["role"] != MessageRole.TOOL.value]
         # but guarantee at least one tool message (the first) if it'll fit
-        first_tool = next((m for m in prompt if m["role"] == MessageRole.TOOL), None)
+        first_tool = next(
+            (m for m in prompt if m["role"] == MessageRole.TOOL.value), None
+        )
         if first_tool:
             kept.append(first_tool)
 

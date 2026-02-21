@@ -161,18 +161,18 @@ Core abstraction representing any piece of content across modalities.
 ```python
 class MemoryPage(BaseModel):
     page_id: str
-    modality: Literal["text", "image", "audio", "video", "structured"]
-    storage_tier: Literal["L0", "L1", "L2", "L3", "L4"]
+    modality: Modality = Modality.TEXT
+    storage_tier: StorageTier = StorageTier.L0
 
     # Page type (critical for eviction/compression decisions)
-    page_type: Literal["transcript", "summary", "artifact", "claim", "procedure", "index"]
+    page_type: PageType = PageType.TRANSCRIPT
 
     # Provenance: what pages justify this one (for claims, summaries)
     provenance: List[str] = []  # page_ids that this page derives from
 
     # Representation linking (for compression chain)
     represents: Optional[str] = None  # page_id this is a compressed version of
-    representation_level: int = 0     # 0=full, 1=reduced, 2=abstract, 3=reference
+    representation_level: CompressionLevel = CompressionLevel.FULL
 
     # Content or reference
     content: Optional[Any] = None
@@ -201,8 +201,8 @@ class MemoryPage(BaseModel):
 # When user says "Let's use PostgreSQL for the database"
 claim_page = MemoryPage(
     page_id="claim_db_choice_001",
-    page_type="claim",
-    modality="text",
+    page_type=PageType.CLAIM,
+    modality=Modality.TEXT,
     content="Decision: Use PostgreSQL for the database",
     provenance=["msg_042", "msg_043"],  # The messages where this was decided
     importance=0.95,  # High importance = low eviction priority
@@ -216,8 +216,8 @@ claim_page = MemoryPage(
 # Learned pattern: "When calling weather_tool, we usually load location claims first"
 procedure_page = MemoryPage(
     page_id="proc_weather_pattern_001",
-    page_type="procedure",
-    modality="structured",
+    page_type=PageType.PROCEDURE,
+    modality=Modality.STRUCTURED,
     content={
         "tool": "weather_tool",
         "prereqs": ["claim_location_*"],
@@ -234,9 +234,9 @@ Core metadata for each page - includes dirty bit from day one.
 ```python
 class PageTableEntry(BaseModel):
     page_id: str
-    tier: Literal["L0", "L1", "L2", "L3", "L4"]
+    tier: StorageTier
     artifact_id: Optional[str] = None
-    compression_level: int = 0
+    compression_level: CompressionLevel = CompressionLevel.FULL
 
     # Dirty tracking (critical for coherency)
     dirty: bool = False
@@ -247,7 +247,7 @@ class PageTableEntry(BaseModel):
     access_count: int = 0
 
     # Locality hints (for future NUMA awareness)
-    affinity: Literal["local", "remote", "shared"] = "local"
+    affinity: Affinity = Affinity.LOCAL
 ```
 
 ### 1.4 PageTable
@@ -512,14 +512,14 @@ class PageMutation(BaseModel):
     page_id: str
     timestamp: datetime
     turn: int
-    mutation_type: Literal["create", "fault_in", "evict", "compress", "pin", "unpin"]
+    mutation_type: MutationType  # CREATE, FAULT_IN, EVICT, COMPRESS, PIN, UNPIN
 
     # Context at mutation time
-    tier_before: Optional[str]
-    tier_after: str
+    tier_before: Optional[StorageTier]
+    tier_after: StorageTier
 
     # Who caused it
-    actor: Literal["user", "model", "tool", "system"]
+    actor: Actor  # USER, MODEL, TOOL, SYSTEM
     cause: Optional[str]  # "eviction_pressure", "page_fault", "explicit_request"
 ```
 
@@ -1180,7 +1180,7 @@ class LocalityManager:
     """
     regions: Dict[str, StorageRegion]
 
-    async def get_affinity(self, page_id: str) -> Literal["local", "remote", "shared"]:
+    async def get_affinity(self, page_id: str) -> Affinity:
         """Determine where page lives relative to current compute"""
 
     async def estimate_fault_cost(self, page_id: str) -> FaultCost:
@@ -2255,12 +2255,12 @@ memory/
 ```python
 class MemoryPage(BaseModel):
     page_id: str
-    modality: Literal["text"] = "text"  # v0.8: text only
-    storage_tier: Literal["L0", "L1", "L2", "L3"]
-    compression_level: int = 0
+    modality: Modality = Modality.TEXT
+    storage_tier: StorageTier = StorageTier.L0
+    compression_level: CompressionLevel = CompressionLevel.FULL
 
     # Page type from day one (critical for eviction/compression)
-    page_type: Literal["transcript", "summary", "artifact", "claim"] = "transcript"
+    page_type: PageType = PageType.TRANSCRIPT
 
     # Provenance from day one (linked representations)
     provenance: List[str] = []  # page_ids this derives from
@@ -2278,10 +2278,10 @@ class MemoryPage(BaseModel):
 
 class PageTableEntry(BaseModel):
     page_id: str
-    tier: str
-    page_type: str  # NEW: for eviction decisions
+    tier: StorageTier
+    page_type: PageType = PageType.TRANSCRIPT
     artifact_id: Optional[str]
-    compression_level: int
+    compression_level: CompressionLevel = CompressionLevel.FULL
     dirty: bool = False
     last_accessed: datetime
     access_count: int = 0

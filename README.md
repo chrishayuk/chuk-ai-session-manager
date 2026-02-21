@@ -123,9 +123,9 @@ from chuk_ai_session_manager.guards import get_tool_state, ToolStateManager
 # Get the singleton tool state manager
 tool_state = get_tool_state()
 
-# Track tool calls and bind results as $v0, $v1, ...
+# Track tool calls and bind results as $v1, $v2, ...
 binding = tool_state.bind_value("sqrt", {"x": 16}, 4.0)
-# LLM can now reference $v0 in subsequent calls
+# LLM can now reference $v1 in subsequent calls
 
 # Check for runaway tool loops
 status = tool_state.check_runaway()

@@ -482,7 +482,7 @@ class SessionManager:
         if self._infinite_context:
             self._full_conversation.append(
                 {
-                    "role": MessageRole.USER,
+                    "role": MessageRole.USER.value,
                     "content": message,
                     "timestamp": event.timestamp.isoformat(),
                     "session_id": self._session_id,
@@ -555,7 +555,7 @@ class SessionManager:
         if self._infinite_context:
             self._full_conversation.append(
                 {
-                    "role": MessageRole.ASSISTANT,
+                    "role": MessageRole.ASSISTANT.value,
                     "content": response,
                     "timestamp": event.timestamp.isoformat(),
                     "session_id": self._session_id,
@@ -658,18 +658,21 @@ class SessionManager:
         if self._vm and include_system:
             ctx = self._vm.build_context(system_prompt=self._system_prompt or "")
             messages: List[Dict[str, str]] = [
-                {"role": MessageRole.SYSTEM, "content": ctx["developer_message"]}
+                {"role": MessageRole.SYSTEM.value, "content": ctx["developer_message"]}
             ]
             for event in self._session.events:
                 if event.type == EventType.MESSAGE:
                     if event.source == EventSource.USER:
                         messages.append(
-                            {"role": MessageRole.USER, "content": str(event.message)}
+                            {
+                                "role": MessageRole.USER.value,
+                                "content": str(event.message),
+                            }
                         )
                     elif event.source == EventSource.LLM:
                         messages.append(
                             {
-                                "role": MessageRole.ASSISTANT,
+                                "role": MessageRole.ASSISTANT.value,
                                 "content": str(event.message),
                             }
                         )
@@ -680,7 +683,7 @@ class SessionManager:
         # Add system prompt if available and requested (and not empty)
         if include_system and self._system_prompt and self._system_prompt.strip():
             messages.append(
-                {"role": MessageRole.SYSTEM, "content": self._system_prompt}
+                {"role": MessageRole.SYSTEM.value, "content": self._system_prompt}
             )
 
         # Add conversation messages
@@ -688,11 +691,17 @@ class SessionManager:
             if event.type == EventType.MESSAGE:
                 if event.source == EventSource.USER:
                     messages.append(
-                        {"role": MessageRole.USER, "content": str(event.message)}
+                        {
+                            "role": MessageRole.USER.value,
+                            "content": str(event.message),
+                        }
                     )
                 elif event.source == EventSource.LLM:
                     messages.append(
-                        {"role": MessageRole.ASSISTANT, "content": str(event.message)}
+                        {
+                            "role": MessageRole.ASSISTANT.value,
+                            "content": str(event.message),
+                        }
                     )
 
         return messages
@@ -724,9 +733,9 @@ class SessionManager:
                 if event.type == EventType.MESSAGE:
                     turn = {
                         "role": (
-                            MessageRole.USER
+                            MessageRole.USER.value
                             if event.source == EventSource.USER
-                            else MessageRole.ASSISTANT
+                            else MessageRole.ASSISTANT.value
                         ),
                         "content": str(event.message),
                         "timestamp": event.timestamp.isoformat(),
@@ -912,9 +921,9 @@ class SessionManager:
                         0,
                         {
                             "role": (
-                                MessageRole.USER
+                                MessageRole.USER.value
                                 if event.source == EventSource.USER
-                                else MessageRole.ASSISTANT
+                                else MessageRole.ASSISTANT.value
                             ),
                             "content": str(event.message),
                             "timestamp": event.timestamp.isoformat(),

@@ -120,6 +120,7 @@ print(packed.content)  # VM:CONTEXT format
 | Module | Purpose |
 |--------|---------|
 | `models.py` | Core models, enums, and type definitions |
+| `manager.py` | MemoryManager orchestrator (v0.9) |
 | `page_table.py` | Page metadata tracking and tier management |
 | `tlb.py` | Fast cache for page table lookups |
 | `working_set.py` | Token budget, L0/L1 capacity, pinning, anti-thrash |
@@ -131,6 +132,9 @@ print(packed.content)  # VM:CONTEXT format
 | `pack_cache.py` | Cache packed context to avoid re-packing (v0.8) |
 | `mutation_log.py` | Append-only log for debugging/replay (v0.8) |
 | `prefetcher.py` | Heuristic-based page prefetch (v0.8) |
+| `demand_paging.py` | DemandPagingPrePass for recall + prefetch (v0.9) |
+| `eviction_policy.py` | EvictionPolicy protocol + 3 implementations (v0.10) |
+| `compressor.py` | CompressorRegistry with per-modality compression (v0.10) |
 
 ## v0.8 Components
 

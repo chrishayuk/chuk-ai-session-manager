@@ -171,14 +171,14 @@ class InfiniteConversationManager:
 
         # Add system prompt based on summarization strategy
         system_prompt = self._get_summarization_prompt()
-        messages.append({"role": MessageRole.SYSTEM, "content": system_prompt})
+        messages.append({"role": MessageRole.SYSTEM.value, "content": system_prompt})
 
         # Add the conversation history
         for event in message_events:
             role = (
-                MessageRole.USER
+                MessageRole.USER.value
                 if event.source == EventSource.USER
-                else MessageRole.ASSISTANT
+                else MessageRole.ASSISTANT.value
             )
             content = event.message
             messages.append({"role": role, "content": content})
@@ -258,7 +258,7 @@ class InfiniteConversationManager:
             if summaries:
                 context.append(
                     {
-                        "role": MessageRole.SYSTEM,
+                        "role": MessageRole.SYSTEM.value,
                         "content": "Previous conversation context: "
                         + " ".join(summaries),
                     }
@@ -275,9 +275,9 @@ class InfiniteConversationManager:
         # Add messages to context
         for event in recent_messages:
             role = (
-                MessageRole.USER
+                MessageRole.USER.value
                 if event.source == EventSource.USER
-                else MessageRole.ASSISTANT
+                else MessageRole.ASSISTANT.value
             )
             content = event.message
             context.append({"role": role, "content": content})
@@ -329,9 +329,9 @@ class InfiniteConversationManager:
             # Add to history
             for event in message_events:
                 role = (
-                    MessageRole.USER
+                    MessageRole.USER.value
                     if event.source == EventSource.USER
-                    else MessageRole.ASSISTANT
+                    else MessageRole.ASSISTANT.value
                 )
                 content = event.message
                 history.append((role, event.source, content))
