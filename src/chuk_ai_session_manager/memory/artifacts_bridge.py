@@ -245,7 +245,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             return await self._backend.store(page, tier)
         else:
-            raise StorageError("ArtifactsBridge not configured")
+            raise StorageError(operation="store_page", backend="artifacts")
 
     async def _store_with_artifacts(
         self,
@@ -306,7 +306,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             return await self._backend.load(artifact_id)
         else:
-            raise StorageError("ArtifactsBridge not configured")
+            raise StorageError(operation="load_page", backend="artifacts")
 
     async def _load_with_artifacts(
         self,
@@ -357,7 +357,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             return await self._backend.delete(artifact_id)
         else:
-            raise StorageError("ArtifactsBridge not configured")
+            raise StorageError(operation="delete_page", backend="artifacts")
 
     async def store_checkpoint(
         self,
@@ -420,7 +420,7 @@ class ArtifactsBridge(BaseModel):
                 checkpoint_id = f"checkpoint_{self._backend.counter}"
                 self._backend.pages[checkpoint_id] = manifest_data
                 return checkpoint_id
-            raise StorageError("ArtifactsBridge not configured")
+            raise StorageError(operation="store_checkpoint", backend="artifacts")
 
     async def load_checkpoint(
         self,
@@ -442,7 +442,7 @@ class ArtifactsBridge(BaseModel):
         elif self._backend:
             manifest_data = self._backend.pages.get(checkpoint_id)
         else:
-            raise StorageError("ArtifactsBridge not configured")
+            raise StorageError(operation="load_checkpoint", backend="artifacts")
 
         if not manifest_data:
             return []

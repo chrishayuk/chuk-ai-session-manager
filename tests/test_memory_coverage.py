@@ -1975,17 +1975,17 @@ class TestArtifactsBridge:
     async def test_store_page_not_configured(self):
         bridge = ArtifactsBridge()
         page = make_page("p1")
-        with pytest.raises(StorageError, match="not configured"):
+        with pytest.raises(StorageError, match="Storage error in"):
             await bridge.store_page(page)
 
     async def test_load_page_not_configured(self):
         bridge = ArtifactsBridge()
-        with pytest.raises(StorageError, match="not configured"):
+        with pytest.raises(StorageError, match="Storage error in"):
             await bridge.load_page("some_id")
 
     async def test_delete_page_not_configured(self):
         bridge = ArtifactsBridge()
-        with pytest.raises(StorageError, match="not configured"):
+        with pytest.raises(StorageError, match="Storage error in"):
             await bridge.delete_page("some_id")
 
     async def test_store_checkpoint(self):
@@ -2020,12 +2020,12 @@ class TestArtifactsBridge:
 
     async def test_load_checkpoint_not_configured(self):
         bridge = ArtifactsBridge()
-        with pytest.raises(StorageError, match="not configured"):
+        with pytest.raises(StorageError, match="Storage error in"):
             await bridge.load_checkpoint("some_id")
 
     async def test_store_checkpoint_not_configured(self):
         bridge = ArtifactsBridge()
-        with pytest.raises(StorageError, match="not configured"):
+        with pytest.raises(StorageError, match="Storage error in"):
             await bridge.store_checkpoint([], "cp")
 
     def test_get_stats_unconfigured(self):

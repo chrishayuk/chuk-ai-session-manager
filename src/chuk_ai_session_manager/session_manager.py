@@ -26,6 +26,7 @@ from chuk_ai_session_manager.memory.models import (
     MessageRole,
     PageType,
     StorageTier,
+    VMContext,
     VMMode,
 )
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
@@ -202,15 +203,12 @@ class SessionManager:
         self,
         model_id: str = "",
         token_budget: int | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> VMContext | None:
         """
         Get the full VM context for an LLM call.
 
-        Returns None if VM is disabled. Otherwise returns a dict with:
-        - developer_message: str with VM rules, manifest, and context
-        - tools: list of VM tool definitions
-        - manifest: VMManifest
-        - packed_context: PackedContext
+        Returns None if VM is disabled, otherwise a VMContext with
+        developer_message, tools, manifest, and packed_context.
 
         Args:
             model_id: Optional model identifier for context sizing.
