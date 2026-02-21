@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/memory/models/enums.py
 """Enums and constants for the AI Virtual Memory system."""
 
+from __future__ import annotations
+
 from enum import Enum, IntEnum
 
 # =============================================================================

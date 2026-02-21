@@ -4,6 +4,8 @@
 Centralizes magic strings, patterns, and constants to avoid duplication.
 """
 
+from __future__ import annotations
+
 import re
 
 # Reference pattern: $v1, $v2, ${v1}, ${myalias}

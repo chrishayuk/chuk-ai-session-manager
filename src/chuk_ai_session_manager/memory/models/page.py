@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/memory/models/page.py
 """Core page models: MemoryPage and PageTableEntry."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Any
 

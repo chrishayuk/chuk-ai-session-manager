@@ -11,6 +11,8 @@ This is a lite version focused on basic tracking.
 Full event-sourcing with time-travel comes in v0.15.
 """
 
+from __future__ import annotations
+
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -152,20 +154,20 @@ class MutationLogLite(BaseModel):
         self._by_page.clear()
         self._context_snapshots.clear()
 
-    def get_summary(self) -> dict[str, int]:
+    def get_summary(self) -> MutationLogSummary:
         """Get summary statistics."""
         by_type: dict[MutationType, int] = defaultdict(int)
         for m in self._mutations:
             by_type[m.mutation_type] += 1
 
-        return {
-            "total_mutations": len(self._mutations),
-            "unique_pages": len(self._by_page),
-            "context_snapshots": len(self._context_snapshots),
-            "creates": by_type.get(MutationType.CREATE, 0),
-            "faults": by_type.get(MutationType.FAULT_IN, 0),
-            "evictions": by_type.get(MutationType.EVICT, 0),
-            "compressions": by_type.get(MutationType.COMPRESS, 0),
-            "pins": by_type.get(MutationType.PIN, 0),
-            "unpins": by_type.get(MutationType.UNPIN, 0),
-        }
+        return MutationLogSummary(
+            total_mutations=len(self._mutations),
+            unique_pages=len(self._by_page),
+            context_snapshots=len(self._context_snapshots),
+            creates=by_type.get(MutationType.CREATE, 0),
+            faults=by_type.get(MutationType.FAULT_IN, 0),
+            evictions=by_type.get(MutationType.EVICT, 0),
+            compressions=by_type.get(MutationType.COMPRESS, 0),
+            pins=by_type.get(MutationType.PIN, 0),
+            unpins=by_type.get(MutationType.UNPIN, 0),
+        )

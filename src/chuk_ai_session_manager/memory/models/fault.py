@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/memory/models/fault.py
 """Fault policy, fault records, and mutation log models."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field

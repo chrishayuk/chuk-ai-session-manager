@@ -1,8 +1,13 @@
 # chuk_ai_session_manager/memory/models/stats.py
 """Statistics, token budget, and VM metrics models."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from pydantic import BaseModel, Field
 
+from chuk_ai_session_manager.base_models import DictCompatModel
 from chuk_ai_session_manager.memory.models.enums import Modality, StorageTier
 
 # =============================================================================
@@ -46,7 +51,7 @@ class StorageStats(BaseModel):
 class CombinedPageTableStats(BaseModel):
     """Combined statistics for PageTable and TLB."""
 
-    page_table: "PageTableStats"
+    page_table: PageTableStats
     tlb: TLBStats
 
 
@@ -226,3 +231,67 @@ class VMMetrics(BaseModel):
         self.faults_this_turn = 0
         self.evictions_this_turn = 0
         self.compressions_this_turn = 0
+
+
+# =============================================================================
+# Subsystem Stats Models (DictCompat for backward compatibility)
+# =============================================================================
+
+
+class MutationLogSummary(DictCompatModel):
+    """Summary statistics from the mutation log."""
+
+    total_mutations: int = 0
+    unique_pages: int = 0
+    context_snapshots: int = 0
+    creates: int = 0
+    faults: int = 0
+    evictions: int = 0
+    compressions: int = 0
+    pins: int = 0
+    unpins: int = 0
+
+
+class PrefetcherStats(DictCompatModel):
+    """Statistics from the demand-paging prefetcher."""
+
+    tools_tracked: int = 0
+    pages_tracked: int = 0
+    total_accesses: int = 0
+
+
+class PackCacheStats(DictCompatModel):
+    """Statistics from the context pack cache."""
+
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    invalidations: int = 0
+    size: int = 0
+    max_size: int = 0
+
+
+class MemoryManagerStats(DictCompatModel):
+    """Comprehensive stats across all VM subsystems."""
+
+    session_id: str = ""
+    turn: int = 0
+    mode: str = ""
+    page_table: dict[str, Any] = Field(default_factory=dict)
+    working_set: dict[str, Any] = Field(default_factory=dict)
+    fault_handler: dict[str, Any] = Field(default_factory=dict)
+    tlb: dict[str, Any] = Field(default_factory=dict)
+    mutation_log: MutationLogSummary = Field(default_factory=MutationLogSummary)
+    prefetcher: PrefetcherStats = Field(default_factory=PrefetcherStats)
+    pack_cache: PackCacheStats = Field(default_factory=PackCacheStats)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    pages_in_store: int = 0
+
+
+class VMContext(DictCompatModel):
+    """Complete VM context for an LLM call."""
+
+    developer_message: str = ""
+    tools: list[Any] = Field(default_factory=list)
+    manifest: Any = Field(default=None)
+    packed_context: Any = Field(default=None)

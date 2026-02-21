@@ -10,6 +10,8 @@ Don't wait for ML prediction. Start with dumb heuristics that work:
 Keep it simple: no ML prediction required.
 """
 
+from __future__ import annotations
+
 from collections import Counter
 from typing import TYPE_CHECKING
 

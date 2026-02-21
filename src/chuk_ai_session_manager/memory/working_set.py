@@ -13,6 +13,8 @@ Design principles:
 - Anti-thrash: Prevent evicting recently faulted pages
 """
 
+from __future__ import annotations
+
 import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any

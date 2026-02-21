@@ -7,6 +7,8 @@ session manager to provide specific, informative error conditions
 for various failure modes.
 """
 
+from __future__ import annotations
+
 
 class SessionManagerError(Exception):
     """

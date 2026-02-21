@@ -1,4 +1,6 @@
 # chuk_ai_session_manager/models/event_source.py
+from __future__ import annotations
+
 from enum import Enum
 
 

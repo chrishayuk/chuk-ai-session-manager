@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/memory/models/abi.py
 """Memory ABI, recall tracking, and UX metrics models."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field

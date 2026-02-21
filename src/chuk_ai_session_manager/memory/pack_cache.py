@@ -15,6 +15,8 @@ This cache stores the packed context output to avoid recomputing it when:
 Cache is keyed by: (session_id, model_id, token_budget, working_set_hash)
 """
 
+from __future__ import annotations
+
 import hashlib
 from collections import OrderedDict
 from datetime import datetime

@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/memory/models/content.py
 """Content models, tool definitions, and formatted output for the VM system."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from pydantic import BaseModel, Field

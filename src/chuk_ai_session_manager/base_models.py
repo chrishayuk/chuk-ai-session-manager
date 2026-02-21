@@ -1,6 +1,8 @@
 # chuk_ai_session_manager/base_models.py
 """Base model with backward-compatible dict-style access."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from pydantic import BaseModel

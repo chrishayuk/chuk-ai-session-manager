@@ -14,6 +14,8 @@ Design principles:
 - No magic strings: Uses constants for MIME types
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from typing import Any, Protocol

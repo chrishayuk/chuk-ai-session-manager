@@ -14,6 +14,8 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 from .models import (

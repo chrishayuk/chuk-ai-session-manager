@@ -17,6 +17,8 @@ Design principles:
 - Type-safe: Full type annotations throughout
 """
 
+from __future__ import annotations
+
 from collections import OrderedDict
 
 from pydantic import BaseModel, Field, PrivateAttr

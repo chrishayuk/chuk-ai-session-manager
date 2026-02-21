@@ -70,10 +70,15 @@ from chuk_ai_session_manager.memory.models.page import (  # noqa: F401
 from chuk_ai_session_manager.memory.models.stats import (  # noqa: F401
     CombinedPageTableStats,
     FaultMetrics,
+    MemoryManagerStats,
+    MutationLogSummary,
+    PackCacheStats,
     PageTableStats,
+    PrefetcherStats,
     StorageStats,
     TLBStats,
     TokenBudget,
+    VMContext,
     VMMetrics,
     WorkingSetStats,
 )
@@ -123,6 +128,11 @@ __all__ = [
     "FaultMetrics",
     "TokenBudget",
     "VMMetrics",
+    "MutationLogSummary",
+    "PrefetcherStats",
+    "PackCacheStats",
+    "MemoryManagerStats",
+    "VMContext",
     # fault
     "FaultPolicy",
     "FaultRecord",

@@ -16,6 +16,8 @@ Design principles:
 - Metrics-aware: Tracks fault counts and latencies
 """
 
+from __future__ import annotations
+
 import logging
 import time
 from collections.abc import Callable
