@@ -87,7 +87,7 @@ class SimplePrefetcher(BaseModel):
         """Update the last segment summary page ID."""
         self._last_segment_summary_id = page_id
 
-    def get_likely_tools(self, recent_turns: int = 5) -> list[str]:
+    def get_likely_tools(self, recent_turns: int = 5) -> list[str]:  # noqa: ARG002
         """Get tools likely to be called based on recent usage."""
         # Sort by recency and frequency
         tools = list(self._tool_usage.values())
@@ -140,7 +140,7 @@ class SimplePrefetcher(BaseModel):
 
     async def prefetch_on_turn_start(
         self,
-        session_id: str,
+        session_id: str,  # noqa: ARG002 — reserved for storage-backed prefetch
         page_table: Optional["PageTable"] = None,
     ) -> list[str]:
         """

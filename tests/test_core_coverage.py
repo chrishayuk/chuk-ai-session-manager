@@ -147,10 +147,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import track_tool_use
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "tool-session-1"
             mock_create.return_value = session
@@ -172,10 +175,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import track_tool_use
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "tool-err-session"
             mock_create.return_value = session
@@ -195,10 +201,13 @@ class TestSimpleApiCoverage:
         existing = Session()
         existing.id = "existing-tool-session"
         sessions["existing-tool-session"] = existing
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.return_value = existing
             store_inst.save = AsyncMock()
@@ -215,10 +224,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import get_session_stats
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "stats-session"
             mock_create.return_value = session
@@ -235,10 +247,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import get_session_stats
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "stats-seg-session"
             mock_create.return_value = session
@@ -249,10 +264,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import get_conversation_history
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "history-session"
             mock_create.return_value = session
@@ -268,10 +286,13 @@ class TestSimpleApiCoverage:
         from chuk_ai_session_manager.api.simple_api import get_conversation_history
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "history-seg-session"
             mock_create.return_value = session
@@ -300,10 +321,13 @@ class TestInfiniteConversationCoverage:
             max_turns_per_segment=50,
             summarization_strategy=SummarizationStrategy.BASIC,
         )
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.side_effect = lambda sid: sessions.get(sid)
             store_inst.save.side_effect = lambda s: sessions.__setitem__(s.id, s)
@@ -370,10 +394,13 @@ class TestInfiniteConversationCoverage:
         await child.add_event(msg_event)
         sessions[child.id] = child
         mgr = InfiniteConversationManager()
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.side_effect = lambda sid: sessions.get(sid)
             mock_css.return_value = store_inst
@@ -406,10 +433,13 @@ class TestInfiniteConversationCoverage:
         child.parent_id = "root-session"
         sessions[child.id] = child
         mgr = InfiniteConversationManager()
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.side_effect = lambda sid: sessions.get(sid)
             mock_css.return_value = store_inst
@@ -430,10 +460,13 @@ class TestInfiniteConversationCoverage:
 
         mock_store, sessions = _make_mock_store_and_sessions()
         mgr = InfiniteConversationManager()
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.return_value = None
             mock_css.return_value = store_inst
@@ -457,10 +490,13 @@ class TestInfiniteConversationCoverage:
         await s2.add_event(SessionEvent(message="How are you?", source=EventSource.USER, type=EventType.MESSAGE))
         sessions[s2.id] = s2
         mgr = InfiniteConversationManager()
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.infinite_conversation.ChukSessionsStore") as mock_css,
+        ):
             store_inst = AsyncMock()
             store_inst.get.side_effect = lambda sid: sessions.get(sid)
             mock_css.return_value = store_inst
@@ -494,10 +530,13 @@ class TestSessionManagerCoverage:
         store_inst = AsyncMock()
         store_inst.get.side_effect = RuntimeError("conn lost")
         store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 new_session = Session()
@@ -519,10 +558,13 @@ class TestSessionManagerCoverage:
         store_inst = AsyncMock()
         store_inst.get.return_value = None
         store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 new_session = Session()
@@ -542,10 +584,13 @@ class TestSessionManagerCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "summary-q-session"
             mock_create.return_value = session
@@ -564,10 +609,13 @@ class TestSessionManagerCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "many-topics-session"
             mock_create.return_value = session
@@ -589,10 +637,13 @@ class TestSessionManagerCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "no-q-session"
             mock_create.return_value = session
@@ -608,10 +659,13 @@ class TestSessionManagerCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "cb-summary-session"
             mock_create.return_value = session
@@ -636,10 +690,13 @@ class TestSessionManagerCoverage:
         mock_store_inst = AsyncMock()
         mock_store_inst.get.side_effect = lambda sid: sessions_db.get(sid)
         mock_store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = mock_store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 mock_create.return_value = session2
@@ -675,10 +732,13 @@ class TestSessionManagerCoverage:
 
         mock_store_inst.get.side_effect = get_side_effect
         mock_store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = mock_store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 mock_create.return_value = session
@@ -719,10 +779,13 @@ class TestSessionManagerCoverage:
         mock_store_inst = AsyncMock()
         mock_store_inst.get.side_effect = lambda sid: sessions_db.get(sid)
         mock_store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = mock_store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 mock_create.return_value = child
@@ -752,10 +815,13 @@ class TestSessionManagerCoverage:
         mock_store_inst = AsyncMock()
         mock_store_inst.get.return_value = None
         mock_store_inst.save = AsyncMock()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=AsyncMock(),
-        ), patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=AsyncMock(),
+            ),
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_css,
+        ):
             mock_css.return_value = mock_store_inst
             with patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
                 s = Session()
@@ -902,10 +968,13 @@ class TestAdditionalCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "double-lock-session"
             mock_create.return_value = session
@@ -919,10 +988,13 @@ class TestAdditionalCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "stats-non-inf"
             mock_create.return_value = session
@@ -956,10 +1028,13 @@ class TestAdditionalCoverage:
         from chuk_ai_session_manager.session_manager import SessionManager
 
         mock_store, sessions = _make_mock_store_and_sessions()
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "meta-session"
             mock_create.return_value = session

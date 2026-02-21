@@ -504,10 +504,10 @@ class ToolStateManager(BaseModel):
                     val = float(val_str)
                     for binding in self.bindings.bindings.values():
                         if isinstance(binding.raw_value, (int, float)) and abs(binding.raw_value - val) < 1e-9:
-                                repaired[key] = f"${binding.id}"
-                                log.info(f"Repaired {key}={val} -> ${binding.id}")
-                                any_repaired = True
-                                break
+                            repaired[key] = f"${binding.id}"
+                            log.info(f"Repaired {key}={val} -> ${binding.id}")
+                            any_repaired = True
+                            break
                 except ValueError:
                     pass
 

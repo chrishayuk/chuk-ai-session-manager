@@ -98,12 +98,12 @@ class TestToolLogEntry:
 
     @staticmethod
     def _make_entry(**overrides) -> ToolLogEntry:
-        defaults = dict(
-            id="call-0001",
-            tool_name="solver",
-            outcome=ToolOutcome.SUCCESS,
-            result_summary="ok",
-        )
+        defaults = {
+            "id": "call-0001",
+            "tool_name": "solver",
+            "outcome": ToolOutcome.SUCCESS,
+            "result_summary": "ok",
+        }
         defaults.update(overrides)
         return ToolLogEntry(**defaults)
 
@@ -1172,12 +1172,12 @@ class TestFormatRecentCalls:
     """_format_recent_calls: success, failure, fix relations, args, timing."""
 
     def _entry(self, **kw) -> ToolLogEntry:
-        defaults = dict(
-            id="call-0001",
-            tool_name="t",
-            outcome=ToolOutcome.SUCCESS,
-            result_summary="ok",
-        )
+        defaults = {
+            "id": "call-0001",
+            "tool_name": "t",
+            "outcome": ToolOutcome.SUCCESS,
+            "result_summary": "ok",
+        }
         defaults.update(kw)
         return ToolLogEntry(**defaults)
 
@@ -1576,7 +1576,7 @@ class TestManagerEdgeCases:
         # Record a failure far back
         await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e")
         # Add enough successes to push it out of the window
-        for i in range(5):
+        for _i in range(5):
             await mgr.record_call("other", {}, "ok", ToolOutcome.SUCCESS)
         # Now a success for the same tool should NOT detect a fix
         entry = await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)

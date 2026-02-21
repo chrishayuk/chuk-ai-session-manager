@@ -107,10 +107,13 @@ class TestSessionAwareToolProcessor:
         if hasattr(mock_processor, "executor"):
             delattr(mock_processor, "executor")
 
-        with patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor",
-            return_value=mock_processor,
-        ), pytest.raises(AttributeError, match="missing `.executor`"):
+        with (
+            patch(
+                "chuk_ai_session_manager.session_aware_tool_processor.ToolProcessor",
+                return_value=mock_processor,
+            ),
+            pytest.raises(AttributeError, match="missing `.executor`"),
+        ):
             SessionAwareToolProcessor(session_id="test-session")
 
     async def test_tool_processor_create_method(self):

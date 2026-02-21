@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 def event_to_page(
     message: str,
-    role: str,
+    role: str,  # noqa: ARG001 — kept for future role-based page metadata
     session_id: str,
     event_id: str | None = None,
     page_type: PageType = PageType.TRANSCRIPT,
@@ -205,7 +205,7 @@ class MemoryManager:
     async def load(
         self,
         page_id: str,
-        tier: StorageTier,
+        tier: StorageTier,  # noqa: ARG002 — part of PageLoader protocol
         artifact_id: str | None = None,
     ) -> MemoryPage | None:
         """PageLoader protocol — load a page from the appropriate tier."""
@@ -591,7 +591,7 @@ class MemoryManager:
         self,
         mode: VMMode | None = None,
         system_prompt: str = "",
-        model_id: str = "",
+        model_id: str = "",  # noqa: ARG002 — reserved for model-specific context
         token_budget: int | None = None,
     ) -> dict[str, Any]:
         """

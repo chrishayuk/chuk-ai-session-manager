@@ -9,7 +9,6 @@ Design principles:
 - No magic strings: Uses enums for modes and types
 """
 
-
 from .models import (
     Modality,
     ToolDefinition,

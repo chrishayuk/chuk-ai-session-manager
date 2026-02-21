@@ -417,7 +417,7 @@ class TestStorageIntegration:
         storage.chuk = mock_chuk
 
         # Save should fail but not crash
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             await storage.save(session)
 
         # Clear cache to ensure we don't get cached version
@@ -447,7 +447,7 @@ class TestStorageIntegration:
         results = await asyncio.gather(*get_tasks)
 
         assert all(result is not None for result in results)
-        assert len(set(result.id for result in results)) == 5
+        assert len({result.id for result in results}) == 5
 
 
 if __name__ == "__main__":

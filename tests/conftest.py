@@ -306,7 +306,7 @@ def mock_storage_backend():
             self.cache.pop(session_id, None)
 
         async def list_sessions(self, prefix=""):
-            return [sid for sid in self.cache.keys() if sid.startswith(prefix)]
+            return [sid for sid in self.cache if sid.startswith(prefix)]
 
     return MockSessionStorage()
 

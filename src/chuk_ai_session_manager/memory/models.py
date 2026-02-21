@@ -16,7 +16,7 @@ Design principles:
 
 from datetime import datetime
 from enum import Enum, IntEnum
-from typing import Any, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -285,13 +285,7 @@ class StructuredContent(BaseModel):
 
 
 # Union type for all content types
-PageContent = Union[
-    TextContent,
-    ImageContent,
-    AudioContent,
-    VideoContent,
-    StructuredContent,
-]
+PageContent = TextContent | ImageContent | AudioContent | VideoContent | StructuredContent
 
 
 class PageMeta(BaseModel):
@@ -471,9 +465,7 @@ class MemoryPage(BaseModel):
     pinned: bool = Field(default=False, description="Pinned pages are never evicted")
 
     # Lineage (legacy, use provenance/represents instead)
-    parent_page_id: str | None = Field(
-        default=None, description="Parent page if derived (e.g., summary of original)"
-    )
+    parent_page_id: str | None = Field(default=None, description="Parent page if derived (e.g., summary of original)")
 
     # Modality-specific metadata
     mime_type: str | None = Field(default=None)
@@ -778,9 +770,7 @@ class FaultPolicy(BaseModel):
         """Check if a fault is allowed under current policy."""
         if self.faults_this_turn >= self.max_faults_per_turn:
             return False
-        if self.tokens_used_this_turn + estimated_tokens > self.max_fault_tokens_per_turn:
-            return False
-        return True
+        return self.tokens_used_this_turn + estimated_tokens <= self.max_fault_tokens_per_turn
 
     def record_fault(self, tokens: int) -> None:
         """Record a fault and its token cost."""

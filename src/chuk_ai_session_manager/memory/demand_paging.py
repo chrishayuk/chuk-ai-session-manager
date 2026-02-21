@@ -61,10 +61,7 @@ class DemandPagingPrePass:
 
     def has_recall_signal(self, message: str) -> bool:
         """Check if the message contains any recall signal patterns."""
-        for pattern in self._recall_patterns:
-            if pattern.search(message):
-                return True
-        return False
+        return any(pattern.search(message) for pattern in self._recall_patterns)
 
     # ------------------------------------------------------------------
     # Topic extraction

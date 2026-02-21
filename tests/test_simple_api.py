@@ -47,10 +47,13 @@ class TestSessionManager:
         """Test SessionManager initialization with new session."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             new_session = Session()
             new_session.id = "new-session-123"
             mock_create.return_value = new_session
@@ -160,10 +163,13 @@ class TestSessionManager:
         """Test basic user_says functionality."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -181,10 +187,13 @@ class TestSessionManager:
         """Test basic ai_responds functionality."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -209,10 +218,13 @@ class TestSessionManager:
         """Test basic tool_used functionality."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -246,10 +258,13 @@ class TestSessionManager:
         """Test tool_used with error."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -270,10 +285,13 @@ class TestSessionManager:
         """Test get_conversation for current session only."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -362,10 +380,13 @@ class TestSessionManager:
         """Test get_stats for current session only."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -395,10 +416,13 @@ class TestSessionManager:
         """Test infinite context segmentation logic."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -419,10 +443,13 @@ class TestSessionManager:
         """Test summary creation for infinite context."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "test-session"
             mock_create.return_value = session
@@ -444,10 +471,13 @@ class TestSessionManager:
         """Test new segment creation."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             original_session = Session()
             original_session.id = "original-session"
             mock_create.return_value = original_session
@@ -488,10 +518,13 @@ class TestConvenienceFunctions:
         """Test track_conversation function."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "tracked-session"
             mock_create.return_value = session
@@ -518,10 +551,13 @@ class TestConvenienceFunctions:
         """Test track_infinite_conversation function."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "infinite-session"
             mock_create.return_value = session
@@ -541,10 +577,13 @@ class TestConvenienceFunctions:
         """Test track_llm_call with synchronous LLM function."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "llm-call-session"
             mock_create.return_value = session
@@ -567,10 +606,13 @@ class TestConvenienceFunctions:
         """Test track_llm_call with async LLM function."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "async-llm-session"
             mock_create.return_value = session
@@ -592,10 +634,13 @@ class TestConvenienceFunctions:
         """Test track_llm_call with dict response format."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "dict-response-session"
             mock_create.return_value = session
@@ -612,10 +657,13 @@ class TestConvenienceFunctions:
         """Test track_llm_call with object response format."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "object-response-session"
             mock_create.return_value = session
@@ -636,10 +684,13 @@ class TestConvenienceFunctions:
         """Test track_llm_call with existing SessionManager."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "existing-sm-session"
             mock_create.return_value = session
@@ -662,10 +713,13 @@ class TestConvenienceFunctions:
         """Test quick_conversation function."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "quick-session"
             mock_create.return_value = session
@@ -685,10 +739,13 @@ class TestConvenienceFunctions:
         """Test quick_conversation with infinite context."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "quick-infinite-session"
             mock_create.return_value = session
@@ -710,10 +767,13 @@ class TestSessionManagerInfiniteContext:
         """Test that infinite context tracks full conversation."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "infinite-tracking-session"
             mock_create.return_value = session
@@ -835,10 +895,13 @@ class TestSessionManagerEdgeCases:
         """Test that session is cached after first access."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "cached-session"
             mock_create.return_value = session
@@ -857,10 +920,13 @@ class TestSessionManagerEdgeCases:
         """Test infinite context that doesn't trigger segmentation."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "no-segment-session"
             mock_create.return_value = session
@@ -886,10 +952,13 @@ class TestSessionManagerEdgeCases:
         """Test get_conversation filtering out non-message events."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend",
-            return_value=mock_store,
-        ), patch("chuk_ai_session_manager.models.session.Session.create") as mock_create:
+        with (
+            patch(
+                "chuk_ai_session_manager.session_storage.get_backend",
+                return_value=mock_store,
+            ),
+            patch("chuk_ai_session_manager.models.session.Session.create") as mock_create,
+        ):
             session = Session()
             session.id = "mixed-events-session"
             mock_create.return_value = session

@@ -14,7 +14,6 @@ Design principles:
 - No magic strings: Uses enums for all categorical values
 """
 
-
 from pydantic import BaseModel, Field
 
 from .models import (

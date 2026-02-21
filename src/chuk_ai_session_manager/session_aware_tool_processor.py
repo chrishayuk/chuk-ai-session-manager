@@ -145,7 +145,7 @@ class SessionAwareToolProcessor:
                 args = {"raw": fn.get("arguments")}
 
             cache_key = (
-                hashlib.md5(f"{name}:{json.dumps(args, sort_keys=True)}".encode()).hexdigest()
+                hashlib.md5(f"{name}:{json.dumps(args, sort_keys=True)}".encode(), usedforsecurity=False).hexdigest()  # noqa: S324
                 if self.enable_caching
                 else None
             )

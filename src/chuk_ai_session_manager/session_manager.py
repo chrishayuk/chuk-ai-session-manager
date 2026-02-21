@@ -322,10 +322,7 @@ class SessionManager:
 
         # Check turn threshold
         message_events = [e for e in self._session.events if e.type == EventType.MESSAGE]
-        if len(message_events) >= self._max_turns_per_segment:
-            return True
-
-        return False
+        return len(message_events) >= self._max_turns_per_segment
 
     async def _create_summary(self, llm_callback: Callable | None = None) -> str:
         """

@@ -210,7 +210,7 @@ async def track_infinite_conversation(
     provider: str = "unknown",
     session_id: str | None = None,
     token_threshold: int = 4000,
-    max_turns: int = 20,
+    max_turns: int = 20,  # noqa: ARG001 — reserved for turn-based segmentation
 ) -> str:
     """
     Track a conversation with infinite context support.

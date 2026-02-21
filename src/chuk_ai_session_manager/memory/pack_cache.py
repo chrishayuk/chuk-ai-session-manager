@@ -94,11 +94,7 @@ class ContextPackCache:
         # Sort for consistency
         sorted_ids = sorted(page_ids)
 
-        if versions:
-            # Include versions in hash
-            parts = [f"{pid}:{versions.get(pid, 0)}" for pid in sorted_ids]
-        else:
-            parts = sorted_ids
+        parts = [f"{pid}:{versions.get(pid, 0)}" for pid in sorted_ids] if versions else sorted_ids
 
         content = "|".join(parts)
         return hashlib.sha256(content.encode()).hexdigest()[:16]

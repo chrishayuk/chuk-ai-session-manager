@@ -388,10 +388,7 @@ class ArtifactsBridge(BaseModel):
         manifest_data = manifest.model_dump_json().encode("utf-8")
 
         if self._using_artifacts and self._artifact_store:
-            if StorageScope:
-                scope = StorageScope.SESSION
-            else:
-                scope = "session"
+            scope = StorageScope.SESSION if StorageScope else "session"
 
             checkpoint_metadata = CheckpointMetadata(
                 checkpoint_name=checkpoint_name,
@@ -441,10 +438,7 @@ class ArtifactsBridge(BaseModel):
         if not manifest_data:
             return []
 
-        if isinstance(manifest_data, bytes):
-            manifest_str = manifest_data.decode("utf-8")
-        else:
-            manifest_str = manifest_data
+        manifest_str = manifest_data.decode("utf-8") if isinstance(manifest_data, bytes) else manifest_data
 
         manifest = CheckpointManifest.model_validate_json(manifest_str)
 

@@ -38,11 +38,11 @@ class PromptStrategy(str, Enum):
 async def build_prompt_from_session(
     session: Session,
     strategy: PromptStrategy | str = PromptStrategy.MINIMAL,
-    max_tokens: int | None = None,
-    model: str = "gpt-3.5-turbo",
+    max_tokens: int | None = None,  # noqa: ARG001 — reserved for token-aware strategies
+    model: str = "gpt-3.5-turbo",  # noqa: ARG001 — reserved for model-specific tokenization
     include_parent_context: bool = False,
-    current_query: str | None = None,
-    max_history: int = 5,  # Add this parameter for conversation strategy
+    current_query: str | None = None,  # noqa: ARG001 — reserved for query-aware strategies
+    max_history: int = 5,
 ) -> list[dict[str, Any]]:
     """
     Build a prompt for the next LLM call from a Session asynchronously.
@@ -345,7 +345,7 @@ async def _build_conversation_prompt(session: Session, max_history: int = 5) -> 
 
     # Build the conversation history
     prompt: list[dict[str, Any]] = []
-    for i, msg in enumerate(recent_messages):
+    for _i, msg in enumerate(recent_messages):
         role = MessageRole.USER.value if msg.source == EventSource.USER else MessageRole.ASSISTANT.value
         content = _extract_content(msg.message)
 

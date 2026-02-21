@@ -351,10 +351,13 @@ class TestInfiniteConversationEdgeCases:
         """Test handling of nonexistent session."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), pytest.raises(ValueError, match="Session nonexistent not found"):
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            pytest.raises(ValueError, match="Session nonexistent not found"),
+        ):
             await infinite_manager.process_message(
                 session_id="nonexistent",
                 message="Hello",
@@ -376,10 +379,13 @@ class TestInfiniteConversationEdgeCases:
         """Test build context with nonexistent session."""
         mock_store, sessions = mock_session_store
 
-        with patch(
-            "chuk_ai_session_manager.infinite_conversation.get_backend",
-            return_value=mock_store,
-        ), pytest.raises(ValueError, match="Session nonexistent not found"):
+        with (
+            patch(
+                "chuk_ai_session_manager.infinite_conversation.get_backend",
+                return_value=mock_store,
+            ),
+            pytest.raises(ValueError, match="Session nonexistent not found"),
+        ):
             await infinite_manager.build_context_for_llm("nonexistent")
 
     async def test_segmentation_without_llm_callback(self, infinite_manager, mock_session_store):
@@ -396,7 +402,7 @@ class TestInfiniteConversationEdgeCases:
             sessions[session.id] = session
 
             # This should trigger an error when trying to create summary
-            with pytest.raises(Exception):
+            with pytest.raises(Exception):  # noqa: B017
                 await infinite_manager.process_message(
                     session_id=session.id,
                     message="Test message",

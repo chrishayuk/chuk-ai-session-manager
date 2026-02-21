@@ -317,7 +317,7 @@ class TestPromptBuilderStrategies:
         ]
 
         events = []
-        for role, content, source in messages:
+        for _role, content, source in messages:
             event = await SessionEvent.create_with_tokens(
                 message=content,
                 prompt=content if source == EventSource.USER else "",

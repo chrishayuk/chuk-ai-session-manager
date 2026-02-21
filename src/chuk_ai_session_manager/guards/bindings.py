@@ -160,8 +160,12 @@ class BindingManager(BaseModel):
                 binding_val = float(binding.typed_value)
                 if value == binding_val:
                     return binding
-                if abs(value) > 1e-10 and abs(binding_val) > 1e-10 and abs(value - binding_val) / max(abs(value), abs(binding_val)) < tolerance:
-                        return binding
+                if (
+                    abs(value) > 1e-10
+                    and abs(binding_val) > 1e-10
+                    and abs(value - binding_val) / max(abs(value), abs(binding_val)) < tolerance
+                ):
+                    return binding
             except (ValueError, TypeError):
                 continue
         return None

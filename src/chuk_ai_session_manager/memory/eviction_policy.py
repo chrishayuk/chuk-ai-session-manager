@@ -126,15 +126,9 @@ class ImportanceWeightedLRU:
         self,
         context: EvictionContext,
         from_tier: StorageTier,
-        tokens_needed: int = 0,
+        tokens_needed: int = 0,  # noqa: ARG002 — part of EvictionPolicy protocol
     ) -> list[EvictionCandidate]:
-        candidates: list[EvictionCandidate] = []
-
-        if from_tier == StorageTier.L0:
-            candidates = self._score_l0(context)
-        else:
-            candidates = self._score_l1(context)
-
+        candidates = self._score_l0(context) if from_tier == StorageTier.L0 else self._score_l1(context)
         candidates.sort(key=lambda c: c.score)
         return candidates
 
@@ -211,7 +205,7 @@ class LRUEvictionPolicy:
         self,
         context: EvictionContext,
         from_tier: StorageTier,
-        tokens_needed: int = 0,
+        tokens_needed: int = 0,  # noqa: ARG002 — part of EvictionPolicy protocol
     ) -> list[EvictionCandidate]:
         candidates: list[EvictionCandidate] = []
 
