@@ -18,10 +18,15 @@ Cache is keyed by: (session_id, model_id, token_budget, working_set_hash)
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections import OrderedDict
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+
+from .models import PackCacheStats
+
+logger = logging.getLogger(__name__)
 
 
 class PackedContext(BaseModel):
@@ -188,10 +193,13 @@ class ContextPackCache:
             return 0.0
         return self._stats["hits"] / total
 
-    def get_stats(self) -> dict[str, int]:
+    def get_stats(self) -> PackCacheStats:
         """Get cache statistics."""
-        return {
-            **self._stats,
-            "size": len(self._cache),
-            "max_size": self.max_entries,
-        }
+        return PackCacheStats(
+            hits=self._stats["hits"],
+            misses=self._stats["misses"],
+            evictions=self._stats["evictions"],
+            invalidations=self._stats["invalidations"],
+            size=len(self._cache),
+            max_size=self.max_entries,
+        )

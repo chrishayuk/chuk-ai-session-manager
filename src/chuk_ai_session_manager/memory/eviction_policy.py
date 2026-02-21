@@ -26,6 +26,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
@@ -33,6 +34,8 @@ from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from .models import MemoryPage, Modality, StorageTier
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Models

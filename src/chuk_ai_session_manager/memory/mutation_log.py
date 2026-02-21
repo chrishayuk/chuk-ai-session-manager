@@ -13,6 +13,7 @@ Full event-sourcing with time-travel comes in v0.15.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -21,10 +22,13 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 from .models import (
     Actor,
+    MutationLogSummary,
     MutationType,
     PageMutation,
     StorageTier,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ContextSnapshot(BaseModel):

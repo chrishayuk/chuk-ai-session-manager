@@ -277,14 +277,16 @@ class MemoryManagerStats(DictCompatModel):
     session_id: str = ""
     turn: int = 0
     mode: str = ""
-    page_table: dict[str, Any] = Field(default_factory=dict)
-    working_set: dict[str, Any] = Field(default_factory=dict)
-    fault_handler: dict[str, Any] = Field(default_factory=dict)
-    tlb: dict[str, Any] = Field(default_factory=dict)
+    page_table: PageTableStats = Field(
+        default_factory=lambda: PageTableStats(total_pages=0, dirty_pages=0, pages_by_tier={}, pages_by_modality={})
+    )
+    working_set: WorkingSetStats = Field(default_factory=WorkingSetStats)
+    fault_handler: FaultMetrics = Field(default_factory=FaultMetrics)
+    tlb: TLBStats = Field(default_factory=TLBStats)
     mutation_log: MutationLogSummary = Field(default_factory=MutationLogSummary)
     prefetcher: PrefetcherStats = Field(default_factory=PrefetcherStats)
     pack_cache: PackCacheStats = Field(default_factory=PackCacheStats)
-    metrics: dict[str, Any] = Field(default_factory=dict)
+    metrics: VMMetrics = Field(default_factory=VMMetrics)
     pages_in_store: int = 0
 
 

@@ -48,6 +48,25 @@ VM_IMPORTANCE_SUMMARY = 0.9
 PAGE_ID_PREFIX_MSG = "msg"
 
 
+def _default_summary(messages: list[dict[str, str]]) -> str:
+    """Simple extractive summary for when no LLM callback is provided."""
+    user_messages = [m for m in messages if m.get("role") == "user"]
+    topics: list[str] = []
+    for msg in user_messages:
+        content = msg.get("content", "")
+        if "?" in content:
+            question = content.split("?")[0].strip()
+            if len(question) > 10:
+                topics.append(question[:50])
+
+    if topics:
+        summary = f"User discussed: {'; '.join(topics[:3])}"
+        if len(topics) > 3:
+            summary += f" and {len(topics) - 3} other topics"
+        return summary
+    return f"Conversation with {len(user_messages)} user messages and {len(messages) - len(user_messages)} responses"
+
+
 class SessionManager:
     """
     High-level session manager for AI conversations.
@@ -328,38 +347,15 @@ class SessionManager:
         """
         Create a summary of the current session.
 
-        Args:
-            llm_callback: Optional async function to generate summary using an LLM.
-                         Should accept List[Dict] messages and return str summary.
+        Delegates to llm_callback if provided, otherwise uses the
+        module-level _default_summary() extractive fallback.
         """
         await self._ensure_initialized()
         assert self._session is not None
-        message_events = [e for e in self._session.events if e.type == EventType.MESSAGE]
-
-        # Use LLM callback if provided
+        messages = await self.get_messages_for_llm(include_system=False)
         if llm_callback:
-            messages = await self.get_messages_for_llm(include_system=False)
             return await llm_callback(messages)
-
-        # Simple summary generation
-        user_messages = [e for e in message_events if e.source == EventSource.USER]
-
-        topics = []
-        for event in user_messages:
-            content = str(event.message)
-            if "?" in content:
-                question = content.split("?")[0].strip()
-                if len(question) > 10:
-                    topics.append(question[:50])
-
-        if topics:
-            summary = f"User discussed: {'; '.join(topics[:3])}"
-            if len(topics) > 3:
-                summary += f" and {len(topics) - 3} other topics"
-        else:
-            summary = f"Conversation with {len(user_messages)} user messages and {len(message_events) - len(user_messages)} responses"
-
-        return summary
+        return _default_summary(messages)
 
     async def _create_new_segment(self, llm_callback: Callable | None = None) -> str:
         """

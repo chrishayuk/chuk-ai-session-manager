@@ -19,11 +19,14 @@ Design principles:
 
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 
 from pydantic import BaseModel, Field, PrivateAttr
 
 from .models import CombinedPageTableStats, PageTableEntry, TLBStats
+
+logger = logging.getLogger(__name__)
 
 
 class PageTLB(BaseModel):

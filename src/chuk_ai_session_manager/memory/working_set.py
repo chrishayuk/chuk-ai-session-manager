@@ -15,6 +15,7 @@ Design principles:
 
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -31,6 +32,8 @@ from .models import (
     TokenBudget,
     WorkingSetStats,
 )
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Pinned Set
@@ -421,7 +424,7 @@ class WorkingSetManager(BaseModel):
         self,
         tokens_needed: int = 0,
         from_tier: StorageTier = StorageTier.L0,
-        page_table: "PageTable | None" = None,
+        page_table: PageTable | None = None,
     ) -> list[tuple[str, float]]:
         """
         Get pages that are candidates for eviction, scored by priority.
