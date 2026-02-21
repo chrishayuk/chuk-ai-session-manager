@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.token_usage import TokenUsage
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 MessageT = TypeVar("MessageT")
 
@@ -49,7 +50,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         message: MessageT,
         prompt: str,
         completion: str | None = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = DEFAULT_TOKEN_MODEL,
         source: EventSource = EventSource.SYSTEM,
         type: EventType = EventType.MESSAGE,
         **kwargs,
@@ -83,7 +84,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         completion: str | None = None,
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = DEFAULT_TOKEN_MODEL,
     ) -> None:
         """
         Update the token usage for this event.
@@ -186,7 +187,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         """Clear all metadata asynchronously."""
         self.metadata.clear()
 
-    async def calculate_tokens(self, model: str = "gpt-3.5-turbo") -> int:
+    async def calculate_tokens(self, model: str = DEFAULT_TOKEN_MODEL) -> int:
         """
         Calculate tokens for this event's message asynchronously.
 

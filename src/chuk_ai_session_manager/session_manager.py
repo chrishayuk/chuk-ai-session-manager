@@ -20,6 +20,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.memory.manager import MemoryManager
 from chuk_ai_session_manager.memory.models import (
     MessageRole,
@@ -35,8 +36,6 @@ from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_storage import ChukSessionsStore
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_TOKEN_MODEL = "gpt-4o-mini"
 
 # Default importance scores for VM page creation
 VM_IMPORTANCE_USER = 0.6

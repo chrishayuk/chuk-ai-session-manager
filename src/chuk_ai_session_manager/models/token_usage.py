@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 # chuk_ai_session_manager/models/token_usage.py
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
+
 """
 Token usage tracking models for the chuk session manager.
 
 This module provides models for tracking token usage in LLM interactions
 with proper async support.
 """
-
-from __future__ import annotations
 
 import asyncio
 from typing import Any
@@ -124,7 +126,12 @@ class TokenUsage(BaseModel):
             self.estimated_cost_usd = await self.calculate_cost()
 
     @classmethod
-    def _from_text_sync(cls, prompt: str, completion: str | None = None, model: str = "gpt-3.5-turbo") -> TokenUsage:
+    def _from_text_sync(
+        cls,
+        prompt: str,
+        completion: str | None = None,
+        model: str = DEFAULT_TOKEN_MODEL,
+    ) -> TokenUsage:
         """
         Synchronous implementation of from_text.
 
@@ -146,7 +153,12 @@ class TokenUsage(BaseModel):
         )
 
     @classmethod
-    async def from_text(cls, prompt: str, completion: str | None = None, model: str = "gpt-3.5-turbo") -> TokenUsage:
+    async def from_text(
+        cls,
+        prompt: str,
+        completion: str | None = None,
+        model: str = DEFAULT_TOKEN_MODEL,
+    ) -> TokenUsage:
         """
         Async version of from_text.
 
@@ -163,7 +175,9 @@ class TokenUsage(BaseModel):
         return await loop.run_in_executor(None, lambda: cls._from_text_sync(prompt, completion, model))
 
     @staticmethod
-    def _count_tokens_sync(text: str | Any | None, model: str = "gpt-3.5-turbo") -> int:
+    def _count_tokens_sync(
+        text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL
+    ) -> int:
         """
         Synchronous implementation of count_tokens.
 
@@ -205,7 +219,9 @@ class TokenUsage(BaseModel):
         return int(len(text) / 4)
 
     @staticmethod
-    async def count_tokens(text: str | Any | None, model: str = "gpt-3.5-turbo") -> int:
+    async def count_tokens(
+        text: str | Any | None, model: str = DEFAULT_TOKEN_MODEL
+    ) -> int:
         """
         Async version of count_tokens.
 

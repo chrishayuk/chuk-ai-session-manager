@@ -20,13 +20,13 @@ Quick Start:
     from chuk_ai_session_manager import SessionManager
     sm = SessionManager()
     await sm.user_says("What's the weather?")
-    await sm.ai_responds("It's sunny and 72°F", model="gpt-4")
+    await sm.ai_responds("It's sunny and 72°F", model=DEFAULT_TOKEN_MODEL)
 
 Infinite Context Example:
     # Automatically handles long conversations with summarization
     sm = SessionManager(infinite_context=True, token_threshold=4000)
     await sm.user_says("Tell me about machine learning")
-    await sm.ai_responds("Machine learning is...", model="gpt-4")
+    await sm.ai_responds("Machine learning is...", model=DEFAULT_TOKEN_MODEL)
     # Session will auto-segment when limits are reached
 
 Storage Configuration:
@@ -50,6 +50,8 @@ __version__ = "0.8"
 
 # Set up package-level logger
 logger = logging.getLogger(__name__)
+
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Core enums and constants
 # Simple API - The main interface most users will use

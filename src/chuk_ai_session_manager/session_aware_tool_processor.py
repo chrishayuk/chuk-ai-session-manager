@@ -24,6 +24,7 @@ from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,7 @@ class SessionAwareToolProcessor:
             message=llm_msg,
             prompt="",
             completion=json.dumps(llm_msg, ensure_ascii=False),
-            model="gpt-4o-mini",
+            model=DEFAULT_TOKEN_MODEL,
             source=EventSource.LLM,
             type=EventType.MESSAGE,
         )

@@ -1,4 +1,5 @@
 # tests/test_simple.py
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 """
 Simple working test for chuk_ai_session_manager.
 
@@ -106,7 +107,7 @@ class TestBasicFunctionality:
         user_session_id = await sm.user_says("Hello!")
 
         # Then AI response
-        ai_session_id = await sm.ai_responds("Hi there! How can I help?", model="gpt-4", provider="openai")
+        ai_session_id = await sm.ai_responds("Hi there! How can I help?", model=DEFAULT_TOKEN_MODEL, provider="openai")
 
         assert isinstance(ai_session_id, str)
         assert len(ai_session_id) > 0
@@ -206,7 +207,7 @@ class TestBasicFunctionality:
         session_id = await track_conversation(
             user_message="Hello!",
             ai_response="Hi there!",
-            model="gpt-4",
+            model=DEFAULT_TOKEN_MODEL,
             provider="openai",
         )
 
@@ -220,7 +221,7 @@ class TestBasicFunctionality:
         session_id = await track_infinite_conversation(
             user_message="Hello!",
             ai_response="Hi there!",
-            model="gpt-4",
+            model=DEFAULT_TOKEN_MODEL,
             provider="openai",
         )
 
@@ -248,22 +249,22 @@ class TestModelsWork:
         """Test TokenUsage model."""
         from chuk_ai_session_manager.models.token_usage import TokenUsage
 
-        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-3.5-turbo")
+        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model=DEFAULT_TOKEN_MODEL)
 
         assert usage.total_tokens == 150
         assert usage.estimated_cost_usd > 0
-        assert usage.model == "gpt-3.5-turbo"
+        assert usage.model == DEFAULT_TOKEN_MODEL
 
     async def test_token_usage_from_text(self):
         """Test TokenUsage.from_text async method."""
         from chuk_ai_session_manager.models.token_usage import TokenUsage
 
-        usage = await TokenUsage.from_text(prompt="Hello, world!", completion="Hi there!", model="gpt-3.5-turbo")
+        usage = await TokenUsage.from_text(prompt="Hello, world!", completion="Hi there!", model=DEFAULT_TOKEN_MODEL)
 
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
         assert usage.total_tokens > 0
-        assert usage.model == "gpt-3.5-turbo"
+        assert usage.model == DEFAULT_TOKEN_MODEL
 
     async def test_session_event(self):
         """Test SessionEvent model."""
@@ -285,7 +286,7 @@ class TestModelsWork:
             message="Test message",
             prompt="Test prompt",
             completion="Test completion",
-            model="gpt-3.5-turbo",
+            model=DEFAULT_TOKEN_MODEL,
             source=EventSource.LLM,
             type=EventType.MESSAGE,
         )
@@ -294,7 +295,7 @@ class TestModelsWork:
         assert event.token_usage.prompt_tokens > 0
         assert event.token_usage.completion_tokens > 0
         assert event.token_usage.total_tokens > 0
-        assert event.token_usage.model == "gpt-3.5-turbo"
+        assert event.token_usage.model == DEFAULT_TOKEN_MODEL
 
     async def test_session_event_metadata(self):
         """Test SessionEvent metadata operations."""

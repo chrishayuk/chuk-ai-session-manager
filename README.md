@@ -32,12 +32,13 @@ pip install chuk-ai-session-manager[dev]
 
 ```python
 from chuk_ai_session_manager import track_conversation
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Track any conversation automatically
 session_id = await track_conversation(
     user_message="What's the weather like?",
     ai_response="I don't have access to real-time weather data.",
-    model="gpt-3.5-turbo",
+    model=DEFAULT_TOKEN_MODEL,
     provider="openai"
 )
 
@@ -53,6 +54,7 @@ OS-style memory management for AI context windows. Pages, working sets, faults, 
 
 ```python
 from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 from chuk_ai_session_manager.memory import (
     MemoryManager, CompressorRegistry, ImportanceWeightedLRU,
     PageType, VMMode, WorkingSetConfig,
@@ -87,11 +89,12 @@ See [AI Virtual Memory docs](docs/memory/README.md) for full documentation.
 ### 🎯 **Zero-Configuration Tracking**
 ```python
 from chuk_ai_session_manager import SessionManager
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # Just start using it
 sm = SessionManager()
 await sm.user_says("Hello!")
-await sm.ai_responds("Hi there!", model="gpt-4")
+await sm.ai_responds("Hi there!", model=DEFAULT_TOKEN_MODEL)
 
 # Get stats instantly
 stats = await sm.get_stats()
@@ -103,7 +106,7 @@ print(f"Tokens: {stats['total_tokens']}, Cost: ${stats['estimated_cost']:.4f}")
 # Automatically handles conversations longer than token limits
 sm = SessionManager(infinite_context=True, token_threshold=4000)
 await sm.user_says("Tell me about the history of computing...")
-await sm.ai_responds("Computing history begins with...", model="gpt-4")
+await sm.ai_responds("Computing history begins with...", model=DEFAULT_TOKEN_MODEL)
 # Session will auto-segment when limits are reached
 ```
 
@@ -174,12 +177,13 @@ await sm.tool_used(
 ### Web App Conversation Tracking
 ```python
 from chuk_ai_session_manager import track_conversation
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 
 # In your chat endpoint
 session_id = await track_conversation(
     user_message=request.message,
     ai_response=ai_response,
-    model="gpt-4",
+    model=DEFAULT_TOKEN_MODEL,
     provider="openai",
     session_id=request.session_id  # Continue existing conversation
 )
@@ -188,11 +192,12 @@ session_id = await track_conversation(
 ### LLM Wrapper with Automatic Tracking
 ```python
 from chuk_ai_session_manager import track_llm_call
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL
 import openai
 
 async def my_openai_call(prompt):
     response = await openai.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model=DEFAULT_TOKEN_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -201,7 +206,7 @@ async def my_openai_call(prompt):
 response, session_id = await track_llm_call(
     user_input="Explain machine learning",
     llm_function=my_openai_call,
-    model="gpt-3.5-turbo",
+    model=DEFAULT_TOKEN_MODEL,
     provider="openai"
 )
 ```
@@ -209,12 +214,13 @@ response, session_id = await track_llm_call(
 ### Long Conversations with Auto-Segmentation
 ```python
 from chuk_ai_session_manager import track_infinite_conversation
+from chuk_ai_session_manager.config import DEFAULT_TOKEN_MODEL # gpt-4o, gpt-4o-mini, etc.
 
 # Start a conversation
 session_id = await track_infinite_conversation(
     user_message="Tell me about the history of computing",
     ai_response="Computing history begins with ancient calculating devices...",
-    model="gpt-4",
+    model=DEFAULT_TOKEN_MODEL,
     token_threshold=4000  # Auto-segment after 4000 tokens
 )
 
@@ -223,7 +229,7 @@ session_id = await track_infinite_conversation(
     user_message="What about quantum computers?",
     ai_response="Quantum computing represents a fundamental shift...",
     session_id=session_id,
-    model="gpt-4"
+    model=DEFAULT_TOKEN_MODEL
 )
 ```
 
@@ -239,6 +245,25 @@ export SESSION_PROVIDER=memory
 export SESSION_PROVIDER=redis
 export SESSION_REDIS_URL=redis://localhost:6379/0
 ```
+
+### Model Configuration
+
+`DEFAULT_TOKEN_MODEL` resolves to the default LLM model defined in:
+
+- `config.py`
+- or the `CHUK_DEFAULT_MODEL` environment variable
+
+By default (as shipped), it is set to:
+- `gpt-4o-mini`
+
+You can override it explicitly:
+```python
+await sm.ai_responds(
+    "Hello!",
+    model="gpt-4o"
+)
+```
+The selected model must be compatible with the specified provider.
 
 ### Installation Matrix
 
