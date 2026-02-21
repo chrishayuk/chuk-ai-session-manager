@@ -5,17 +5,18 @@ Test suite for infinite conversation functionality in chuk_ai_session_manager.
 Tests InfiniteConversationManager and automatic session segmentation.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
+import pytest
+
 from chuk_ai_session_manager.infinite_conversation import (
     InfiniteConversationManager,
     SummarizationStrategy,
 )
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
 
 
 @pytest.fixture
@@ -75,9 +76,7 @@ class TestInfiniteConversationManager:
         assert manager.max_turns_per_segment == 25
         assert manager.summarization_strategy == SummarizationStrategy.KEY_POINTS
 
-    async def test_process_message_basic(
-        self, infinite_manager, mock_session_store, mock_llm_callback
-    ):
+    async def test_process_message_basic(self, infinite_manager, mock_session_store, mock_llm_callback):
         """Test basic message processing without segmentation."""
         mock_store, sessions = mock_session_store
 
@@ -167,9 +166,7 @@ class TestInfiniteConversationManager:
         assert len(summary) > 0
         assert "3" in summary  # Should mention 3 user messages
 
-    async def test_create_summary_with_questions(
-        self, infinite_manager, mock_llm_callback
-    ):
+    async def test_create_summary_with_questions(self, infinite_manager, mock_llm_callback):
         """Test summary creation with question extraction."""
         session = Session()
 
@@ -225,9 +222,7 @@ class TestInfiniteConversationManager:
         prompt = infinite_manager._get_summarization_prompt()
         assert "questions" in prompt.lower()
 
-    async def test_build_context_without_summaries(
-        self, infinite_manager, mock_session_store
-    ):
+    async def test_build_context_without_summaries(self, infinite_manager, mock_session_store):
         """Test building context without including summaries."""
         mock_store, sessions = mock_session_store
 
@@ -258,9 +253,7 @@ class TestInfiniteConversationManager:
             assert len(context) == 3
             assert all(msg["role"] in ["user", "assistant"] for msg in context)
 
-    async def test_get_full_conversation_history(
-        self, infinite_manager, mock_session_store
-    ):
+    async def test_get_full_conversation_history(self, infinite_manager, mock_session_store):
         """Test getting full conversation history across segments."""
         mock_store, sessions = mock_session_store
 
@@ -273,12 +266,8 @@ class TestInfiniteConversationManager:
             session1.id = "session1"
 
             # Add messages to first session
-            event1 = SessionEvent(
-                message="Hello", source=EventSource.USER, type=EventType.MESSAGE
-            )
-            event2 = SessionEvent(
-                message="Hi there!", source=EventSource.LLM, type=EventType.MESSAGE
-            )
+            event1 = SessionEvent(message="Hello", source=EventSource.USER, type=EventType.MESSAGE)
+            event2 = SessionEvent(message="Hi there!", source=EventSource.LLM, type=EventType.MESSAGE)
             await session1.add_event(event1)
             await session1.add_event(event2)
             sessions[session1.id] = session1
@@ -288,12 +277,8 @@ class TestInfiniteConversationManager:
             session2.parent_id = session1.id
 
             # Add messages to second session
-            event3 = SessionEvent(
-                message="How are you?", source=EventSource.USER, type=EventType.MESSAGE
-            )
-            event4 = SessionEvent(
-                message="I'm good!", source=EventSource.LLM, type=EventType.MESSAGE
-            )
+            event3 = SessionEvent(message="How are you?", source=EventSource.USER, type=EventType.MESSAGE)
+            event4 = SessionEvent(message="I'm good!", source=EventSource.LLM, type=EventType.MESSAGE)
             await session2.add_event(event3)
             await session2.add_event(event4)
             sessions[session2.id] = session2
@@ -330,9 +315,7 @@ class TestInfiniteConversationCore:
         # Test turn threshold
         session.token_summary.total_tokens = 50  # Below token threshold
         for i in range(5):  # Above turn threshold
-            event = SessionEvent(
-                message=f"Message {i}", source=EventSource.USER, type=EventType.MESSAGE
-            )
+            event = SessionEvent(message=f"Message {i}", source=EventSource.USER, type=EventType.MESSAGE)
             await session.add_event(event)
 
         assert await infinite_manager._should_create_new_segment(session) is True
@@ -364,23 +347,20 @@ class TestInfiniteConversationCore:
 class TestInfiniteConversationEdgeCases:
     """Test edge cases in infinite conversation management."""
 
-    async def test_session_not_found(
-        self, infinite_manager, mock_session_store, mock_llm_callback
-    ):
+    async def test_session_not_found(self, infinite_manager, mock_session_store, mock_llm_callback):
         """Test handling of nonexistent session."""
         mock_store, sessions = mock_session_store
 
         with patch(
             "chuk_ai_session_manager.infinite_conversation.get_backend",
             return_value=mock_store,
-        ):
-            with pytest.raises(ValueError, match="Session nonexistent not found"):
-                await infinite_manager.process_message(
-                    session_id="nonexistent",
-                    message="Hello",
-                    source=EventSource.USER,
-                    llm_callback=mock_llm_callback,
-                )
+        ), pytest.raises(ValueError, match="Session nonexistent not found"):
+            await infinite_manager.process_message(
+                session_id="nonexistent",
+                message="Hello",
+                source=EventSource.USER,
+                llm_callback=mock_llm_callback,
+            )
 
     async def test_empty_session_summary(self, infinite_manager, mock_llm_callback):
         """Test summary creation for empty session."""
@@ -392,22 +372,17 @@ class TestInfiniteConversationEdgeCases:
         assert len(summary) > 0
         assert "0" in summary  # Should mention 0 user messages
 
-    async def test_build_context_session_not_found(
-        self, infinite_manager, mock_session_store
-    ):
+    async def test_build_context_session_not_found(self, infinite_manager, mock_session_store):
         """Test build context with nonexistent session."""
         mock_store, sessions = mock_session_store
 
         with patch(
             "chuk_ai_session_manager.infinite_conversation.get_backend",
             return_value=mock_store,
-        ):
-            with pytest.raises(ValueError, match="Session nonexistent not found"):
-                await infinite_manager.build_context_for_llm("nonexistent")
+        ), pytest.raises(ValueError, match="Session nonexistent not found"):
+            await infinite_manager.build_context_for_llm("nonexistent")
 
-    async def test_segmentation_without_llm_callback(
-        self, infinite_manager, mock_session_store
-    ):
+    async def test_segmentation_without_llm_callback(self, infinite_manager, mock_session_store):
         """Test that segmentation fails gracefully without LLM callback."""
         mock_store, sessions = mock_session_store
 

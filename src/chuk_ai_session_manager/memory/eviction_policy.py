@@ -28,12 +28,11 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
 from .models import MemoryPage, Modality, StorageTier
-
 
 # =============================================================================
 # Models
@@ -58,10 +57,10 @@ class EvictionContext(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     current_turn: int = 0
-    l0_page_ids: List[str] = Field(default_factory=list)
-    l1_pages: Dict[str, MemoryPage] = Field(default_factory=dict)
-    pinned_page_ids: Set[str] = Field(default_factory=set)
-    importance_overrides: Dict[str, float] = Field(default_factory=dict)
+    l0_page_ids: list[str] = Field(default_factory=list)
+    l1_pages: dict[str, MemoryPage] = Field(default_factory=dict)
+    pinned_page_ids: set[str] = Field(default_factory=set)
+    importance_overrides: dict[str, float] = Field(default_factory=dict)
     anti_thrash: Any = None  # AntiThrashPolicy (avoid circular import)
     page_table: Any = None  # Optional PageTable for metadata lookups
 
@@ -86,7 +85,7 @@ class EvictionPolicy(Protocol):
         context: EvictionContext,
         from_tier: StorageTier,
         tokens_needed: int = 0,
-    ) -> List[EvictionCandidate]: ...
+    ) -> list[EvictionCandidate]: ...
 
 
 # =============================================================================
@@ -120,7 +119,7 @@ class ImportanceWeightedLRU:
     L1 scoring: recency * w1 + frequency * w2 + importance * w3 + thrash * w4
     """
 
-    def __init__(self, config: Optional[ImportanceWeightedLRUConfig] = None) -> None:
+    def __init__(self, config: ImportanceWeightedLRUConfig | None = None) -> None:
         self.config = config or ImportanceWeightedLRUConfig()
 
     def score_candidates(
@@ -128,8 +127,8 @@ class ImportanceWeightedLRU:
         context: EvictionContext,
         from_tier: StorageTier,
         tokens_needed: int = 0,
-    ) -> List[EvictionCandidate]:
-        candidates: List[EvictionCandidate] = []
+    ) -> list[EvictionCandidate]:
+        candidates: list[EvictionCandidate] = []
 
         if from_tier == StorageTier.L0:
             candidates = self._score_l0(context)
@@ -139,16 +138,14 @@ class ImportanceWeightedLRU:
         candidates.sort(key=lambda c: c.score)
         return candidates
 
-    def _score_l0(self, context: EvictionContext) -> List[EvictionCandidate]:
-        candidates: List[EvictionCandidate] = []
+    def _score_l0(self, context: EvictionContext) -> list[EvictionCandidate]:
+        candidates: list[EvictionCandidate] = []
         cfg = self.config
 
         for i, page_id in enumerate(context.l0_page_ids):
             if page_id in context.pinned_page_ids:
                 continue
-            if context.anti_thrash and not context.anti_thrash.can_evict(
-                page_id, context.current_turn
-            ):
+            if context.anti_thrash and not context.anti_thrash.can_evict(page_id, context.current_turn):
                 continue
 
             position_score = i / max(len(context.l0_page_ids), 1)
@@ -156,9 +153,7 @@ class ImportanceWeightedLRU:
 
             thrash_penalty = 0.0
             if context.anti_thrash:
-                thrash_penalty = context.anti_thrash.get_eviction_penalty(
-                    page_id, context.current_turn
-                )
+                thrash_penalty = context.anti_thrash.get_eviction_penalty(page_id, context.current_turn)
 
             score = (
                 position_score * cfg.l0_position_weight
@@ -169,17 +164,15 @@ class ImportanceWeightedLRU:
 
         return candidates
 
-    def _score_l1(self, context: EvictionContext) -> List[EvictionCandidate]:
-        candidates: List[EvictionCandidate] = []
+    def _score_l1(self, context: EvictionContext) -> list[EvictionCandidate]:
+        candidates: list[EvictionCandidate] = []
         cfg = self.config
         now = datetime.utcnow()
 
         for page_id, page in context.l1_pages.items():
             if page_id in context.pinned_page_ids or page.pinned:
                 continue
-            if context.anti_thrash and not context.anti_thrash.can_evict(
-                page_id, context.current_turn
-            ):
+            if context.anti_thrash and not context.anti_thrash.can_evict(page_id, context.current_turn):
                 continue
 
             age_seconds = (now - page.last_accessed).total_seconds()
@@ -192,9 +185,7 @@ class ImportanceWeightedLRU:
 
             thrash_penalty = 0.0
             if context.anti_thrash:
-                thrash_penalty = context.anti_thrash.get_eviction_penalty(
-                    page_id, context.current_turn
-                )
+                thrash_penalty = context.anti_thrash.get_eviction_penalty(page_id, context.current_turn)
 
             score = (
                 recency_score * cfg.l1_recency_weight
@@ -221,16 +212,14 @@ class LRUEvictionPolicy:
         context: EvictionContext,
         from_tier: StorageTier,
         tokens_needed: int = 0,
-    ) -> List[EvictionCandidate]:
-        candidates: List[EvictionCandidate] = []
+    ) -> list[EvictionCandidate]:
+        candidates: list[EvictionCandidate] = []
 
         if from_tier == StorageTier.L0:
             for i, page_id in enumerate(context.l0_page_ids):
                 if page_id in context.pinned_page_ids:
                     continue
-                if context.anti_thrash and not context.anti_thrash.can_evict(
-                    page_id, context.current_turn
-                ):
+                if context.anti_thrash and not context.anti_thrash.can_evict(page_id, context.current_turn):
                     continue
 
                 score = i / max(len(context.l0_page_ids), 1)
@@ -240,9 +229,7 @@ class LRUEvictionPolicy:
             for page_id, page in context.l1_pages.items():
                 if page_id in context.pinned_page_ids or page.pinned:
                     continue
-                if context.anti_thrash and not context.anti_thrash.can_evict(
-                    page_id, context.current_turn
-                ):
+                if context.anti_thrash and not context.anti_thrash.can_evict(page_id, context.current_turn):
                     continue
 
                 age_seconds = (now - page.last_accessed).total_seconds()
@@ -256,7 +243,7 @@ class LRUEvictionPolicy:
 class ModalityAwareLRUConfig(BaseModel):
     """Configuration for modality-aware eviction."""
 
-    modality_weights: Dict[Modality, float] = Field(
+    modality_weights: dict[Modality, float] = Field(
         default_factory=lambda: {
             Modality.TEXT: 1.0,
             Modality.STRUCTURED: 0.9,
@@ -280,8 +267,8 @@ class ModalityAwareLRU:
 
     def __init__(
         self,
-        config: Optional[ModalityAwareLRUConfig] = None,
-        base_policy: Optional[EvictionPolicy] = None,
+        config: ModalityAwareLRUConfig | None = None,
+        base_policy: EvictionPolicy | None = None,
     ) -> None:
         self.config = config or ModalityAwareLRUConfig()
         self._base = base_policy or ImportanceWeightedLRU()
@@ -291,10 +278,10 @@ class ModalityAwareLRU:
         context: EvictionContext,
         from_tier: StorageTier,
         tokens_needed: int = 0,
-    ) -> List[EvictionCandidate]:
+    ) -> list[EvictionCandidate]:
         base_candidates = self._base.score_candidates(context, from_tier, tokens_needed)
 
-        adjusted: List[EvictionCandidate] = []
+        adjusted: list[EvictionCandidate] = []
         for candidate in base_candidates:
             modality_weight = self._get_modality_weight(candidate.page_id, context)
             adjusted.append(

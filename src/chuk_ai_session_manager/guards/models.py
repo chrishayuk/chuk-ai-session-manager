@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-def classify_value_type(value: Any) -> "ValueType":
+def classify_value_type(value: Any) -> ValueType:
     """Classify the type of a value for binding."""
     if isinstance(value, (int, float)):
         return ValueType.NUMBER
@@ -106,25 +106,19 @@ class ToolClassification:
     @classmethod
     def is_discovery_tool(cls, tool_name: str) -> bool:
         """Check if tool is a discovery tool."""
-        base = (
-            tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
-        )
+        base = tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
         return base in cls.DISCOVERY_TOOLS
 
     @classmethod
     def is_idempotent_math_tool(cls, tool_name: str) -> bool:
         """Check if tool is an idempotent math tool."""
-        base = (
-            tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
-        )
+        base = tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
         return base in cls.IDEMPOTENT_MATH_TOOLS
 
     @classmethod
     def is_parameterized_tool(cls, tool_name: str) -> bool:
         """Check if tool requires computed values."""
-        base = (
-            tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
-        )
+        base = tool_name.split(".")[-1].lower() if "." in tool_name else tool_name.lower()
         return base in cls.PARAMETERIZED_TOOLS
 
 
@@ -173,9 +167,7 @@ class ValueBinding(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     aliases: list[str] = Field(default_factory=list, description="Model-provided names")
     used: bool = Field(default=False, description="Has this value been referenced?")
-    used_in: list[str] = Field(
-        default_factory=list, description="Tool calls that used this"
-    )
+    used_in: list[str] = Field(default_factory=list, description="Tool calls that used this")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -196,10 +188,7 @@ class ValueBinding(BaseModel):
         if self.value_type == ValueType.NUMBER:
             val = self.typed_value
             if isinstance(val, float):
-                if abs(val) < 0.0001 or abs(val) > 10000:
-                    formatted = f"{val:.6e}"
-                else:
-                    formatted = f"{val:.6f}"
+                formatted = f"{val:.6e}" if abs(val) < 0.0001 or abs(val) > 10000 else f"{val:.6f}"
             else:
                 formatted = str(val)
         elif self.value_type == ValueType.STRING:
@@ -239,12 +228,8 @@ class ReferenceCheckResult(BaseModel):
     """Result of checking references in tool arguments."""
 
     valid: bool = Field(..., description="Whether all references are valid")
-    missing_refs: list[str] = Field(
-        default_factory=list, description="References that don't exist"
-    )
-    resolved_refs: dict[str, Any] = Field(
-        default_factory=dict, description="ref -> resolved value"
-    )
+    missing_refs: list[str] = Field(default_factory=list, description="References that don't exist")
+    resolved_refs: dict[str, Any] = Field(default_factory=dict, description="ref -> resolved value")
     message: str = Field(default="", description="Human-readable message")
 
 
@@ -253,9 +238,7 @@ class PerToolCallStatus(BaseModel):
 
     tool_name: str
     call_count: int = Field(default=0)
-    max_calls: int = Field(
-        default=3, description="Default max before requiring justification"
-    )
+    max_calls: int = Field(default=3, description="Default max before requiring justification")
     requires_justification: bool = Field(default=False)
 
 
@@ -292,9 +275,7 @@ class RunawayStatus(BaseModel):
         if self.degenerate_detected:
             return "Degenerate output detected (0.0, 1.0, or repeating). Results have saturated."
         if self.saturation_detected:
-            return (
-                "Numeric saturation detected. Values are at machine precision limits."
-            )
+            return "Numeric saturation detected. Values are at machine precision limits."
         return self.reason or "Unknown stop reason"
 
 
@@ -433,9 +414,7 @@ class SoftBlock(BaseModel):
         """Get the next repair action to try."""
         if self.reason == SoftBlockReason.UNGROUNDED_ARGS:
             return RepairAction.REBIND_FROM_EXISTING
-        elif self.reason == SoftBlockReason.MISSING_REFS:
-            return RepairAction.COMPUTE_MISSING
-        elif self.reason == SoftBlockReason.MISSING_DEPENDENCY:
+        elif self.reason == SoftBlockReason.MISSING_REFS or self.reason == SoftBlockReason.MISSING_DEPENDENCY:
             return RepairAction.COMPUTE_MISSING
         return RepairAction.ASK_USER
 
@@ -470,7 +449,7 @@ class RuntimeLimits(BaseModel):
     unused_results: UnusedResultAction = Field(default=UnusedResultAction.WARN)
 
     @classmethod
-    def smooth(cls) -> "RuntimeLimits":
+    def smooth(cls) -> RuntimeLimits:
         """Preset for smooth UI-like experience."""
         return cls(
             discovery_budget=6,
@@ -484,7 +463,7 @@ class RuntimeLimits(BaseModel):
         )
 
     @classmethod
-    def strict(cls) -> "RuntimeLimits":
+    def strict(cls) -> RuntimeLimits:
         """Preset for strict dataflow enforcement."""
         return cls(
             discovery_budget=4,

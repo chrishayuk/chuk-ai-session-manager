@@ -6,7 +6,7 @@ Sample tools for chuk session manager demos - corrected version following regist
 import asyncio
 import random
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 from chuk_tool_processor.registry import register_tool
 
@@ -19,7 +19,7 @@ from chuk_tool_processor.registry import register_tool
 class CalculatorTool:
     """Calculator tool for basic arithmetic."""
 
-    async def execute(self, operation: str, a: float, b: float) -> Dict[str, Any]:
+    async def execute(self, operation: str, a: float, b: float) -> dict[str, Any]:
         """
         Perform a basic arithmetic operation.
 
@@ -63,7 +63,7 @@ class CalculatorTool:
 class WeatherTool:
     """Weather tool that returns mock weather data."""
 
-    async def execute(self, location: str) -> Dict[str, Any]:
+    async def execute(self, location: str) -> dict[str, Any]:
         """
         Get weather information for a specific location.
 
@@ -78,24 +78,13 @@ class WeatherTool:
 
         # Mock realistic weather based on location
         base_temp = 15  # Default moderate temperature
-        if any(
-            city in location.lower()
-            for city in ["miami", "phoenix", "dubai", "singapore"]
-        ):
+        if any(city in location.lower() for city in ["miami", "phoenix", "dubai", "singapore"]):
             base_temp = 28
-        elif any(
-            city in location.lower()
-            for city in ["moscow", "montreal", "oslo", "anchorage"]
-        ):
+        elif any(city in location.lower() for city in ["moscow", "montreal", "oslo", "anchorage"]):
             base_temp = -5
-        elif any(
-            city in location.lower() for city in ["london", "seattle", "vancouver"]
-        ):
+        elif any(city in location.lower() for city in ["london", "seattle", "vancouver"]):
             base_temp = 12
-        elif any(
-            city in location.lower()
-            for city in ["tokyo", "new york", "paris", "berlin"]
-        ):
+        elif any(city in location.lower() for city in ["tokyo", "new york", "paris", "berlin"]):
             base_temp = 18
 
         # Add some randomness
@@ -143,7 +132,7 @@ class WeatherTool:
 class SearchTool:
     """Search tool that returns mock search results."""
 
-    async def execute(self, query: str, max_results: int = 3) -> Dict[str, Any]:
+    async def execute(self, query: str, max_results: int = 3) -> dict[str, Any]:
         """
         Search for information on the internet.
 
@@ -222,6 +211,4 @@ class SearchTool:
         }
 
 
-print(
-    "✅ sample_tools.py: 3 tools defined with @register_tool decorator (corrected version)"
-)
+print("✅ sample_tools.py: 3 tools defined with @register_tool decorator (corrected version)")

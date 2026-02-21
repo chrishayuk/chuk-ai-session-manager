@@ -7,9 +7,10 @@ CHUK Sessions handles all storage concerns (memory, Redis, TTL, multi-tenancy).
 """
 
 from __future__ import annotations
+
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Import the correct class from chuk_sessions
 # We need to determine the correct import based on what's actually available
@@ -36,18 +37,14 @@ class SessionStorage:
     All provider logic is handled by CHUK Sessions.
     """
 
-    def __init__(
-        self, sandbox_id: str = "ai-session-manager", default_ttl_hours: int = 24
-    ):
-        self.chuk = ChukSessionManager(
-            sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours
-        )
+    def __init__(self, sandbox_id: str = "ai-session-manager", default_ttl_hours: int = 24):
+        self.chuk = ChukSessionManager(sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours)
         self.sandbox_id = sandbox_id
-        self._cache: Dict[str, Session] = {}
+        self._cache: dict[str, Session] = {}
 
         logger.info(f"AI Session Manager using CHUK Sessions (sandbox: {sandbox_id})")
 
-    async def get(self, session_id: str) -> Optional[Session]:
+    async def get(self, session_id: str) -> Session | None:
         """Get AI session by ID."""
         if session_id in self._cache:
             return self._cache[session_id]
@@ -91,9 +88,7 @@ class SessionStorage:
                 "session_type": "ai_session_manager",
             }
 
-            await self.chuk.allocate_session(
-                session_id=session.id, user_id=user_id, custom_metadata=custom_metadata
-            )
+            await self.chuk.allocate_session(session_id=session.id, user_id=user_id, custom_metadata=custom_metadata)
 
             self._cache[session.id] = session
 
@@ -110,14 +105,14 @@ class SessionStorage:
             logger.error(f"Failed to delete AI session {session_id}: {e}")
             raise
 
-    async def list_sessions(self, prefix: str = "") -> List[str]:
+    async def list_sessions(self, prefix: str = "") -> list[str]:
         """List AI session IDs."""
         session_ids = list(self._cache.keys())
         if prefix:
             session_ids = [sid for sid in session_ids if sid.startswith(prefix)]
         return session_ids
 
-    def _extract_user_id(self, session: Session) -> Optional[str]:
+    def _extract_user_id(self, session: Session) -> str | None:
         """Extract user ID from AI session metadata."""
         try:
             if hasattr(session.metadata, "properties"):
@@ -130,7 +125,7 @@ class SessionStorage:
         """Extend session TTL."""
         return await self.chuk.extend_session_ttl(session_id, additional_hours)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         return {
             "backend": "chuk_sessions",
@@ -141,7 +136,7 @@ class SessionStorage:
 
 
 # Global backend
-_backend: Optional[SessionStorage] = None
+_backend: SessionStorage | None = None
 
 
 def get_backend() -> SessionStorage:
@@ -152,24 +147,20 @@ def get_backend() -> SessionStorage:
     return _backend
 
 
-def setup_chuk_sessions_storage(
-    sandbox_id: str = "ai-session-manager", default_ttl_hours: int = 24
-) -> SessionStorage:
+def setup_chuk_sessions_storage(sandbox_id: str = "ai-session-manager", default_ttl_hours: int = 24) -> SessionStorage:
     """Set up CHUK Sessions as the storage backend."""
     global _backend
-    _backend = SessionStorage(
-        sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours
-    )
+    _backend = SessionStorage(sandbox_id=sandbox_id, default_ttl_hours=default_ttl_hours)
     return _backend
 
 
 class ChukSessionsStore:
     """Storage interface adapter for CHUK Sessions."""
 
-    def __init__(self, backend: Optional[SessionStorage] = None):
+    def __init__(self, backend: SessionStorage | None = None):
         self.backend = backend or get_backend()
 
-    async def get(self, session_id: str) -> Optional[Session]:
+    async def get(self, session_id: str) -> Session | None:
         return await self.backend.get(session_id)
 
     async def save(self, session: Session) -> None:
@@ -178,5 +169,5 @@ class ChukSessionsStore:
     async def delete(self, session_id: str) -> None:
         await self.backend.delete(session_id)
 
-    async def list_sessions(self, prefix: str = "") -> List[str]:
+    async def list_sessions(self, prefix: str = "") -> list[str]:
         return await self.backend.list_sessions(prefix)

@@ -9,8 +9,6 @@ Design principles:
 - No magic strings: Uses enums for modes and types
 """
 
-from typing import List
-
 
 from .models import (
     Modality,
@@ -21,7 +19,6 @@ from .models import (
     ToolType,
     VMMode,
 )
-
 
 # Strict mode: No hallucinated memory, citations required
 VM_STRICT_PROMPT = """You are operating under STRICT Virtual Memory grounding rules.
@@ -158,7 +155,7 @@ def build_vm_developer_message(
     else:
         rules = VM_PASSIVE_PROMPT
 
-    parts: List[str] = []
+    parts: list[str] = []
 
     if system_prompt:
         parts.append(system_prompt)
@@ -228,10 +225,10 @@ SEARCH_PAGES_TOOL = ToolDefinition(
 
 
 # List of all VM tools as Pydantic models
-VM_TOOL_DEFINITIONS: List[ToolDefinition] = [PAGE_FAULT_TOOL, SEARCH_PAGES_TOOL]
+VM_TOOL_DEFINITIONS: list[ToolDefinition] = [PAGE_FAULT_TOOL, SEARCH_PAGES_TOOL]
 
 
-def get_vm_tools(include_search: bool = True) -> List[ToolDefinition]:
+def get_vm_tools(include_search: bool = True) -> list[ToolDefinition]:
     """
     Get the VM tool definitions as Pydantic models.
 
@@ -246,7 +243,7 @@ def get_vm_tools(include_search: bool = True) -> List[ToolDefinition]:
     return [PAGE_FAULT_TOOL]
 
 
-def get_vm_tools_as_dicts(include_search: bool = True) -> List[dict]:
+def get_vm_tools_as_dicts(include_search: bool = True) -> list[dict]:
     """
     Get the VM tool definitions as dicts (for Chat Completions API).
 

@@ -14,7 +14,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from chuk_tool_processor.core.processor import ToolProcessor
 from chuk_tool_processor.models.tool_call import ToolCall
@@ -23,7 +23,7 @@ from chuk_tool_processor.models.tool_result import ToolResult
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
 from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.session_storage import get_backend, ChukSessionsStore
+from chuk_ai_session_manager.session_storage import ChukSessionsStore, get_backend
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +44,11 @@ class SessionAwareToolProcessor:
         self.enable_caching = enable_caching
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self.cache: Dict[str, ToolResult] = {}
+        self.cache: dict[str, ToolResult] = {}
 
         self._tp: ToolProcessor = ToolProcessor()
         if not hasattr(self._tp, "executor"):
-            raise AttributeError(
-                "Installed chuk_tool_processor is too old - missing `.executor`"
-            )
+            raise AttributeError("Installed chuk_tool_processor is too old - missing `.executor`")
 
     @classmethod
     async def create(cls, session_id: str, **kwargs):
@@ -64,7 +62,7 @@ class SessionAwareToolProcessor:
     async def _maybe_await(self, val: Any) -> Any:
         return await val if asyncio.iscoroutine(val) else val
 
-    async def _exec_calls(self, calls: List[Dict[str, Any]]) -> List[ToolResult]:
+    async def _exec_calls(self, calls: list[dict[str, Any]]) -> list[ToolResult]:
         """Convert dicts → ToolCall and drive the executor."""
         tool_calls: list[ToolCall] = []
         for c in calls:
@@ -116,7 +114,7 @@ class SessionAwareToolProcessor:
         await session.add_event_and_save(ev)
 
     # ─────────────────────────── public API ────────────────────────────
-    async def process_llm_message(self, llm_msg: Dict[str, Any], _) -> List[ToolResult]:
+    async def process_llm_message(self, llm_msg: dict[str, Any], _) -> list[ToolResult]:
         backend = get_backend()
         store = ChukSessionsStore(backend)
         session = await store.get(self.session_id)
@@ -147,9 +145,7 @@ class SessionAwareToolProcessor:
                 args = {"raw": fn.get("arguments")}
 
             cache_key = (
-                hashlib.md5(
-                    f"{name}:{json.dumps(args, sort_keys=True)}".encode()
-                ).hexdigest()
+                hashlib.md5(f"{name}:{json.dumps(args, sort_keys=True)}".encode()).hexdigest()
                 if self.enable_caching
                 else None
             )
@@ -167,9 +163,7 @@ class SessionAwareToolProcessor:
                     res = (await self._exec_calls([call]))[0]
                     if cache_key:
                         self.cache[cache_key] = res
-                    await self._log_event(
-                        session, parent_evt.id, res, attempt, cached=False
-                    )
+                    await self._log_event(session, parent_evt.id, res, attempt, cached=False)
                     out.append(res)
                     break
                 except Exception as exc:  # noqa: BLE001

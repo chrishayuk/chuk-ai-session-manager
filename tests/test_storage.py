@@ -6,16 +6,17 @@ Tests SessionStorage, ChukSessionsStore, and related storage operations.
 """
 
 import json
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.session_storage import (
-    SessionStorage,
     ChukSessionsStore,
+    SessionStorage,
     get_backend,
     setup_chuk_sessions_storage,
 )
@@ -27,8 +28,8 @@ def sample_session_data():
     return {
         "id": "test-session-123",
         "metadata": {
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "properties": {"user_id": "user-456"},
         },
         "parent_id": None,
@@ -83,9 +84,7 @@ class TestSessionStorage:
 
     async def test_session_storage_initialization(self):
         """Test SessionStorage initialization."""
-        with patch(
-            "chuk_ai_session_manager.session_storage.ChukSessionManager"
-        ) as mock_chuk:
+        with patch("chuk_ai_session_manager.session_storage.ChukSessionManager") as mock_chuk:
             mock_instance = AsyncMock()
             mock_chuk.return_value = mock_instance
 
@@ -93,9 +92,7 @@ class TestSessionStorage:
 
             assert storage.sandbox_id == "test-sandbox"
             assert storage._cache == {}
-            mock_chuk.assert_called_once_with(
-                sandbox_id="test-sandbox", default_ttl_hours=2
-            )
+            mock_chuk.assert_called_once_with(sandbox_id="test-sandbox", default_ttl_hours=2)
 
     async def test_session_storage_save_and_get(self, session_storage):
         """Test saving and retrieving sessions."""
@@ -148,9 +145,7 @@ class TestSessionStorage:
     async def test_session_storage_get_invalid_data(self, session_storage):
         """Test handling invalid session data."""
         # Mock invalid JSON data
-        session_storage.chuk.get_session_info.return_value = {
-            "custom_metadata": {"ai_session_data": "invalid json"}
-        }
+        session_storage.chuk.get_session_info.return_value = {"custom_metadata": {"ai_session_data": "invalid json"}}
 
         retrieved = await session_storage.get("invalid-session")
         assert retrieved is None
@@ -233,9 +228,7 @@ class TestSessionStorage:
 
         result = await session_storage.extend_session_ttl(session_id, additional_hours)
 
-        session_storage.chuk.extend_session_ttl.assert_called_once_with(
-            session_id, additional_hours
-        )
+        session_storage.chuk.extend_session_ttl.assert_called_once_with(session_id, additional_hours)
         assert result is True
 
     def test_session_storage_extract_user_id(self, session_storage):
@@ -283,9 +276,7 @@ class TestChukSessionsStore:
 
     async def test_chuk_sessions_store_initialization(self):
         """Test ChukSessionsStore initialization."""
-        with patch(
-            "chuk_ai_session_manager.session_storage.get_backend"
-        ) as mock_get_backend:
+        with patch("chuk_ai_session_manager.session_storage.get_backend") as mock_get_backend:
             mock_backend = AsyncMock()
             mock_get_backend.return_value = mock_backend
 
@@ -326,9 +317,7 @@ class TestStorageBackendManagement:
 
     def test_get_backend_singleton(self):
         """Test that get_backend returns singleton."""
-        with patch(
-            "chuk_ai_session_manager.session_storage.SessionStorage"
-        ) as mock_storage:
+        with patch("chuk_ai_session_manager.session_storage.SessionStorage") as mock_storage:
             # Clear the global backend
             import chuk_ai_session_manager.session_storage as storage_module
 
@@ -343,9 +332,7 @@ class TestStorageBackendManagement:
 
     def test_setup_chuk_sessions_storage(self):
         """Test setup function."""
-        with patch(
-            "chuk_ai_session_manager.session_storage.SessionStorage"
-        ) as mock_storage:
+        with patch("chuk_ai_session_manager.session_storage.SessionStorage") as mock_storage:
             mock_instance = MagicMock()
             mock_storage.return_value = mock_instance
 
@@ -354,13 +341,9 @@ class TestStorageBackendManagement:
 
             storage_module._backend = None
 
-            result = setup_chuk_sessions_storage(
-                sandbox_id="custom-sandbox", default_ttl_hours=48
-            )
+            result = setup_chuk_sessions_storage(sandbox_id="custom-sandbox", default_ttl_hours=48)
 
-            mock_storage.assert_called_once_with(
-                sandbox_id="custom-sandbox", default_ttl_hours=48
-            )
+            mock_storage.assert_called_once_with(sandbox_id="custom-sandbox", default_ttl_hours=48)
             assert result == mock_instance
             assert storage_module._backend == mock_instance
 

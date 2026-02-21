@@ -6,11 +6,12 @@ This configuration avoids circular imports by using lazy imports in fixtures.
 """
 
 import asyncio
-import pytest
-import logging
 import json
+import logging
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+
+import pytest
 
 # Configure logging for tests
 logging.basicConfig(level=logging.WARNING)
@@ -36,8 +37,8 @@ def mock_chuk_session_manager():
                 {
                     "id": "test-session",
                     "metadata": {
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "created_at": datetime.now(UTC).isoformat(),
+                        "updated_at": datetime.now(UTC).isoformat(),
                         "properties": {},
                     },
                     "parent_id": None,
@@ -82,7 +83,7 @@ async def mock_session_store():
         sessions.pop(session_id, None)
 
     async def mock_list_sessions(prefix=""):
-        return [sid for sid in sessions.keys() if sid.startswith(prefix)]
+        return [sid for sid in sessions if sid.startswith(prefix)]
 
     mock_store = AsyncMock()
     mock_store.get.side_effect = mock_get
@@ -136,9 +137,9 @@ async def sample_session():
 
     # Create sample events using direct imports to avoid circular dependencies
     try:
-        from chuk_ai_session_manager.models.session_event import SessionEvent
         from chuk_ai_session_manager.models.event_source import EventSource
         from chuk_ai_session_manager.models.event_type import EventType
+        from chuk_ai_session_manager.models.session_event import SessionEvent
 
         # Add some sample events
         user_event = await SessionEvent.create_with_tokens(
@@ -182,9 +183,7 @@ async def mock_tool_processor():
     mock_executor = AsyncMock()
 
     # Default successful tool result
-    mock_executor.execute.return_value = [
-        MockToolResult(tool="test_tool", result={"success": True}, error=None)
-    ]
+    mock_executor.execute.return_value = [MockToolResult(tool="test_tool", result={"success": True}, error=None)]
 
     mock_processor.executor = mock_executor
     return mock_processor
@@ -217,7 +216,7 @@ async def mock_llm_callback():
 @pytest.fixture
 def mock_datetime():
     """Mock datetime for consistent testing."""
-    fixed_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    fixed_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
     with patch("chuk_ai_session_manager.models.session_metadata.datetime") as mock_dt:
         mock_dt.now.return_value = fixed_time
@@ -233,8 +232,8 @@ def temp_session_data():
         return {
             "id": session_id,
             "metadata": {
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
                 "properties": {},
             },
             "parent_id": None,
@@ -337,18 +336,10 @@ def mock_storage_imports():
     # This fixture will automatically patch problematic imports during test collection
     # We need to patch both the main module and the tool processor module imports
     with (
-        patch(
-            "chuk_ai_session_manager.session_storage.get_backend"
-        ) as mock_get_backend,
-        patch(
-            "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-        ) as mock_store,
-        patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.get_backend"
-        ) as mock_get_backend_tool,
-        patch(
-            "chuk_ai_session_manager.session_aware_tool_processor.ChukSessionsStore"
-        ) as mock_store_tool,
+        patch("chuk_ai_session_manager.session_storage.get_backend") as mock_get_backend,
+        patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store,
+        patch("chuk_ai_session_manager.session_aware_tool_processor.get_backend") as mock_get_backend_tool,
+        patch("chuk_ai_session_manager.session_aware_tool_processor.ChukSessionsStore") as mock_store_tool,
     ):
         # Create a mock backend with proper async methods
         mock_backend = AsyncMock()
@@ -377,9 +368,7 @@ def mock_storage_imports():
 
         # Create a mock store with proper async methods
         mock_store_instance = AsyncMock()
-        mock_store_instance.backend = (
-            mock_backend  # Store should have reference to backend
-        )
+        mock_store_instance.backend = mock_backend  # Store should have reference to backend
         mock_store_instance.get = AsyncMock(return_value=None)
         mock_store_instance.save = AsyncMock()
         mock_store_instance.delete = AsyncMock()

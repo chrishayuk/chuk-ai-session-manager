@@ -9,26 +9,39 @@ Covers:
 - guards/manager.py    (ToolStateManager, get_tool_state, reset_tool_state)
 """
 
-from chuk_ai_session_manager.guards.bindings import BindingManager, REFERENCE_PATTERN
+from chuk_tool_processor.guards import (
+    EnforcementLevel as CTPEnforcementLevel,
+)
+from chuk_tool_processor.guards import (
+    GuardResult,
+    GuardVerdict,
+)
+
+from chuk_ai_session_manager.guards.bindings import REFERENCE_PATTERN, BindingManager
 from chuk_ai_session_manager.guards.cache import ResultCache
+from chuk_ai_session_manager.guards.manager import (
+    ToolStateManager,
+    get_tool_state,
+    reset_tool_state,
+)
 from chuk_ai_session_manager.guards.models import (
-    ValueBinding,
-    ValueType,
     CachedToolResult,
+    CacheScope,
+    EnforcementLevel,
     NamedVariable,
-    ToolClassification,
+    PerToolCallStatus,
+    ReferenceCheckResult,
+    RepairAction,
+    RunawayStatus,
     RuntimeLimits,
     RuntimeMode,
     SoftBlock,
     SoftBlockReason,
-    RepairAction,
-    RunawayStatus,
-    ReferenceCheckResult,
-    PerToolCallStatus,
+    ToolClassification,
     UngroundedCallResult,
-    EnforcementLevel,
-    CacheScope,
     UnusedResultAction,
+    ValueBinding,
+    ValueType,
     classify_value_type,
     compute_args_hash,
 )
@@ -36,17 +49,6 @@ from chuk_ai_session_manager.guards.ungrounded import (
     UngroundedGuard,
     UngroundedGuardConfig,
 )
-from chuk_ai_session_manager.guards.manager import (
-    ToolStateManager,
-    get_tool_state,
-    reset_tool_state,
-)
-from chuk_tool_processor.guards import (
-    GuardResult,
-    GuardVerdict,
-    EnforcementLevel as CTPEnforcementLevel,
-)
-
 
 # ============================================================================
 # TESTS FOR guards/models.py
@@ -351,9 +353,7 @@ class TestCachedToolResult:
         assert "3.14" in result
 
     def test_format_compact_numeric_large(self):
-        c = CachedToolResult(
-            tool_name="pow", arguments={"base": 10, "exp": 6}, result=1000000.0
-        )
+        c = CachedToolResult(tool_name="pow", arguments={"base": 10, "exp": 6}, result=1000000.0)
         result = c.format_compact()
         assert "e" in result.lower()
 
@@ -1372,11 +1372,7 @@ class TestToolStateManager:
         mgr = self._make_manager()
         result = mgr.check_ungrounded_call("add", {"a": 42, "b": 7})
         # Should detect ungrounded since no user literals or bindings
-        assert (
-            "Ungrounded" in result.message
-            or result.is_ungrounded is True
-            or result.is_ungrounded is False
-        )
+        assert "Ungrounded" in result.message or result.is_ungrounded is True or result.is_ungrounded is False
 
     def test_check_ungrounded_call_with_bindings(self):
         mgr = self._make_manager()
@@ -1406,9 +1402,7 @@ class TestToolStateManager:
             numeric_args=["a=42"],
             has_bindings=True,
         )
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "multiply", {"a": 42}, reason
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("multiply", {"a": 42}, reason)
         assert repaired is True
         assert new_args is not None
         assert "$v1" in str(new_args.values())
@@ -1421,25 +1415,19 @@ class TestToolStateManager:
             numeric_args=["a=42"],
             has_bindings=True,
         )
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "multiply", {"a": 42}, reason
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("multiply", {"a": 42}, reason)
         assert repaired is False
         assert "No matching bindings" in msg
 
     def test_try_soft_block_repair_soft_block_reason_ungrounded(self):
         mgr = self._make_manager()
         mgr.bind_value("add", {"x": 1}, 42)
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "multiply", {"a": 42}, SoftBlockReason.UNGROUNDED_ARGS
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("multiply", {"a": 42}, SoftBlockReason.UNGROUNDED_ARGS)
         assert repaired is True
 
     def test_try_soft_block_repair_soft_block_reason_no_bindings(self):
         mgr = self._make_manager()
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "multiply", {"a": 42}, SoftBlockReason.UNGROUNDED_ARGS
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("multiply", {"a": 42}, SoftBlockReason.UNGROUNDED_ARGS)
         assert repaired is False
         assert "Cannot call" in msg
 
@@ -1454,9 +1442,7 @@ class TestToolStateManager:
 
     def test_try_soft_block_repair_other_reason(self):
         mgr = self._make_manager()
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "add", {"a": 1}, SoftBlockReason.BUDGET_EXHAUSTED
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("add", {"a": 1}, SoftBlockReason.BUDGET_EXHAUSTED)
         assert repaired is False
         assert new_args is None
         assert msg is None
@@ -1896,9 +1882,7 @@ class TestToolStateManagerAdditional:
             numeric_args=["a=not_a_number"],
             has_bindings=True,
         )
-        repaired, new_args, msg = mgr.try_soft_block_repair(
-            "multiply", {"a": 42}, reason
-        )
+        repaired, new_args, msg = mgr.try_soft_block_repair("multiply", {"a": 42}, reason)
         # ValueError on float("not_a_number") should be caught
         assert repaired is False
 
@@ -1976,9 +1960,7 @@ class TestToolStateManagerAdditional:
         mgr = ToolStateManager()
         # normal_cdf is parameterized; without bindings or user literals,
         # the precondition guard should block
-        ok, msg = mgr.check_preconditions(
-            "normal_cdf", {"x": 1.96, "mu": 0, "sigma": 1}
-        )
+        ok, msg = mgr.check_preconditions("normal_cdf", {"x": 1.96, "mu": 0, "sigma": 1})
         # Whether it blocks depends on safe_values={0.0, 1.0} and if x=1.96 triggers it
         assert isinstance(ok, bool)
         assert isinstance(msg, (str, type(None)))
@@ -2005,9 +1987,7 @@ class TestToolStateManagerAdditional:
         mgr = ToolStateManager()
         # Mock the runaway guard to return a blocked result
         mock_guard = MagicMock()
-        mock_guard.check.return_value = GuardResult(
-            verdict=GuardVerdict.BLOCK, reason="Degenerate saturation detected"
-        )
+        mock_guard.check.return_value = GuardResult(verdict=GuardVerdict.BLOCK, reason="Degenerate saturation detected")
         mgr.runaway_guard = mock_guard
         status = mgr.check_runaway("add")
         assert status.should_stop is True
@@ -2105,9 +2085,7 @@ class TestToolStateManagerAdditional:
                 raise ValueError("mocked")
             return original_float(val)
 
-        with patch(
-            "chuk_ai_session_manager.guards.manager.float", side_effect=patched_float
-        ):
+        with patch("chuk_ai_session_manager.guards.manager.float", side_effect=patched_float):
             count = mgr.register_user_literals("The values are 3.14 and 2.718")
         # At least one should have been registered before the mock kicked in
         assert isinstance(count, int)
@@ -2126,9 +2104,7 @@ class TestToolStateManagerAdditional:
             # Always raise ValueError for the extracted match values
             raise ValueError("mocked")
 
-        with patch(
-            "chuk_ai_session_manager.guards.manager.float", side_effect=patched_float
-        ):
+        with patch("chuk_ai_session_manager.guards.manager.float", side_effect=patched_float):
             bindings = mgr.extract_bindings_from_text("mu = 3.14 and sigma = 1.5")
         # Should return empty since all float conversions fail
         assert bindings == []

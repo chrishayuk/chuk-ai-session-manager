@@ -12,17 +12,14 @@ This module provides the main SessionManager class which offers:
 """
 
 from __future__ import annotations
+
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Callable
-from datetime import datetime
 import uuid
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any
 
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.session_event import SessionEvent
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.session_storage import ChukSessionsStore
 from chuk_ai_session_manager.memory.manager import MemoryManager
 from chuk_ai_session_manager.memory.models import (
     MessageRole,
@@ -31,6 +28,11 @@ from chuk_ai_session_manager.memory.models import (
     VMMode,
 )
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
+from chuk_ai_session_manager.session_storage import ChukSessionsStore
 
 logger = logging.getLogger(__name__)
 
@@ -76,20 +78,20 @@ class SessionManager:
 
     def __init__(
         self,
-        session_id: Optional[str] = None,
-        system_prompt: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        store: Optional[ChukSessionsStore] = None,
+        session_id: str | None = None,
+        system_prompt: str | None = None,
+        parent_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        store: ChukSessionsStore | None = None,
         infinite_context: bool = False,
         token_threshold: int = 4000,
         max_turns_per_segment: int = 20,
         default_model: str = DEFAULT_TOKEN_MODEL,
         enable_vm: bool = False,
-        vm_config: Optional[WorkingSetConfig] = None,
+        vm_config: WorkingSetConfig | None = None,
         vm_mode: VMMode = VMMode.STRICT,
-        vm_eviction_policy: Optional[Any] = None,
-        vm_compressor_registry: Optional[Any] = None,
+        vm_eviction_policy: Any | None = None,
+        vm_compressor_registry: Any | None = None,
     ):
         """
         Initialize a SessionManager.
@@ -116,12 +118,12 @@ class SessionManager:
         self._parent_id = parent_id
         self._metadata = metadata or {}
         self._store = store or ChukSessionsStore()
-        self._session: Optional[Session] = None
+        self._session: Session | None = None
         self._initialized = False
         self._lock = asyncio.Lock()
         self._loaded_from_storage = False  # Track if loaded from storage
         self._default_model = default_model
-        self._summary_callback: Optional[Callable] = None
+        self._summary_callback: Callable | None = None
 
         # Infinite context settings
         self._infinite_context = infinite_context
@@ -129,12 +131,12 @@ class SessionManager:
         self._max_turns_per_segment = max_turns_per_segment
 
         # Infinite context state
-        self._session_chain: List[str] = []
-        self._full_conversation: List[Dict[str, Any]] = []
+        self._session_chain: list[str] = []
+        self._full_conversation: list[dict[str, Any]] = []
         self._total_segments = 1
 
         # Virtual Memory subsystem
-        self._vm: Optional[MemoryManager] = None
+        self._vm: MemoryManager | None = None
         if enable_vm:
             self._vm = MemoryManager(
                 session_id=self.session_id,
@@ -156,7 +158,7 @@ class SessionManager:
             return self._session_id
 
     @property
-    def system_prompt(self) -> Optional[str]:
+    def system_prompt(self) -> str | None:
         """Get the current system prompt."""
         return self._system_prompt
 
@@ -173,15 +175,15 @@ class SessionManager:
         return not self._loaded_from_storage
 
     @property
-    def vm(self) -> Optional[MemoryManager]:
+    def vm(self) -> MemoryManager | None:
         """Access the Virtual Memory manager (None if VM is disabled)."""
         return self._vm
 
     def get_vm_context(
         self,
         model_id: str = "",
-        token_budget: Optional[int] = None,
-    ) -> Optional[Dict[str, Any]]:
+        token_budget: int | None = None,
+    ) -> dict[str, Any] | None:
         """
         Get the full VM context for an LLM call.
 
@@ -204,7 +206,7 @@ class SessionManager:
             token_budget=token_budget,
         )
 
-    async def _ensure_session(self) -> Optional[Session]:
+    async def _ensure_session(self) -> Session | None:
         """Ensure session is initialized and return it."""
         await self._ensure_initialized()
         return self._session
@@ -229,11 +231,9 @@ class SessionManager:
 
         logger.debug(f"Updated system prompt for session {self.session_id}")
 
-    async def _create_and_save_session(
-        self, session_id: Optional[str] = None
-    ) -> Session:
+    async def _create_and_save_session(self, session_id: str | None = None) -> Session:
         """Create a new session with metadata and save it."""
-        session_metadata: Dict[str, Any] = {}
+        session_metadata: dict[str, Any] = {}
         if self._metadata:
             session_metadata.update(self._metadata)
         if self._system_prompt:
@@ -272,31 +272,22 @@ class SessionManager:
                         self._loaded_from_storage = True
 
                         # Load system prompt from session if not already set
-                        if (
-                            not self._system_prompt
-                            and self._session.metadata.properties
-                        ):
-                            self._system_prompt = self._session.metadata.properties.get(
-                                "system_prompt"
-                            )
+                        if not self._system_prompt and self._session.metadata.properties:
+                            self._system_prompt = self._session.metadata.properties.get("system_prompt")
 
                         # Initialize session chain for infinite context
                         if self._infinite_context:
                             self._session_chain = [self._session_id]
                     else:
                         # Session not found - create a new session with the provided ID
-                        self._session = await self._create_and_save_session(
-                            self._session_id
-                        )
+                        self._session = await self._create_and_save_session(self._session_id)
                         self._loaded_from_storage = False
 
                         if self._infinite_context:
                             self._session_chain = [self._session_id]
                 except Exception as e:
                     logger.warning(f"Failed to load session {self._session_id}: {e}")
-                    self._session = await self._create_and_save_session(
-                        self._session_id
-                    )
+                    self._session = await self._create_and_save_session(self._session_id)
                     self._loaded_from_storage = False
 
                     if self._infinite_context:
@@ -330,15 +321,13 @@ class SessionManager:
             return True
 
         # Check turn threshold
-        message_events = [
-            e for e in self._session.events if e.type == EventType.MESSAGE
-        ]
+        message_events = [e for e in self._session.events if e.type == EventType.MESSAGE]
         if len(message_events) >= self._max_turns_per_segment:
             return True
 
         return False
 
-    async def _create_summary(self, llm_callback: Optional[Callable] = None) -> str:
+    async def _create_summary(self, llm_callback: Callable | None = None) -> str:
         """
         Create a summary of the current session.
 
@@ -348,9 +337,7 @@ class SessionManager:
         """
         await self._ensure_initialized()
         assert self._session is not None
-        message_events = [
-            e for e in self._session.events if e.type == EventType.MESSAGE
-        ]
+        message_events = [e for e in self._session.events if e.type == EventType.MESSAGE]
 
         # Use LLM callback if provided
         if llm_callback:
@@ -377,7 +364,7 @@ class SessionManager:
 
         return summary
 
-    async def _create_new_segment(self, llm_callback: Optional[Callable] = None) -> str:
+    async def _create_new_segment(self, llm_callback: Callable | None = None) -> str:
         """
         Create a new session segment with summary.
 
@@ -394,9 +381,7 @@ class SessionManager:
         summary = await self._create_summary(callback)
 
         # Add summary to current session
-        summary_event = SessionEvent(
-            message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY
-        )
+        summary_event = SessionEvent(message=summary, source=EventSource.SYSTEM, type=EventType.SUMMARY)
         await self._ensure_initialized()
         assert self._session is not None
         await self._session.add_event_and_save(summary_event)
@@ -436,9 +421,7 @@ class SessionManager:
             self._vm.update_session_id(self._session_id or "")
             self._vm.new_turn()
 
-        logger.info(
-            f"Created new session segment: {old_session_id} -> {self._session_id}"
-        )
+        logger.info(f"Created new session segment: {old_session_id} -> {self._session_id}")
         return self._session_id
 
     async def user_says(self, message: str, **metadata) -> str:
@@ -580,9 +563,9 @@ class SessionManager:
     async def tool_used(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
-        error: Optional[str] = None,
+        error: str | None = None,
         **metadata,
     ) -> str:
         """
@@ -638,9 +621,7 @@ class SessionManager:
 
         return self._session_id
 
-    async def get_messages_for_llm(
-        self, include_system: bool = True
-    ) -> List[Dict[str, str]]:
+    async def get_messages_for_llm(self, include_system: bool = True) -> list[dict[str, str]]:
         """
         Get messages formatted for LLM consumption, optionally including system prompt.
 
@@ -657,9 +638,7 @@ class SessionManager:
         # Only when include_system=True (avoid breaking _create_summary)
         if self._vm and include_system:
             ctx = self._vm.build_context(system_prompt=self._system_prompt or "")
-            messages: List[Dict[str, str]] = [
-                {"role": MessageRole.SYSTEM.value, "content": ctx["developer_message"]}
-            ]
+            messages: list[dict[str, str]] = [{"role": MessageRole.SYSTEM.value, "content": ctx["developer_message"]}]
             for event in self._session.events:
                 if event.type == EventType.MESSAGE:
                     if event.source == EventSource.USER:
@@ -682,9 +661,7 @@ class SessionManager:
 
         # Add system prompt if available and requested (and not empty)
         if include_system and self._system_prompt and self._system_prompt.strip():
-            messages.append(
-                {"role": MessageRole.SYSTEM.value, "content": self._system_prompt}
-            )
+            messages.append({"role": MessageRole.SYSTEM.value, "content": self._system_prompt})
 
         # Add conversation messages
         for event in self._session.events:
@@ -706,9 +683,7 @@ class SessionManager:
 
         return messages
 
-    async def get_conversation(
-        self, include_all_segments: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_conversation(self, include_all_segments: bool | None = None) -> list[dict[str, Any]]:
         """
         Get conversation history.
 
@@ -733,9 +708,7 @@ class SessionManager:
                 if event.type == EventType.MESSAGE:
                     turn = {
                         "role": (
-                            MessageRole.USER.value
-                            if event.source == EventSource.USER
-                            else MessageRole.ASSISTANT.value
+                            MessageRole.USER.value if event.source == EventSource.USER else MessageRole.ASSISTANT.value
                         ),
                         "content": str(event.message),
                         "timestamp": event.timestamp.isoformat(),
@@ -744,16 +717,14 @@ class SessionManager:
 
             return conversation
 
-    async def get_session_chain(self) -> List[str]:
+    async def get_session_chain(self) -> list[str]:
         """Get the chain of session IDs (infinite context only)."""
         if self._infinite_context:
             return self._session_chain.copy()
         else:
             return [self.session_id]
 
-    async def get_stats(
-        self, include_all_segments: Optional[bool] = None
-    ) -> Dict[str, Any]:
+    async def get_stats(self, include_all_segments: bool | None = None) -> dict[str, Any]:
         """
         Get conversation statistics.
 
@@ -785,8 +756,8 @@ class SessionManager:
             if len(self._session_chain) < self._total_segments:
                 # Need to reconstruct the chain
                 store = self._store
-                chain: List[str] = []
-                current_id: Optional[str] = self._session_id
+                chain: list[str] = []
+                current_id: str | None = self._session_id
 
                 # Walk backwards to find all segments
                 while current_id:
@@ -801,12 +772,8 @@ class SessionManager:
                 self._total_segments = len(chain)
 
             # Calculate stats across all segments
-            user_messages = len(
-                [t for t in self._full_conversation if t["role"] == "user"]
-            )
-            ai_messages = len(
-                [t for t in self._full_conversation if t["role"] == "assistant"]
-            )
+            user_messages = len([t for t in self._full_conversation if t["role"] == "user"])
+            ai_messages = len([t for t in self._full_conversation if t["role"] == "assistant"])
 
             # Get token/cost stats by loading all sessions in chain
             total_tokens = 0
@@ -820,7 +787,7 @@ class SessionManager:
                 try:
                     # For the current session, use self._session directly
                     # to ensure we have the latest in-memory state
-                    sess: Optional[Session]
+                    sess: Session | None
                     if session_id == self._session_id:
                         sess = self._session
                     else:
@@ -830,9 +797,7 @@ class SessionManager:
                         total_tokens += sess.total_tokens
                         total_cost += sess.total_cost
                         total_events += len(sess.events)
-                        tool_calls += sum(
-                            1 for e in sess.events if e.type == EventType.TOOL_CALL
-                        )
+                        tool_calls += sum(1 for e in sess.events if e.type == EventType.TOOL_CALL)
                 except Exception as e:
                     logger.warning(f"Failed to load session {session_id} in chain: {e}")
 
@@ -854,18 +819,12 @@ class SessionManager:
         else:
             # Current session stats only
             user_messages = sum(
-                1
-                for e in self._session.events
-                if e.type == EventType.MESSAGE and e.source == EventSource.USER
+                1 for e in self._session.events if e.type == EventType.MESSAGE and e.source == EventSource.USER
             )
             ai_messages = sum(
-                1
-                for e in self._session.events
-                if e.type == EventType.MESSAGE and e.source == EventSource.LLM
+                1 for e in self._session.events if e.type == EventType.MESSAGE and e.source == EventSource.LLM
             )
-            tool_calls = sum(
-                1 for e in self._session.events if e.type == EventType.TOOL_CALL
-            )
+            tool_calls = sum(1 for e in self._session.events if e.type == EventType.TOOL_CALL)
 
             return {
                 "session_id": self._session.id,
@@ -882,7 +841,7 @@ class SessionManager:
                 "infinite_context": self._infinite_context,
             }
 
-    def set_summary_callback(self, callback: Callable[[List[Dict]], str]) -> None:
+    def set_summary_callback(self, callback: Callable[[list[dict]], str]) -> None:
         """
         Set a custom callback for generating summaries in infinite context mode.
 
@@ -906,8 +865,8 @@ class SessionManager:
         # Start from current session and work backwards
         assert self._session_id is not None
         current_id: str = self._session_id
-        chain: List[str] = [current_id]
-        conversation: List[Dict[str, Any]] = []
+        chain: list[str] = [current_id]
+        conversation: list[dict[str, Any]] = []
 
         while current_id:
             session = await store.get(current_id)

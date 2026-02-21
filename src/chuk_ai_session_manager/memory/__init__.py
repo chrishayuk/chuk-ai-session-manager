@@ -15,95 +15,6 @@ Design principles:
 - No magic strings: Uses enums and constants throughout
 """
 
-from .models import (
-    # Enums
-    Actor,
-    Affinity,
-    CompressionLevel,
-    ContextPrefix,
-    FaultConfidenceThreshold,
-    FaultReason,
-    MessageRole,
-    Modality,
-    MutationType,
-    PageType,
-    StorageTier,
-    ToolType,
-    VMMode,
-    # Constants
-    ALL_COMPRESSION_LEVELS,
-    MEMORY_PAGE_MIME_TYPE,
-    VM_CHECKPOINT_MIME_TYPE,
-    # Stats Models
-    CombinedPageTableStats,
-    FaultMetrics,
-    PageTableStats,
-    StorageStats,
-    TLBStats,
-    WorkingSetStats,
-    # Content Models
-    AudioContent,
-    FaultEffects,
-    FormattedPage,
-    ImageContent,
-    PageContent,
-    PageData,
-    PageMeta,
-    SearchResultEntry,
-    StructuredContent,
-    TextContent,
-    VideoContent,
-    # Tool Definition Models
-    ToolDefinition,
-    ToolFunction,
-    ToolParameter,
-    ToolParameters,
-    # Core Models
-    MemoryPage,
-    PageTableEntry,
-    TokenBudget,
-    VMMetrics,
-    # Fault Policy Models
-    FaultPolicy,
-    FaultRecord,
-    # Mutation Log Models
-    PageMutation,
-    # Memory ABI Models
-    MemoryABI,
-    PageManifestEntry,
-    # UX Metrics Models
-    RecallAttempt,
-    UserExperienceMetrics,
-)
-from .page_table import PageTable
-from .tlb import PageTLB, TLBWithPageTable
-from .working_set import (
-    AntiThrashPolicy,
-    PinnedSet,
-    WorkingSetConfig,
-    WorkingSetManager,
-)
-from .pack_cache import ContextPackCache, PackedContext as CachedPackedContext
-from .mutation_log import ContextSnapshot, MutationLogLite
-from .prefetcher import SimplePrefetcher, ToolUsagePattern
-from .context_packer import ContextPacker, ContextPackerConfig, PackedContext
-from .manifest import (
-    AvailablePageEntry,
-    HintType,
-    ManifestBuilder,
-    ManifestPolicies,
-    VMManifest,
-    WorkingSetEntry,
-    generate_simple_hint,
-)
-from .fault_handler import (
-    FaultResult,
-    PageFaultHandler,
-    PageSearchHandler,
-    SearchResult,
-    VMToolError,
-    VMToolResult,
-)
 from .artifacts_bridge import (
     ArtifactsBridge,
     CheckpointEntry,
@@ -111,16 +22,6 @@ from .artifacts_bridge import (
     CheckpointMetadata,
     InMemoryBackend,
     PageMetadata,
-)
-from .eviction_policy import (
-    EvictionCandidate,
-    EvictionContext,
-    EvictionPolicy,
-    ImportanceWeightedLRU,
-    ImportanceWeightedLRUConfig,
-    LRUEvictionPolicy,
-    ModalityAwareLRU,
-    ModalityAwareLRUConfig,
 )
 from .compressor import (
     CompressionResult,
@@ -131,8 +32,102 @@ from .compressor import (
     TextCompressor,
     TextCompressorConfig,
 )
-from .manager import MemoryManager, event_to_page
+from .context_packer import ContextPacker, ContextPackerConfig, PackedContext
 from .demand_paging import DEFAULT_RECALL_SIGNALS, DemandPagingPrePass
+from .eviction_policy import (
+    EvictionCandidate,
+    EvictionContext,
+    EvictionPolicy,
+    ImportanceWeightedLRU,
+    ImportanceWeightedLRUConfig,
+    LRUEvictionPolicy,
+    ModalityAwareLRU,
+    ModalityAwareLRUConfig,
+)
+from .fault_handler import (
+    FaultResult,
+    PageFaultHandler,
+    PageSearchHandler,
+    SearchResult,
+    VMToolError,
+    VMToolResult,
+)
+from .manager import MemoryManager, event_to_page
+from .manifest import (
+    AvailablePageEntry,
+    HintType,
+    ManifestBuilder,
+    ManifestPolicies,
+    VMManifest,
+    WorkingSetEntry,
+    generate_simple_hint,
+)
+from .models import (
+    # Constants
+    ALL_COMPRESSION_LEVELS,
+    MEMORY_PAGE_MIME_TYPE,
+    VM_CHECKPOINT_MIME_TYPE,
+    # Enums
+    Actor,
+    Affinity,
+    # Content Models
+    AudioContent,
+    # Stats Models
+    CombinedPageTableStats,
+    CompressionLevel,
+    ContextPrefix,
+    FaultConfidenceThreshold,
+    FaultEffects,
+    FaultMetrics,
+    # Fault Policy Models
+    FaultPolicy,
+    FaultReason,
+    FaultRecord,
+    FormattedPage,
+    ImageContent,
+    # Memory ABI Models
+    MemoryABI,
+    # Core Models
+    MemoryPage,
+    MessageRole,
+    Modality,
+    MutationType,
+    PageContent,
+    PageData,
+    PageManifestEntry,
+    PageMeta,
+    # Mutation Log Models
+    PageMutation,
+    PageTableEntry,
+    PageTableStats,
+    PageType,
+    # UX Metrics Models
+    RecallAttempt,
+    SearchResultEntry,
+    StorageStats,
+    StorageTier,
+    StructuredContent,
+    TextContent,
+    TLBStats,
+    TokenBudget,
+    # Tool Definition Models
+    ToolDefinition,
+    ToolFunction,
+    ToolParameter,
+    ToolParameters,
+    ToolType,
+    UserExperienceMetrics,
+    VideoContent,
+    VMMetrics,
+    VMMode,
+    WorkingSetStats,
+)
+from .mutation_log import ContextSnapshot, MutationLogLite
+from .pack_cache import ContextPackCache
+from .pack_cache import PackedContext as CachedPackedContext
+from .page_table import PageTable
+from .prefetcher import SimplePrefetcher, ToolUsagePattern
+from .tlb import PageTLB, TLBWithPageTable
 from .vm_prompts import (
     PAGE_FAULT_TOOL,
     SEARCH_PAGES_TOOL,
@@ -146,6 +141,12 @@ from .vm_prompts import (
     get_prompt_for_mode,
     get_vm_tools,
     get_vm_tools_as_dicts,
+)
+from .working_set import (
+    AntiThrashPolicy,
+    PinnedSet,
+    WorkingSetConfig,
+    WorkingSetManager,
 )
 
 __all__ = [

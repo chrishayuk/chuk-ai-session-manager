@@ -4,10 +4,12 @@ Session event model for the chuk session manager with improved async support.
 """
 
 from __future__ import annotations
-from datetime import datetime, timezone
-from typing import Any, Dict, Generic, Optional, TypeVar
+
+from datetime import UTC, datetime
+from typing import Any, Generic, TypeVar
 from uuid import uuid4
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
@@ -28,25 +30,25 @@ class SessionEvent(BaseModel, Generic[MessageT]):
 
     id: str = Field(default_factory=lambda: str(uuid4()))
     message: MessageT
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Make source and type have defaults for backward compatibility with tests
     source: EventSource = Field(default=EventSource.SYSTEM)
     type: EventType = Field(default=EventType.MESSAGE)
 
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    parent_event_id: Optional[str] = None
-    task_id: Optional[str] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    parent_event_id: str | None = None
+    task_id: str | None = None
 
     # Token tracking
-    token_usage: Optional[TokenUsage] = None
+    token_usage: TokenUsage | None = None
 
     @classmethod
     async def create_with_tokens(
         cls,
         message: MessageT,
         prompt: str,
-        completion: Optional[str] = None,
+        completion: str | None = None,
         model: str = "gpt-3.5-turbo",
         source: EventSource = EventSource.SYSTEM,
         type: EventType = EventType.MESSAGE,
@@ -68,23 +70,19 @@ class SessionEvent(BaseModel, Generic[MessageT]):
             A new SessionEvent instance with token usage calculated
         """
         # Create token usage
-        token_usage = await TokenUsage.from_text(
-            prompt=prompt, completion=completion, model=model
-        )
+        token_usage = await TokenUsage.from_text(prompt=prompt, completion=completion, model=model)
 
         # Create the event
-        event = cls(
-            message=message, source=source, type=type, token_usage=token_usage, **kwargs
-        )
+        event = cls(message=message, source=source, type=type, token_usage=token_usage, **kwargs)
 
         return event
 
     async def update_token_usage(
         self,
-        prompt: Optional[str] = None,
-        completion: Optional[str] = None,
-        prompt_tokens: Optional[int] = None,
-        completion_tokens: Optional[int] = None,
+        prompt: str | None = None,
+        completion: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
         model: str = "gpt-3.5-turbo",
     ) -> None:
         """
@@ -103,9 +101,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         """
         if prompt is not None or completion is not None:
             # Calculate tokens from text
-            self.token_usage = await TokenUsage.from_text(
-                prompt=prompt or "", completion=completion, model=model
-            )
+            self.token_usage = await TokenUsage.from_text(prompt=prompt or "", completion=completion, model=model)
         elif prompt_tokens is not None or completion_tokens is not None:
             # Use provided token counts
             if not self.token_usage:
@@ -117,14 +113,10 @@ class SessionEvent(BaseModel, Generic[MessageT]):
                 self.token_usage.completion_tokens = completion_tokens
 
             # Update total
-            self.token_usage.total_tokens = (
-                self.token_usage.prompt_tokens + self.token_usage.completion_tokens
-            )
+            self.token_usage.total_tokens = self.token_usage.prompt_tokens + self.token_usage.completion_tokens
 
             # Recalculate cost
-            self.token_usage.estimated_cost_usd = (
-                self.token_usage._calculate_cost_sync()
-            )
+            self.token_usage.estimated_cost_usd = self.token_usage._calculate_cost_sync()
 
     async def set_metadata(self, key: str, value: Any) -> None:
         """
@@ -181,7 +173,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         """
         self.metadata[key] = value
 
-    async def merge_metadata(self, new_metadata: Dict[str, Any]) -> None:
+    async def merge_metadata(self, new_metadata: dict[str, Any]) -> None:
         """
         Merge new metadata with existing metadata asynchronously.
 
@@ -208,9 +200,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
             return self.token_usage.total_tokens
 
         # Calculate tokens from message
-        message_str = (
-            str(self.message) if not isinstance(self.message, str) else self.message
-        )
+        message_str = str(self.message) if not isinstance(self.message, str) else self.message
         return await TokenUsage.count_tokens(message_str, model)
 
     def is_child_of(self, parent_event_id: str) -> bool:
@@ -237,7 +227,7 @@ class SessionEvent(BaseModel, Generic[MessageT]):
         """
         return self.task_id == task_id
 
-    async def to_dict(self) -> Dict[str, Any]:
+    async def to_dict(self) -> dict[str, Any]:
         """
         Convert the event to a dictionary asynchronously.
 

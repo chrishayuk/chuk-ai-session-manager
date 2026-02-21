@@ -13,7 +13,6 @@ Covers:
 
 import math
 from datetime import datetime, timedelta
-from typing import Set
 
 import pytest
 
@@ -38,7 +37,6 @@ from chuk_ai_session_manager.memory.working_set import (
     WorkingSetManager,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -47,7 +45,7 @@ from chuk_ai_session_manager.memory.working_set import (
 class MockAntiThrash:
     """Mock anti-thrash policy that blocks specific page IDs."""
 
-    def __init__(self, blocked_ids: Set[str] | None = None):
+    def __init__(self, blocked_ids: set[str] | None = None):
         self._blocked = blocked_ids or set()
 
     def can_evict(self, page_id: str, current_turn: int) -> bool:

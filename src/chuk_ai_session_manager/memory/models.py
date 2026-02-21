@@ -16,10 +16,9 @@ Design principles:
 
 from datetime import datetime
 from enum import Enum, IntEnum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 from pydantic import BaseModel, Field
-
 
 # =============================================================================
 # Enums
@@ -170,7 +169,7 @@ MEMORY_PAGE_MIME_TYPE = "application/x-memory-page"
 VM_CHECKPOINT_MIME_TYPE = "application/x-vm-checkpoint"
 
 # All compression levels as a list (for iteration)
-ALL_COMPRESSION_LEVELS: List[int] = [level.value for level in CompressionLevel]
+ALL_COMPRESSION_LEVELS: list[int] = [level.value for level in CompressionLevel]
 
 
 # =============================================================================
@@ -198,10 +197,8 @@ class WorkingSetStats(BaseModel):
     tokens_used: int = Field(default=0, description="Tokens currently used")
     tokens_available: int = Field(default=0, description="Tokens available")
     utilization: float = Field(default=0.0, description="Token utilization (0-1)")
-    needs_eviction: bool = Field(
-        default=False, description="Whether eviction is needed"
-    )
-    tokens_by_modality: Dict[Modality, int] = Field(default_factory=dict)
+    needs_eviction: bool = Field(default=False, description="Whether eviction is needed")
+    tokens_by_modality: dict[Modality, int] = Field(default_factory=dict)
 
 
 class StorageStats(BaseModel):
@@ -209,7 +206,7 @@ class StorageStats(BaseModel):
 
     backend: str = Field(..., description="Backend type name")
     persistent: bool = Field(default=False, description="Whether storage persists")
-    session_id: Optional[str] = Field(default=None, description="Associated session")
+    session_id: str | None = Field(default=None, description="Associated session")
     pages_stored: int = Field(default=0, description="Number of pages stored")
 
 
@@ -225,15 +222,13 @@ class PageTableStats(BaseModel):
 
     total_pages: int
     dirty_pages: int
-    pages_by_tier: Dict[StorageTier, int]
-    pages_by_modality: Dict[Modality, int]
+    pages_by_tier: dict[StorageTier, int]
+    pages_by_modality: dict[Modality, int]
 
     @property
     def working_set_size(self) -> int:
         """Pages in L0 + L1."""
-        return self.pages_by_tier.get(StorageTier.L0, 0) + self.pages_by_tier.get(
-            StorageTier.L1, 0
-        )
+        return self.pages_by_tier.get(StorageTier.L0, 0) + self.pages_by_tier.get(StorageTier.L1, 0)
 
 
 class FaultMetrics(BaseModel):
@@ -260,33 +255,33 @@ class TextContent(BaseModel):
 class ImageContent(BaseModel):
     """Image content representation."""
 
-    caption: Optional[str] = Field(default=None)
-    url: Optional[str] = Field(default=None)
-    base64: Optional[str] = Field(default=None)
-    embedding: Optional[List[float]] = Field(default=None)
+    caption: str | None = Field(default=None)
+    url: str | None = Field(default=None)
+    base64: str | None = Field(default=None)
+    embedding: list[float] | None = Field(default=None)
 
 
 class AudioContent(BaseModel):
     """Audio content representation."""
 
-    transcript: Optional[str] = Field(default=None)
-    timestamps: Optional[List[Dict[str, Any]]] = Field(default=None)
-    duration_seconds: Optional[float] = Field(default=None)
+    transcript: str | None = Field(default=None)
+    timestamps: list[dict[str, Any]] | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None)
 
 
 class VideoContent(BaseModel):
     """Video content representation."""
 
-    scenes: List[Dict[str, Any]] = Field(default_factory=list)
-    transcript: Optional[str] = Field(default=None)
-    duration_seconds: Optional[float] = Field(default=None)
+    scenes: list[dict[str, Any]] = Field(default_factory=list)
+    transcript: str | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None)
 
 
 class StructuredContent(BaseModel):
     """Structured data content representation."""
 
-    data: Dict[str, Any] = Field(default_factory=dict)
-    schema_name: Optional[str] = Field(default=None)
+    data: dict[str, Any] = Field(default_factory=dict)
+    schema_name: str | None = Field(default=None)
 
 
 # Union type for all content types
@@ -302,12 +297,12 @@ PageContent = Union[
 class PageMeta(BaseModel):
     """Metadata for a page in tool results."""
 
-    source_tier: Optional[StorageTier] = Field(default=None)
-    mime_type: Optional[str] = Field(default=None)
-    size_bytes: Optional[int] = Field(default=None)
-    dimensions: Optional[List[int]] = Field(default=None)
-    duration_seconds: Optional[float] = Field(default=None)
-    latency_ms: Optional[float] = Field(default=None)
+    source_tier: StorageTier | None = Field(default=None)
+    mime_type: str | None = Field(default=None)
+    size_bytes: int | None = Field(default=None)
+    dimensions: list[int] | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None)
+    latency_ms: float | None = Field(default=None)
 
 
 class PageData(BaseModel):
@@ -326,7 +321,7 @@ class FaultEffects(BaseModel):
 
     promoted_to_working_set: bool = Field(default=False)
     tokens_est: int = Field(default=0)
-    evictions: Optional[List[str]] = Field(default=None)
+    evictions: list[str] | None = Field(default=None)
 
 
 class SearchResultEntry(BaseModel):
@@ -335,7 +330,7 @@ class SearchResultEntry(BaseModel):
     page_id: str
     modality: Modality
     tier: StorageTier
-    levels: List[CompressionLevel] = Field(default_factory=list)
+    levels: list[CompressionLevel] = Field(default_factory=list)
     hint: str = Field(default="")
     relevance: float = Field(default=0.0)
 
@@ -350,18 +345,18 @@ class ToolParameter(BaseModel):
 
     type: str
     description: str
-    enum: Optional[List[str]] = Field(default=None)
-    minimum: Optional[int] = Field(default=None)
-    maximum: Optional[int] = Field(default=None)
-    default: Optional[Any] = Field(default=None)
+    enum: list[str] | None = Field(default=None)
+    minimum: int | None = Field(default=None)
+    maximum: int | None = Field(default=None)
+    default: Any | None = Field(default=None)
 
 
 class ToolParameters(BaseModel):
     """Parameters schema for a tool."""
 
     type: str = Field(default="object")
-    properties: Dict[str, ToolParameter] = Field(default_factory=dict)
-    required: List[str] = Field(default_factory=list)
+    properties: dict[str, ToolParameter] = Field(default_factory=dict)
+    required: list[str] = Field(default_factory=list)
 
 
 class ToolFunction(BaseModel):
@@ -412,7 +407,7 @@ class MemoryPage(BaseModel):
 
     # Identity
     page_id: str = Field(..., description="Unique identifier for this page")
-    session_id: Optional[str] = Field(default=None, description="Owning session")
+    session_id: str | None = Field(default=None, description="Owning session")
 
     # Content type
     modality: Modality = Field(..., description="Content modality")
@@ -424,13 +419,13 @@ class MemoryPage(BaseModel):
     )
 
     # Provenance: what pages justify this one (for claims, summaries)
-    provenance: List[str] = Field(
+    provenance: list[str] = Field(
         default_factory=list,
         description="page_ids that this page derives from (for claims/summaries)",
     )
 
     # Representation linking (for compression chain)
-    represents: Optional[str] = Field(
+    represents: str | None = Field(
         default=None,
         description="page_id this is a compressed version of",
     )
@@ -440,32 +435,22 @@ class MemoryPage(BaseModel):
     )
 
     # Location
-    storage_tier: StorageTier = Field(
-        default=StorageTier.L1, description="Current storage tier"
-    )
-    artifact_id: Optional[str] = Field(
-        default=None, description="Reference to chuk-artifacts storage"
-    )
+    storage_tier: StorageTier = Field(default=StorageTier.L1, description="Current storage tier")
+    artifact_id: str | None = Field(default=None, description="Reference to chuk-artifacts storage")
 
     # Content (when loaded into L0/L1)
-    content: Optional[Any] = Field(
-        default=None, description="Actual content when in working set"
-    )
-    compression_level: CompressionLevel = Field(
-        default=CompressionLevel.FULL, description="Current compression level"
-    )
+    content: Any | None = Field(default=None, description="Actual content when in working set")
+    compression_level: CompressionLevel = Field(default=CompressionLevel.FULL, description="Current compression level")
 
     # Multi-resolution representations
     # Maps compression level -> artifact_id for stored representations
-    representations: Dict[CompressionLevel, str] = Field(
+    representations: dict[CompressionLevel, str] = Field(
         default_factory=dict, description="artifact_id for each compression level"
     )
 
     # Size tracking
     size_bytes: int = Field(default=0, description="Size in bytes")
-    size_tokens: Optional[int] = Field(
-        default=None, description="Estimated token count (for text/transcript)"
-    )
+    size_tokens: int | None = Field(default=None, description="Estimated token count (for text/transcript)")
 
     # Access tracking (for LRU/eviction)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -486,27 +471,19 @@ class MemoryPage(BaseModel):
     pinned: bool = Field(default=False, description="Pinned pages are never evicted")
 
     # Lineage (legacy, use provenance/represents instead)
-    parent_page_id: Optional[str] = Field(
+    parent_page_id: str | None = Field(
         default=None, description="Parent page if derived (e.g., summary of original)"
     )
 
     # Modality-specific metadata
-    mime_type: Optional[str] = Field(default=None)
-    duration_seconds: Optional[float] = Field(
-        default=None, description="Duration for audio/video"
-    )
-    dimensions: Optional[Tuple[int, int]] = Field(
-        default=None, description="Width x height for image/video"
-    )
-    transcript: Optional[str] = Field(
-        default=None, description="Transcript for audio/video (L1 representation)"
-    )
-    caption: Optional[str] = Field(
-        default=None, description="Caption for image (L2 representation)"
-    )
+    mime_type: str | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None, description="Duration for audio/video")
+    dimensions: tuple[int, int] | None = Field(default=None, description="Width x height for image/video")
+    transcript: str | None = Field(default=None, description="Transcript for audio/video (L1 representation)")
+    caption: str | None = Field(default=None, description="Caption for image (L2 representation)")
 
     # Custom metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     def mark_accessed(self) -> None:
         """Update access tracking."""
@@ -552,7 +529,7 @@ class PageTableEntry(BaseModel):
 
     # Location
     tier: StorageTier
-    artifact_id: Optional[str] = None
+    artifact_id: str | None = None
     compression_level: CompressionLevel = CompressionLevel.FULL
 
     # Page type (for eviction decisions)
@@ -562,7 +539,7 @@ class PageTableEntry(BaseModel):
     )
 
     # Provenance (for tracing back to source)
-    provenance: List[str] = Field(
+    provenance: list[str] = Field(
         default_factory=list,
         description="page_ids this page derives from",
     )
@@ -570,22 +547,20 @@ class PageTableEntry(BaseModel):
     # State
     dirty: bool = Field(default=False, description="Modified since last flush")
     pinned: bool = Field(default=False, description="Pinned pages are never evicted")
-    last_flushed: Optional[datetime] = Field(default=None)
+    last_flushed: datetime | None = Field(default=None)
 
     # Access tracking
     last_accessed: datetime = Field(default_factory=datetime.utcnow)
     access_count: int = Field(default=0)
 
     # Size
-    size_tokens: Optional[int] = None
+    size_tokens: int | None = None
 
     # Modality (for filtering)
     modality: Modality = Modality.TEXT
 
     # Locality hints (for NUMA awareness)
-    affinity: Affinity = Field(
-        default=Affinity.LOCAL, description="Locality hint for distributed storage"
-    )
+    affinity: Affinity = Field(default=Affinity.LOCAL, description="Locality hint for distributed storage")
 
     def mark_accessed(self) -> None:
         """Update access tracking."""
@@ -622,14 +597,10 @@ class TokenBudget(BaseModel):
     """
 
     total_limit: int = Field(default=128000, description="Total context window size")
-    reserved: int = Field(
-        default=4000, description="Reserved for system prompt, tools, etc."
-    )
+    reserved: int = Field(default=4000, description="Reserved for system prompt, tools, etc.")
 
     # Current usage by modality - stored as dict for Pydantic serialization
-    tokens_by_modality: Dict[Modality, int] = Field(
-        default_factory=lambda: {m: 0 for m in Modality}
-    )
+    tokens_by_modality: dict[Modality, int] = Field(default_factory=lambda: dict.fromkeys(Modality, 0))
 
     @property
     def text_tokens(self) -> int:
@@ -720,12 +691,8 @@ class VMMetrics(BaseModel):
     tokens_available: int = Field(default=0)
 
     # Page distribution - use Enums as keys
-    pages_by_tier: Dict[StorageTier, int] = Field(
-        default_factory=lambda: {t: 0 for t in StorageTier}
-    )
-    pages_by_modality: Dict[Modality, int] = Field(
-        default_factory=lambda: {m: 0 for m in Modality}
-    )
+    pages_by_tier: dict[StorageTier, int] = Field(default_factory=lambda: dict.fromkeys(StorageTier, 0))
+    pages_by_modality: dict[Modality, int] = Field(default_factory=lambda: dict.fromkeys(Modality, 0))
 
     @property
     def fault_rate(self) -> float:
@@ -798,14 +765,10 @@ class FaultPolicy(BaseModel):
     max_faults_per_turn: int = Field(default=3)
 
     # Token budget for fault resolution
-    max_fault_tokens_per_turn: int = Field(
-        default=8192, description="Don't let faults blow the token budget"
-    )
+    max_fault_tokens_per_turn: int = Field(default=8192, description="Don't let faults blow the token budget")
 
     # Confidence threshold - only fault if explicitly needed
-    fault_confidence_threshold: FaultConfidenceThreshold = Field(
-        default=FaultConfidenceThreshold.REFERENCED
-    )
+    fault_confidence_threshold: FaultConfidenceThreshold = Field(default=FaultConfidenceThreshold.REFERENCED)
 
     # Track tokens used this turn for fault resolution
     tokens_used_this_turn: int = Field(default=0)
@@ -815,10 +778,7 @@ class FaultPolicy(BaseModel):
         """Check if a fault is allowed under current policy."""
         if self.faults_this_turn >= self.max_faults_per_turn:
             return False
-        if (
-            self.tokens_used_this_turn + estimated_tokens
-            > self.max_fault_tokens_per_turn
-        ):
+        if self.tokens_used_this_turn + estimated_tokens > self.max_fault_tokens_per_turn:
             return False
         return True
 
@@ -866,12 +826,12 @@ class PageMutation(BaseModel):
     mutation_type: MutationType
 
     # Context at mutation time
-    tier_before: Optional[StorageTier] = None
+    tier_before: StorageTier | None = None
     tier_after: StorageTier
 
     # Who caused it
     actor: Actor
-    cause: Optional[str] = Field(
+    cause: str | None = Field(
         default=None,
         description="e.g., 'eviction_pressure', 'page_fault', 'explicit_request'",
     )
@@ -891,7 +851,7 @@ class PageManifestEntry(BaseModel):
     compression_level: CompressionLevel
     tokens: int
     importance: float
-    provenance: List[str] = Field(default_factory=list)  # source page_ids
+    provenance: list[str] = Field(default_factory=list)  # source page_ids
     can_evict: bool = Field(default=True)
     can_compress: bool = Field(default=True)
 
@@ -906,28 +866,22 @@ class MemoryABI(BaseModel):
     """
 
     # What's in context
-    pages: List[PageManifestEntry] = Field(default_factory=list)
+    pages: list[PageManifestEntry] = Field(default_factory=list)
 
     # Capabilities
     faults_allowed: bool = Field(default=True)
-    upgrade_budget_tokens: int = Field(
-        default=2048, description="Tokens reserved for fault resolution"
-    )
+    upgrade_budget_tokens: int = Field(default=2048, description="Tokens reserved for fault resolution")
 
     # Constraints
     max_context_tokens: int = Field(default=128000)
     reserved_tokens: int = Field(default=2000, description="System prompt, etc.")
 
     # Tool schema budget (often the hidden token hog)
-    tool_schema_tokens_reserved: int = Field(
-        default=0, description="Tokens consumed by tool definitions"
-    )
-    active_toolset_hash: Optional[str] = Field(
-        default=None, description="For cache invalidation when tools change"
-    )
+    tool_schema_tokens_reserved: int = Field(default=0, description="Tokens consumed by tool definitions")
+    active_toolset_hash: str | None = Field(default=None, description="For cache invalidation when tools change")
 
     # Preferences
-    modality_weights: Dict[Modality, float] = Field(
+    modality_weights: dict[Modality, float] = Field(
         default_factory=lambda: {
             Modality.TEXT: 1.0,
             Modality.IMAGE: 0.8,
@@ -941,9 +895,7 @@ class MemoryABI(BaseModel):
         """Tokens available for content after reservations."""
         return max(
             0,
-            self.max_context_tokens
-            - self.reserved_tokens
-            - self.tool_schema_tokens_reserved,
+            self.max_context_tokens - self.reserved_tokens - self.tool_schema_tokens_reserved,
         )
 
 
@@ -957,7 +909,7 @@ class RecallAttempt(BaseModel):
 
     turn: int
     query: str  # What user asked to recall
-    page_ids_cited: List[str] = Field(default_factory=list)
+    page_ids_cited: list[str] = Field(default_factory=list)
     user_corrected: bool = Field(default=False)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -970,14 +922,14 @@ class UserExperienceMetrics(BaseModel):
     """
 
     # Recall tracking
-    recall_attempts: List[RecallAttempt] = Field(default_factory=list)
+    recall_attempts: list[RecallAttempt] = Field(default_factory=list)
 
     # Fault history for thrash calculation
-    fault_history: List[FaultRecord] = Field(default_factory=list)
+    fault_history: list[FaultRecord] = Field(default_factory=list)
 
     # Page references per turn (for effective tokens)
-    pages_referenced_per_turn: Dict[int, List[str]] = Field(default_factory=dict)
-    tokens_in_context_per_turn: Dict[int, int] = Field(default_factory=dict)
+    pages_referenced_per_turn: dict[int, list[str]] = Field(default_factory=dict)
+    tokens_in_context_per_turn: dict[int, int] = Field(default_factory=dict)
 
     def recall_success_rate(self) -> float:
         """
@@ -1030,16 +982,14 @@ class UserExperienceMetrics(BaseModel):
         referenced_pages = self.pages_referenced_per_turn.get(turn, [])
         # This is a simplified calculation - in reality you'd sum tokens of referenced pages
         # For now, estimate based on count
-        referenced_estimate = (
-            len(referenced_pages) * 200
-        )  # ~200 tokens per referenced page
+        referenced_estimate = len(referenced_pages) * 200  # ~200 tokens per referenced page
         return min(1.0, referenced_estimate / context_tokens)
 
     def record_recall_attempt(
         self,
         turn: int,
         query: str,
-        page_ids_cited: List[str],
+        page_ids_cited: list[str],
         user_corrected: bool = False,
     ) -> None:
         """Record a recall attempt."""
@@ -1075,15 +1025,15 @@ class UserExperienceMetrics(BaseModel):
         self,
         turn: int,
         tokens_in_context: int,
-        pages_referenced: List[str],
+        pages_referenced: list[str],
     ) -> None:
         """Record context state for effective tokens calculation."""
         self.tokens_in_context_per_turn[turn] = tokens_in_context
         self.pages_referenced_per_turn[turn] = pages_referenced
 
-    def get_fault_reason_breakdown(self) -> Dict[FaultReason, int]:
+    def get_fault_reason_breakdown(self) -> dict[FaultReason, int]:
         """Get count of faults by reason."""
-        breakdown: Dict[FaultReason, int] = {r: 0 for r in FaultReason}
+        breakdown: dict[FaultReason, int] = dict.fromkeys(FaultReason, 0)
         for fault in self.fault_history:
             breakdown[fault.reason] = breakdown.get(fault.reason, 0) + 1
         return breakdown

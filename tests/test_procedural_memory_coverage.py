@@ -12,24 +12,25 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 
-from chuk_ai_session_manager.procedural_memory.models import (
-    ToolOutcome,
-    ToolFixRelation,
-    ToolLogEntry,
-    ErrorPattern,
-    SuccessPattern,
-    ToolPattern,
-    ProceduralMemory,
-    _abbrev,
-    _describe_fix,
+import pytest
+
+from chuk_ai_session_manager.procedural_memory.formatter import (
+    FormatterConfig,
+    ProceduralContextFormatter,
 )
 from chuk_ai_session_manager.procedural_memory.manager import ToolMemoryManager
-from chuk_ai_session_manager.procedural_memory.formatter import (
-    ProceduralContextFormatter,
-    FormatterConfig,
+from chuk_ai_session_manager.procedural_memory.models import (
+    ErrorPattern,
+    ProceduralMemory,
+    SuccessPattern,
+    ToolFixRelation,
+    ToolLogEntry,
+    ToolOutcome,
+    ToolPattern,
+    _abbrev,
+    _describe_fix,
 )
 
 
@@ -88,9 +89,7 @@ class TestToolFixRelation:
 
     def test_creation_with_delta(self):
         delta = {"added": {"key": "val"}}
-        rel = ToolFixRelation(
-            failed_call_id="c1", success_call_id="c2", delta_args=delta
-        )
+        rel = ToolFixRelation(failed_call_id="c1", success_call_id="c2", delta_args=delta)
         assert rel.delta_args == delta
 
 
@@ -362,9 +361,7 @@ class TestToolPattern:
 
     def test_add_success_pattern_with_delta(self):
         p = ToolPattern(tool_name="solver")
-        sp = p.add_success_pattern(
-            delta_that_fixed={"added": {"y": 2}}, example_call_id="c1"
-        )
+        sp = p.add_success_pattern(delta_that_fixed={"added": {"y": 2}}, example_call_id="c1")
         assert sp.delta_that_fixed is not None
         assert sp.example_call_id == "c1"
 
@@ -598,23 +595,17 @@ class TestToolMemoryManagerRecordCall:
 
     async def test_record_with_context_goal(self):
         mgr = ToolMemoryManager.create("s")
-        entry = await mgr.record_call(
-            "t", {}, "ok", ToolOutcome.SUCCESS, context_goal="find answer"
-        )
+        entry = await mgr.record_call("t", {}, "ok", ToolOutcome.SUCCESS, context_goal="find answer")
         assert entry.context_goal == "find answer"
 
     async def test_record_with_execution_time(self):
         mgr = ToolMemoryManager.create("s")
-        entry = await mgr.record_call(
-            "t", {}, "ok", ToolOutcome.SUCCESS, execution_time_ms=42
-        )
+        entry = await mgr.record_call("t", {}, "ok", ToolOutcome.SUCCESS, execution_time_ms=42)
         assert entry.execution_time_ms == 42
 
     async def test_record_with_preceding_call_id(self):
         mgr = ToolMemoryManager.create("s")
-        entry = await mgr.record_call(
-            "t", {}, "ok", ToolOutcome.SUCCESS, preceding_call_id="call-0000"
-        )
+        entry = await mgr.record_call("t", {}, "ok", ToolOutcome.SUCCESS, preceding_call_id="call-0000")
         assert entry.preceding_call_id == "call-0000"
 
     async def test_max_log_enforced(self):
@@ -626,9 +617,7 @@ class TestToolMemoryManagerRecordCall:
     async def test_fix_detection(self):
         """A success after a failure with changed args is detected as a fix."""
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         entry = await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         assert entry.is_fix()
         assert mgr.memory.tool_log[0].was_fixed()
@@ -644,9 +633,7 @@ class TestToolMemoryManagerRecordCall:
     async def test_fix_adds_success_pattern(self):
         mgr = ToolMemoryManager.create("s")
         await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="e")
-        await mgr.record_call(
-            "t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="goal"
-        )
+        await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="goal")
         pat = mgr.get_pattern("t")
         assert len(pat.success_patterns) >= 1
 
@@ -678,9 +665,7 @@ class TestCheckIfFixesPrior:
 
     async def test_fix_records_to_error_pattern(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         pat = mgr.get_pattern("t")
         ep = pat.error_patterns[0]
@@ -931,12 +916,8 @@ class TestSearchCalls:
             error_type="unsat",
             context_goal="find flights",
         )
-        await mgr.record_call(
-            "t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="find flights"
-        )
-        await mgr.record_call(
-            "u", {}, "ok", ToolOutcome.SUCCESS, context_goal="book hotel"
-        )
+        await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS, context_goal="find flights")
+        await mgr.record_call("u", {}, "ok", ToolOutcome.SUCCESS, context_goal="book hotel")
         return mgr
 
     async def test_no_filters(self):
@@ -995,9 +976,7 @@ class TestGetFixForError:
 
     async def test_found(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fix = mgr.get_fix_for_error("t", "unsat")
         assert fix is not None
@@ -1008,9 +987,7 @@ class TestGetFixForError:
 
     async def test_not_found_no_matching_error(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         assert mgr.get_fix_for_error("t", "timeout") is None
 
 
@@ -1172,9 +1149,7 @@ class TestFormatToolSection:
     async def test_with_pattern_text(self):
         """Pattern section included when there are error/success patterns."""
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fmt = ProceduralContextFormatter()
         section = fmt._format_tool_section(mgr, "t")
@@ -1218,9 +1193,7 @@ class TestFormatRecentCalls:
         assert "fail" in text
 
     def test_fix_relation_shown(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(show_fix_relations=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(show_fix_relations=True))
         e = self._entry(
             fix_for="call-0000",
             delta_args={"changed": {"x": {"from": 1, "to": 2}}},
@@ -1229,17 +1202,13 @@ class TestFormatRecentCalls:
         assert "fixed prior" in text
 
     def test_was_fixed_shown(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(show_fix_relations=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(show_fix_relations=True))
         e = self._entry(outcome=ToolOutcome.FAILURE, fixed_by="call-0002")
         text = fmt._format_recent_calls([e])
         assert "fixed by call-0002" in text
 
     def test_fix_relations_hidden(self):
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(show_fix_relations=False)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(show_fix_relations=False))
         e = self._entry(
             fix_for="call-0000",
             delta_args={"changed": {"x": {"from": 1, "to": 2}}},
@@ -1510,9 +1479,7 @@ class TestFormatErrorGuidance:
 
     async def test_with_fix(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fmt = ProceduralContextFormatter()
         text = fmt.format_error_guidance(mgr, "t", "unsat")
@@ -1521,9 +1488,7 @@ class TestFormatErrorGuidance:
 
     async def test_with_similar_past_fixes(self):
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fmt = ProceduralContextFormatter()
         text = fmt.format_error_guidance(mgr, "t", "unsat")
@@ -1532,9 +1497,7 @@ class TestFormatErrorGuidance:
     async def test_with_past_fix_delta_args(self):
         """Check that the delta_args on the *failed* entry are shown (they may be None)."""
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         fmt = ProceduralContextFormatter()
         text = fmt.format_error_guidance(mgr, "t", "unsat")
@@ -1561,9 +1524,7 @@ class TestFormatSuccessTemplate:
     async def test_with_hints(self):
         mgr = ToolMemoryManager.create("s")
         pat = mgr.memory.get_pattern("t")
-        pat.add_success_pattern(
-            goal_match="find flights", arg_hints={"origin": "SFO", "dest": "LAX"}
-        )
+        pat.add_success_pattern(goal_match="find flights", arg_hints={"origin": "SFO", "dest": "LAX"})
         fmt = ProceduralContextFormatter()
         text = fmt.format_success_template(mgr, "t", "find flights")
         assert text is not None
@@ -1634,16 +1595,12 @@ class TestManagerEdgeCases:
     async def test_summarize_dict_result_key(self):
         """Dict with 'result' key recursively summarises."""
         mgr = ToolMemoryManager.create("s")
-        entry = await mgr.record_call(
-            "t", {}, {"result": {"status": "ok"}}, ToolOutcome.SUCCESS
-        )
+        entry = await mgr.record_call("t", {}, {"result": {"status": "ok"}}, ToolOutcome.SUCCESS)
         assert entry.result_summary == "status=ok"
 
     async def test_classify_dict_with_status_value(self):
         mgr = ToolMemoryManager.create("s")
-        entry = await mgr.record_call(
-            "t", {}, {"status": "completed"}, ToolOutcome.SUCCESS
-        )
+        entry = await mgr.record_call("t", {}, {"status": "completed"}, ToolOutcome.SUCCESS)
         assert entry.result_type == "completed"
 
     async def test_error_type_defaults_to_unknown_on_failure(self):
@@ -1663,9 +1620,7 @@ class TestFormatterEdgeCases:
 
     async def test_format_recent_calls_fix_without_delta(self):
         """is_fix() True but delta_args is None."""
-        fmt = ProceduralContextFormatter(
-            config=FormatterConfig(show_fix_relations=True)
-        )
+        fmt = ProceduralContextFormatter(config=FormatterConfig(show_fix_relations=True))
         e = ToolLogEntry(
             id="c1",
             tool_name="t",
@@ -1719,9 +1674,7 @@ class TestFormatterEdgeCases:
         """Fixed entry in Past fixes but no delta_args on the failed entry."""
         mgr = ToolMemoryManager.create("s")
         # Manually create a failure that was fixed without delta_args
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         # Fix it (this sets delta_args on the *success* entry, not on the failure)
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         # The failed entry has fixed_by but delta_args is None on it
@@ -1736,9 +1689,7 @@ class TestFormatterEdgeCases:
     async def test_format_error_guidance_fixed_entry_with_delta_on_failed(self):
         """Fixed entry in Past fixes WITH delta_args set on the failed entry."""
         mgr = ToolMemoryManager.create("s")
-        await mgr.record_call(
-            "t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat"
-        )
+        await mgr.record_call("t", {"x": 1}, None, ToolOutcome.FAILURE, error_type="unsat")
         await mgr.record_call("t", {"x": 2}, "ok", ToolOutcome.SUCCESS)
         # Manually set delta_args on the failed entry to exercise line 376
         failed = mgr.memory.tool_log[0]

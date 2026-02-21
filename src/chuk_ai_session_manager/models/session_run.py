@@ -4,11 +4,13 @@ Session run model for the chuk session manager with improved async support.
 """
 
 from __future__ import annotations
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional, List
+from typing import Any
 from uuid import uuid4
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RunStatus(str, Enum):
@@ -27,40 +29,38 @@ class SessionRun(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: str = Field(default_factory=lambda: str(uuid4()))
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    ended_at: Optional[datetime] = None
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    ended_at: datetime | None = None
     status: RunStatus = RunStatus.PENDING
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    tool_calls: List[str] = Field(
-        default_factory=list
-    )  # IDs of associated tool call events
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    tool_calls: list[str] = Field(default_factory=list)  # IDs of associated tool call events
 
     @classmethod
-    async def create(cls, metadata: Optional[Dict[str, Any]] = None) -> SessionRun:
+    async def create(cls, metadata: dict[str, Any] | None = None) -> SessionRun:
         """Create a new session run asynchronously."""
         return cls(status=RunStatus.PENDING, metadata=metadata or {})
 
     async def mark_running(self) -> None:
         """Mark the run as started/running asynchronously."""
         self.status = RunStatus.RUNNING
-        self.started_at = datetime.now(timezone.utc)
+        self.started_at = datetime.now(UTC)
 
     async def mark_completed(self) -> None:
         """Mark the run as completed successfully asynchronously."""
         self.status = RunStatus.COMPLETED
-        self.ended_at = datetime.now(timezone.utc)
+        self.ended_at = datetime.now(UTC)
 
-    async def mark_failed(self, reason: Optional[str] = None) -> None:
+    async def mark_failed(self, reason: str | None = None) -> None:
         """Mark the run as failed asynchronously."""
         self.status = RunStatus.FAILED
-        self.ended_at = datetime.now(timezone.utc)
+        self.ended_at = datetime.now(UTC)
         if reason:
             await self.set_metadata("failure_reason", reason)
 
-    async def mark_cancelled(self, reason: Optional[str] = None) -> None:
+    async def mark_cancelled(self, reason: str | None = None) -> None:
         """Mark the run as cancelled asynchronously."""
         self.status = RunStatus.CANCELLED
-        self.ended_at = datetime.now(timezone.utc)
+        self.ended_at = datetime.now(UTC)
         if reason:
             await self.set_metadata("cancel_reason", reason)
 
@@ -81,7 +81,7 @@ class SessionRun(BaseModel):
         if key in self.metadata:
             del self.metadata[key]
 
-    async def get_duration(self) -> Optional[float]:
+    async def get_duration(self) -> float | None:
         """Get the duration of the run in seconds asynchronously."""
         if self.ended_at is None:
             return None
@@ -92,12 +92,12 @@ class SessionRun(BaseModel):
         if tool_call_id not in self.tool_calls:
             self.tool_calls.append(tool_call_id)
 
-    async def get_tool_calls(self, session: Any) -> List[Any]:
+    async def get_tool_calls(self, session: Any) -> list[Any]:
         """Get all tool call events associated with this run asynchronously."""
         # We use Any type to avoid circular imports
         return [event for event in session.events if event.id in self.tool_calls]
 
-    async def to_dict(self) -> Dict[str, Any]:
+    async def to_dict(self) -> dict[str, Any]:
         """Convert the run to a dictionary asynchronously."""
         result = {
             "id": self.id,

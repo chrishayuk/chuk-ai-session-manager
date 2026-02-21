@@ -15,21 +15,22 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from chuk_ai_session_manager.procedural_memory.models import (
+    DEFAULT_ERROR_TYPE,
+    DeltaChangeKey,
+    DeltaKey,
     ProceduralMemory,
+    ResultType,
     ToolFixRelation,
     ToolLogEntry,
     ToolOutcome,
     ToolPattern,
-    DeltaKey,
-    DeltaChangeKey,
-    ResultType,
-    DEFAULT_ERROR_TYPE,
 )
 
 if TYPE_CHECKING:
@@ -58,22 +59,18 @@ class ToolMemoryManager(BaseModel):
     fix_detection_window: int = Field(default=10)  # Look back N calls for fixes
 
     # Optional callbacks
-    on_fix_detected: Optional[Callable[[ToolFixRelation], None]] = Field(
-        default=None, exclude=True
-    )
+    on_fix_detected: Callable[[ToolFixRelation], None] | None = Field(default=None, exclude=True)
 
     model_config = {"arbitrary_types_allowed": True}
 
     @classmethod
-    def create(cls, session_id: str, **kwargs: Any) -> "ToolMemoryManager":
+    def create(cls, session_id: str, **kwargs: Any) -> ToolMemoryManager:
         """Create a new manager for a session."""
         memory = ProceduralMemory(session_id=session_id)
         return cls(memory=memory, **kwargs)
 
     @classmethod
-    async def from_session(
-        cls, session: "Session", **kwargs: Any
-    ) -> "ToolMemoryManager":
+    async def from_session(cls, session: Session, **kwargs: Any) -> ToolMemoryManager:
         """
         Load procedural memory from a session's state.
 
@@ -98,7 +95,7 @@ class ToolMemoryManager(BaseModel):
         # Create fresh
         return cls.create(session_id=session.id, **kwargs)
 
-    async def save_to_session(self, session: "Session") -> None:
+    async def save_to_session(self, session: Session) -> None:
         """
         Persist procedural memory to a session's state.
 
@@ -122,11 +119,11 @@ class ToolMemoryManager(BaseModel):
         arguments: dict[str, Any],
         result: Any,
         outcome: ToolOutcome,
-        context_goal: Optional[str] = None,
-        error_type: Optional[str] = None,
-        error_message: Optional[str] = None,
-        execution_time_ms: Optional[int] = None,
-        preceding_call_id: Optional[str] = None,
+        context_goal: str | None = None,
+        error_type: str | None = None,
+        error_message: str | None = None,
+        execution_time_ms: int | None = None,
+        preceding_call_id: str | None = None,
     ) -> ToolLogEntry:
         """
         Record a tool invocation.
@@ -149,7 +146,7 @@ class ToolMemoryManager(BaseModel):
 
         entry = ToolLogEntry(
             id=call_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             tool_name=tool_name,
             arguments=arguments,
             arguments_hash=self._hash_arguments(arguments),
@@ -194,7 +191,7 @@ class ToolMemoryManager(BaseModel):
                 example_args=arguments,
             )
 
-        self.memory.updated_at = datetime.now(timezone.utc)
+        self.memory.updated_at = datetime.now(UTC)
 
         log.debug(f"Recorded tool call: {entry.format_compact()}")
         return entry
@@ -244,9 +241,7 @@ class ToolMemoryManager(BaseModel):
                     pattern = self.memory.get_pattern(success_entry.tool_name)
                     pattern.record_fix(prior.error_type, delta)
 
-                log.info(
-                    f"Detected fix: {prior.id} -> {success_entry.id}, delta: {delta}"
-                )
+                log.info(f"Detected fix: {prior.id} -> {success_entry.id}, delta: {delta}")
 
                 # Callback
                 if self.on_fix_detected:
@@ -255,9 +250,7 @@ class ToolMemoryManager(BaseModel):
                 # Only link to most recent failure
                 break
 
-    def _compute_arg_delta(
-        self, failed_args: dict[str, Any], success_args: dict[str, Any]
-    ) -> Optional[dict[str, Any]]:
+    def _compute_arg_delta(self, failed_args: dict[str, Any], success_args: dict[str, Any]) -> dict[str, Any] | None:
         """Compute what changed between failed and successful call."""
         delta: dict[str, Any] = {}
 
@@ -355,9 +348,9 @@ class ToolMemoryManager(BaseModel):
 
     def get_recent_calls(
         self,
-        tool_name: Optional[str] = None,
+        tool_name: str | None = None,
         limit: int = 5,
-        outcome: Optional[ToolOutcome] = None,
+        outcome: ToolOutcome | None = None,
     ) -> list[ToolLogEntry]:
         """
         Get recent tool calls.
@@ -380,7 +373,7 @@ class ToolMemoryManager(BaseModel):
 
         return list(reversed(entries[-limit:]))
 
-    def get_pattern(self, tool_name: str) -> Optional[ToolPattern]:
+    def get_pattern(self, tool_name: str) -> ToolPattern | None:
         """Get aggregated pattern for a tool."""
         return self.memory.tool_patterns.get(tool_name)
 
@@ -390,10 +383,10 @@ class ToolMemoryManager(BaseModel):
 
     def search_calls(
         self,
-        tool_name: Optional[str] = None,
-        goal_contains: Optional[str] = None,
-        outcome: Optional[ToolOutcome] = None,
-        error_type: Optional[str] = None,
+        tool_name: str | None = None,
+        goal_contains: str | None = None,
+        outcome: ToolOutcome | None = None,
+        error_type: str | None = None,
         only_fixes: bool = False,
         only_fixed: bool = False,
         limit: int = 10,
@@ -445,9 +438,7 @@ class ToolMemoryManager(BaseModel):
 
         return results
 
-    def get_fix_for_error(
-        self, tool_name: str, error_type: str
-    ) -> Optional[dict[str, Any]]:
+    def get_fix_for_error(self, tool_name: str, error_type: str) -> dict[str, Any] | None:
         """
         Get the typical fix for an error type.
 
@@ -464,9 +455,7 @@ class ToolMemoryManager(BaseModel):
 
         return None
 
-    def get_successful_args_for_goal(
-        self, tool_name: str, goal: str
-    ) -> Optional[dict[str, Any]]:
+    def get_successful_args_for_goal(self, tool_name: str, goal: str) -> dict[str, Any] | None:
         """
         Get argument hints for a goal based on past successes.
 
@@ -492,9 +481,7 @@ class ToolMemoryManager(BaseModel):
         total_fixes = len(self.memory.fix_relations)
         tools_tracked = len(self.memory.tool_patterns)
 
-        success_count = sum(
-            1 for e in self.memory.tool_log if e.outcome == ToolOutcome.SUCCESS
-        )
+        success_count = sum(1 for e in self.memory.tool_log if e.outcome == ToolOutcome.SUCCESS)
         failure_count = sum(1 for e in self.memory.tool_log if e.is_failure())
 
         return {
@@ -516,7 +503,7 @@ class ToolMemoryManager(BaseModel):
         return self.memory.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], **kwargs: Any) -> "ToolMemoryManager":
+    def from_dict(cls, data: dict[str, Any], **kwargs: Any) -> ToolMemoryManager:
         """Restore from dictionary."""
         memory = ProceduralMemory.model_validate(data)
         return cls(memory=memory, **kwargs)
@@ -527,4 +514,4 @@ class ToolMemoryManager(BaseModel):
         self.memory.tool_patterns.clear()
         self.memory.fix_relations.clear()
         self.memory.next_call_id = 1
-        self.memory.updated_at = datetime.now(timezone.utc)
+        self.memory.updated_at = datetime.now(UTC)

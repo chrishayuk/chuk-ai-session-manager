@@ -6,15 +6,16 @@ This file tests core functionality without relying on complex imports
 that might cause circular dependency issues.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import only the models directly to avoid circular imports
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.token_usage import TokenUsage
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
+from chuk_ai_session_manager.models.token_usage import TokenUsage
 
 
 class TestBasicModels:
@@ -46,9 +47,7 @@ class TestBasicModels:
 
     async def test_session_event_basic(self):
         """Test basic SessionEvent functionality."""
-        event = SessionEvent(
-            message="Test message", source=EventSource.USER, type=EventType.MESSAGE
-        )
+        event = SessionEvent(message="Test message", source=EventSource.USER, type=EventType.MESSAGE)
 
         assert event.message == "Test message"
         assert event.source == EventSource.USER
@@ -101,9 +100,7 @@ class TestTokenOperations:
 
     async def test_token_usage_from_text(self):
         """Test creating TokenUsage from text."""
-        usage = await TokenUsage.from_text(
-            prompt="Test prompt", completion="Test completion", model="gpt-3.5-turbo"
-        )
+        usage = await TokenUsage.from_text(prompt="Test prompt", completion="Test completion", model="gpt-3.5-turbo")
 
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
@@ -117,9 +114,7 @@ class TestTokenOperations:
         assert usage.estimated_cost_usd > 0
 
         # Test different model
-        usage_cheap = TokenUsage(
-            prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo"
-        )
+        usage_cheap = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo")
 
         # GPT-4 should be more expensive
         assert usage.estimated_cost_usd > usage_cheap.estimated_cost_usd
@@ -165,9 +160,7 @@ class TestEventCreation:
         assert event.token_usage is None
 
         # Update with token info
-        await event.update_token_usage(
-            prompt="New prompt", completion="New completion", model="gpt-4"
-        )
+        await event.update_token_usage(prompt="New prompt", completion="New completion", model="gpt-4")
 
         assert event.token_usage is not None
         assert event.token_usage.prompt_tokens > 0
@@ -265,9 +258,7 @@ class TestBasicPromptBuilding:
 
             # Test basic prompt building logic manually
             user_messages = [e for e in session.events if e.source == EventSource.USER]
-            assistant_messages = [
-                e for e in session.events if e.source == EventSource.LLM
-            ]
+            assistant_messages = [e for e in session.events if e.source == EventSource.LLM]
 
             assert len(user_messages) == 1
             assert len(assistant_messages) == 1
@@ -294,9 +285,7 @@ class TestErrorHandling:
 
     def test_token_usage_invalid_model(self):
         """Test TokenUsage with unknown model."""
-        usage = TokenUsage(
-            prompt_tokens=100, completion_tokens=50, model="unknown-model-xyz"
-        )
+        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, model="unknown-model-xyz")
 
         # Should still work, just use default pricing
         assert usage.estimated_cost_usd >= 0

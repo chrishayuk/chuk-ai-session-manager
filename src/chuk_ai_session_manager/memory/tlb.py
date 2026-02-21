@@ -18,7 +18,6 @@ Design principles:
 """
 
 from collections import OrderedDict
-from typing import Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -54,7 +53,7 @@ class PageTLB(BaseModel):
     def __contains__(self, page_id: str) -> bool:
         return page_id in self._entries
 
-    def lookup(self, page_id: str) -> Optional[PageTableEntry]:
+    def lookup(self, page_id: str) -> PageTableEntry | None:
         """
         Look up a page entry in the TLB.
 
@@ -91,7 +90,7 @@ class PageTLB(BaseModel):
         # Insert new entry
         self._entries[page_id] = entry
 
-    def _evict_lru(self) -> Optional[str]:
+    def _evict_lru(self) -> str | None:
         """
         Evict the least recently used entry.
 
@@ -123,9 +122,7 @@ class PageTLB(BaseModel):
         Useful when flushing a tier or during checkpoints.
         Returns the number of entries invalidated.
         """
-        to_remove = [
-            page_id for page_id, entry in self._entries.items() if entry.tier == tier
-        ]
+        to_remove = [page_id for page_id, entry in self._entries.items() if entry.tier == tier]
         for page_id in to_remove:
             del self._entries[page_id]
         return len(to_remove)
@@ -164,9 +161,7 @@ class PageTLB(BaseModel):
         return TLBStats(
             size=len(self._entries),
             max_size=self.max_entries,
-            utilization=len(self._entries) / self.max_entries
-            if self.max_entries > 0
-            else 0,
+            utilization=len(self._entries) / self.max_entries if self.max_entries > 0 else 0,
             hits=self.hits,
             misses=self.misses,
             hit_rate=self.hit_rate,
@@ -181,7 +176,7 @@ class TLBWithPageTable:
     then falls back to PageTable, and keeps TLB updated.
     """
 
-    def __init__(self, page_table, tlb: Optional[PageTLB] = None):
+    def __init__(self, page_table, tlb: PageTLB | None = None):
         """
         Initialize with a PageTable and optional TLB.
 
@@ -193,7 +188,7 @@ class TLBWithPageTable:
         # Use 'is None' check because empty PageTLB has __len__=0 which is falsy
         self.tlb = tlb if tlb is not None else PageTLB()
 
-    def lookup(self, page_id: str) -> Optional[PageTableEntry]:
+    def lookup(self, page_id: str) -> PageTableEntry | None:
         """
         Look up a page, checking TLB first.
 
@@ -234,7 +229,7 @@ class TLBWithPageTable:
             self.tlb.invalidate(page_id)
         return success
 
-    def remove(self, page_id: str) -> Optional[PageTableEntry]:
+    def remove(self, page_id: str) -> PageTableEntry | None:
         """Remove from both PageTable and TLB."""
         self.tlb.invalidate(page_id)
         return self.page_table.remove(page_id)

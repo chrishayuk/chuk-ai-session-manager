@@ -1,0 +1,35 @@
+# Ruff configuration for chuk-ai-session-manager
+line-length = 120
+target-version = "py311"
+extend-exclude = ["debug", "examples"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B904",   # raise ... from ... in exception handlers
+    "UP042",  # str(Enum) -> StrEnum (intentional for Pydantic compat)
+    "SIM105", # contextlib.suppress vs try/except/pass (preference)
+]
+
+[lint.per-file-ignores]
+"**/__init__.py" = ["E402", "F401"]  # Allow late imports and re-exports
+"tests/**/*" = ["ARG", "S101"]       # Allow unused arguments and asserts in tests
+"examples/**/*" = ["ARG"]            # Allow unused arguments in examples
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

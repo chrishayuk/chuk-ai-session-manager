@@ -5,17 +5,19 @@ Test suite for core models in chuk_ai_session_manager.
 Tests TokenUsage, SessionEvent, Session, SessionRun, and SessionMetadata models.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from chuk_ai_session_manager.models.event_source import EventSource
+from chuk_ai_session_manager.models.event_type import EventType
 
 # Import models directly to avoid circular import issues
 from chuk_ai_session_manager.models.session import Session
 from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.models.session_metadata import SessionMetadata
-from chuk_ai_session_manager.models.event_source import EventSource
-from chuk_ai_session_manager.models.event_type import EventType
-from chuk_ai_session_manager.models.token_usage import TokenUsage, TokenSummary
-from chuk_ai_session_manager.models.session_run import SessionRun, RunStatus
+from chuk_ai_session_manager.models.session_run import RunStatus, SessionRun
+from chuk_ai_session_manager.models.token_usage import TokenSummary, TokenUsage
 
 
 class TestTokenUsage:
@@ -55,9 +57,7 @@ class TestTokenUsage:
 
     async def test_token_usage_from_text(self):
         """Test creating TokenUsage from text."""
-        usage = await TokenUsage.from_text(
-            prompt="Hello, world!", completion="Hi there!", model="gpt-3.5-turbo"
-        )
+        usage = await TokenUsage.from_text(prompt="Hello, world!", completion="Hi there!", model="gpt-3.5-turbo")
 
         assert usage.prompt_tokens > 0
         assert usage.completion_tokens > 0
@@ -79,15 +79,11 @@ class TestTokenUsage:
     def test_token_usage_cost_calculation(self):
         """Test cost calculation for different models."""
         # Test GPT-4
-        usage_gpt4 = TokenUsage(
-            prompt_tokens=1000, completion_tokens=500, model="gpt-4"
-        )
+        usage_gpt4 = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="gpt-4")
         assert usage_gpt4.estimated_cost_usd > 0
 
         # Test GPT-3.5
-        usage_gpt35 = TokenUsage(
-            prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo"
-        )
+        usage_gpt35 = TokenUsage(prompt_tokens=1000, completion_tokens=500, model="gpt-3.5-turbo")
         assert usage_gpt35.estimated_cost_usd > 0
 
         # GPT-4 should be more expensive than GPT-3.5
@@ -102,9 +98,7 @@ class TestTokenSummary:
         summary = TokenSummary()
 
         usage1 = TokenUsage(prompt_tokens=100, completion_tokens=50, model="gpt-4")
-        usage2 = TokenUsage(
-            prompt_tokens=200, completion_tokens=75, model="gpt-3.5-turbo"
-        )
+        usage2 = TokenUsage(prompt_tokens=200, completion_tokens=75, model="gpt-3.5-turbo")
 
         await summary.add_usage(usage1)
         await summary.add_usage(usage2)
@@ -144,9 +138,7 @@ class TestSessionEvent:
 
     async def test_session_event_creation(self):
         """Test basic SessionEvent creation."""
-        event = SessionEvent(
-            message="Hello, world!", source=EventSource.USER, type=EventType.MESSAGE
-        )
+        event = SessionEvent(message="Hello, world!", source=EventSource.USER, type=EventType.MESSAGE)
 
         assert event.id is not None
         assert event.timestamp is not None
@@ -193,9 +185,7 @@ class TestSessionEvent:
         """Test updating token usage on existing event."""
         event = SessionEvent(message="Test")
 
-        await event.update_token_usage(
-            prompt="New prompt", completion="New completion", model="gpt-4"
-        )
+        await event.update_token_usage(prompt="New prompt", completion="New completion", model="gpt-4")
 
         assert event.token_usage is not None
         assert event.token_usage.prompt_tokens > 0
@@ -328,12 +318,8 @@ class TestSession:
 
         # Patch the storage system
         with (
-            patch(
-                "chuk_ai_session_manager.session_storage.get_backend"
-            ) as mock_get_backend,
-            patch(
-                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-            ) as mock_store_class,
+            patch("chuk_ai_session_manager.session_storage.get_backend") as mock_get_backend,
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store_class,
         ):
             mock_backend = AsyncMock()
             mock_store = AsyncMock()
@@ -355,12 +341,8 @@ class TestSession:
 
         # Patch the storage system
         with (
-            patch(
-                "chuk_ai_session_manager.session_storage.get_backend"
-            ) as mock_get_backend,
-            patch(
-                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-            ) as mock_store_class,
+            patch("chuk_ai_session_manager.session_storage.get_backend") as mock_get_backend,
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store_class,
         ):
             mock_backend = AsyncMock()
             mock_store = AsyncMock()
@@ -394,12 +376,8 @@ class TestSession:
 
         # Patch the storage system properly
         with (
-            patch(
-                "chuk_ai_session_manager.session_storage.get_backend"
-            ) as mock_get_backend,
-            patch(
-                "chuk_ai_session_manager.session_storage.ChukSessionsStore"
-            ) as mock_store_class,
+            patch("chuk_ai_session_manager.session_storage.get_backend") as mock_get_backend,
+            patch("chuk_ai_session_manager.session_storage.ChukSessionsStore") as mock_store_class,
         ):
             mock_backend = AsyncMock()
             mock_store = AsyncMock()

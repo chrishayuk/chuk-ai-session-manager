@@ -17,48 +17,47 @@ import pytest
 from chuk_ai_session_manager.memory import (
     # Enums
     Actor,
-    CompressionLevel,
-    FaultReason,
-    Modality,
-    MutationType,
-    PageType,
-    StorageTier,
-    # Core Models
-    FaultPolicy,
-    FaultRecord,
-    MemoryABI,
-    MemoryPage,
-    PageTableEntry,
-    TokenBudget,
-    UserExperienceMetrics,
-    VMMetrics,
-    # Data Structures
-    PageTable,
-    PageTLB,
-    TLBWithPageTable,
     # Working Set
     AntiThrashPolicy,
-    PinnedSet,
-    WorkingSetConfig,
-    WorkingSetManager,
+    ArtifactsBridge,
+    CompressionLevel,
+    ContextPackCache,
     # Context Packing
     ContextPacker,
-    ContextPackCache,
+    # Core Models
+    FaultPolicy,
+    FaultReason,
+    FaultRecord,
+    FaultResult,
+    InMemoryBackend,
     ManifestBuilder,
     ManifestPolicies,
-    VMManifest,
-    FaultResult,
-    PageFaultHandler,
-    PageSearchHandler,
-    ArtifactsBridge,
-    InMemoryBackend,
+    MemoryABI,
+    MemoryPage,
+    Modality,
     # Mutation Log
     MutationLogLite,
+    MutationType,
+    PageFaultHandler,
+    PageSearchHandler,
+    # Data Structures
+    PageTable,
+    PageTableEntry,
+    PageTLB,
+    PageType,
+    PinnedSet,
     # Prefetcher
     SimplePrefetcher,
+    StorageTier,
+    TLBWithPageTable,
+    TokenBudget,
     ToolUsagePattern,
+    UserExperienceMetrics,
+    VMManifest,
+    VMMetrics,
+    WorkingSetConfig,
+    WorkingSetManager,
 )
-
 
 # =============================================================================
 # Model Tests
@@ -588,9 +587,7 @@ class TestPageFaultHandler:
 
         result = await handler.handle_fault("nonexistent")
         assert not result.success
-        assert (
-            "nonexistent" in result.error.lower() or "not found" in result.error.lower()
-        )
+        assert "nonexistent" in result.error.lower() or "not found" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_fault_limit(self):
@@ -720,12 +717,7 @@ class TestArtifactsBridge:
         bridge = ArtifactsBridge()
         await bridge.configure()
 
-        pages = [
-            MemoryPage(
-                page_id=f"msg_{i}", modality=Modality.TEXT, content=f"Content {i}"
-            )
-            for i in range(3)
-        ]
+        pages = [MemoryPage(page_id=f"msg_{i}", modality=Modality.TEXT, content=f"Content {i}") for i in range(3)]
 
         checkpoint_id = await bridge.store_checkpoint(pages, "test_checkpoint")
         assert checkpoint_id is not None
@@ -1048,12 +1040,8 @@ class TestUserExperienceMetrics:
             page_ids_cited=["p1"],
             user_corrected=False,
         )
-        metrics.record_recall_attempt(
-            turn=2, query="What about X?", page_ids_cited=["p2"], user_corrected=False
-        )
-        metrics.record_recall_attempt(
-            turn=3, query="Tell me about Y", page_ids_cited=["p3"], user_corrected=True
-        )
+        metrics.record_recall_attempt(turn=2, query="What about X?", page_ids_cited=["p2"], user_corrected=False)
+        metrics.record_recall_attempt(turn=3, query="Tell me about Y", page_ids_cited=["p3"], user_corrected=True)
         # 2 successes (not corrected) out of 3 = 2/3
         assert metrics.recall_success_rate() == pytest.approx(2 / 3)
 
@@ -1061,18 +1049,10 @@ class TestUserExperienceMetrics:
         """Test thrash index calculation."""
         metrics = UserExperienceMetrics()
         # Record faults - same page faulted multiple times = thrash
-        metrics.record_fault(
-            "page_a", FaultReason.RESOLVE_REFERENCE, turn=1, tokens_loaded=100
-        )
-        metrics.record_fault(
-            "page_b", FaultReason.RESOLVE_REFERENCE, turn=2, tokens_loaded=100
-        )
-        metrics.record_fault(
-            "page_a", FaultReason.RESOLVE_REFERENCE, turn=3, tokens_loaded=100
-        )  # repeat
-        metrics.record_fault(
-            "page_a", FaultReason.RESOLVE_REFERENCE, turn=4, tokens_loaded=100
-        )  # repeat
+        metrics.record_fault("page_a", FaultReason.RESOLVE_REFERENCE, turn=1, tokens_loaded=100)
+        metrics.record_fault("page_b", FaultReason.RESOLVE_REFERENCE, turn=2, tokens_loaded=100)
+        metrics.record_fault("page_a", FaultReason.RESOLVE_REFERENCE, turn=3, tokens_loaded=100)  # repeat
+        metrics.record_fault("page_a", FaultReason.RESOLVE_REFERENCE, turn=4, tokens_loaded=100)  # repeat
 
         thrash = metrics.thrash_index(window_turns=5)
         # 2 thrash faults (page_a repeated twice) / 5 turns = 0.4
@@ -1092,9 +1072,7 @@ class TestUserExperienceMetrics:
     def test_record_fault_for_metrics(self):
         """Test recording faults for tracking."""
         metrics = UserExperienceMetrics()
-        metrics.record_fault(
-            "page_1", FaultReason.USER_REQUESTED_RECALL, turn=5, tokens_loaded=500
-        )
+        metrics.record_fault("page_1", FaultReason.USER_REQUESTED_RECALL, turn=5, tokens_loaded=500)
 
         assert len(metrics.fault_history) == 1
         assert metrics.fault_history[0].page_id == "page_1"
@@ -1102,15 +1080,9 @@ class TestUserExperienceMetrics:
     def test_fault_reason_breakdown(self):
         """Test getting fault reason breakdown."""
         metrics = UserExperienceMetrics()
-        metrics.record_fault(
-            "p1", FaultReason.USER_REQUESTED_RECALL, turn=1, tokens_loaded=100
-        )
-        metrics.record_fault(
-            "p2", FaultReason.RESOLVE_REFERENCE, turn=2, tokens_loaded=100
-        )
-        metrics.record_fault(
-            "p3", FaultReason.RESOLVE_REFERENCE, turn=3, tokens_loaded=100
-        )
+        metrics.record_fault("p1", FaultReason.USER_REQUESTED_RECALL, turn=1, tokens_loaded=100)
+        metrics.record_fault("p2", FaultReason.RESOLVE_REFERENCE, turn=2, tokens_loaded=100)
+        metrics.record_fault("p3", FaultReason.RESOLVE_REFERENCE, turn=3, tokens_loaded=100)
 
         breakdown = metrics.get_fault_reason_breakdown()
         assert breakdown[FaultReason.USER_REQUESTED_RECALL] == 1
@@ -1248,9 +1220,7 @@ class TestContextPackCache:
             tokens_used=500,
         )
 
-        working_set_hash = ContextPackCache.compute_working_set_hash(
-            ["msg_001", "msg_002"]
-        )
+        working_set_hash = ContextPackCache.compute_working_set_hash(["msg_001", "msg_002"])
         cache.put("sess_001", "gpt-4", 8000, working_set_hash, packed)
 
         result = cache.get("sess_001", "gpt-4", 8000, working_set_hash)
@@ -1395,12 +1365,8 @@ class TestMutationLogLite:
         """Test filtering mutations by actor."""
         log = MutationLogLite()
 
-        log.record_mutation(
-            "msg_001", MutationType.CREATE, StorageTier.L0, actor=Actor.USER
-        )
-        log.record_mutation(
-            "msg_002", MutationType.EVICT, StorageTier.L2, actor=Actor.SYSTEM
-        )
+        log.record_mutation("msg_001", MutationType.CREATE, StorageTier.L0, actor=Actor.USER)
+        log.record_mutation("msg_002", MutationType.EVICT, StorageTier.L2, actor=Actor.SYSTEM)
 
         user_mutations = log.get_mutations_by_actor(Actor.USER)
         assert len(user_mutations) == 1

@@ -5,20 +5,21 @@ Test suite for prompt building functionality in chuk_ai_session_manager.
 Tests different prompt strategies, token counting, and prompt optimization.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from chuk_ai_session_manager.models.session import Session
-from chuk_ai_session_manager.models.session_event import SessionEvent
+import pytest
+
 from chuk_ai_session_manager.models.event_source import EventSource
 from chuk_ai_session_manager.models.event_type import EventType
+from chuk_ai_session_manager.models.session import Session
+from chuk_ai_session_manager.models.session_event import SessionEvent
 from chuk_ai_session_manager.session_prompt_builder import (
-    build_prompt_from_session,
     PromptStrategy,
-    truncate_prompt_to_token_limit,
+    _build_hierarchical_prompt,
     _build_minimal_prompt,
     _build_task_focused_prompt,
-    _build_hierarchical_prompt,
+    build_prompt_from_session,
+    truncate_prompt_to_token_limit,
 )
 
 
@@ -336,9 +337,7 @@ class TestPromptBuilderStrategies:
         await tool_event.set_metadata("parent_event_id", events[-1].id)
         await session.add_event(tool_event)
 
-        prompt = await build_prompt_from_session(
-            session, PromptStrategy.CONVERSATION, max_history=4
-        )
+        prompt = await build_prompt_from_session(session, PromptStrategy.CONVERSATION, max_history=4)
 
         # Should include recent messages plus tool call
         assert len(prompt) >= 4
@@ -356,12 +355,8 @@ class TestPromptBuilderStrategies:
         """Test hierarchical prompt building strategy."""
         # Create parent session with summary
         with (
-            patch(
-                "chuk_ai_session_manager.session_storage.get_backend"
-            ) as mock_backend,
-            patch(
-                "chuk_ai_session_manager.session_prompt_builder.get_backend"
-            ) as mock_builder_backend,
+            patch("chuk_ai_session_manager.session_storage.get_backend") as mock_backend,
+            patch("chuk_ai_session_manager.session_prompt_builder.get_backend") as mock_builder_backend,
         ):
             mock_store = AsyncMock()
             mock_backend.return_value = mock_store
@@ -522,9 +517,7 @@ class TestPromptTruncation:
 
             # Should include at least one tool message
             tool_messages = [m for m in truncated if m["role"] == "tool"]
-            assert (
-                len(tool_messages) >= 0
-            )  # Adjusted - tool preservation is optional when needed
+            assert len(tool_messages) >= 0  # Adjusted - tool preservation is optional when needed
 
     async def test_prompt_truncation_empty_prompt(self):
         """Test truncation with empty prompt."""

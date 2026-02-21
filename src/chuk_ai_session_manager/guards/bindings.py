@@ -132,9 +132,7 @@ class BindingManager(BaseModel):
         except json.JSONDecodeError:
             return arguments
 
-    def check_references(
-        self, arguments: dict[str, Any]
-    ) -> tuple[bool, list[str], dict[str, Any]]:
+    def check_references(self, arguments: dict[str, Any]) -> tuple[bool, list[str], dict[str, Any]]:
         """Check if all $vN references in arguments exist.
 
         Returns:
@@ -155,20 +153,14 @@ class BindingManager(BaseModel):
 
         return len(missing) == 0, missing, resolved
 
-    def find_by_value(
-        self, value: float, tolerance: float = 0.0001
-    ) -> ValueBinding | None:
+    def find_by_value(self, value: float, tolerance: float = 0.0001) -> ValueBinding | None:
         """Find a binding with a matching value."""
         for binding in self.bindings.values():
             try:
                 binding_val = float(binding.typed_value)
                 if value == binding_val:
                     return binding
-                if abs(value) > 1e-10 and abs(binding_val) > 1e-10:
-                    if (
-                        abs(value - binding_val) / max(abs(value), abs(binding_val))
-                        < tolerance
-                    ):
+                if abs(value) > 1e-10 and abs(binding_val) > 1e-10 and abs(value - binding_val) / max(abs(value), abs(binding_val)) < tolerance:
                         return binding
             except (ValueError, TypeError):
                 continue

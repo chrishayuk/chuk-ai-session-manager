@@ -20,7 +20,6 @@ from chuk_ai_session_manager.memory.models import (
 )
 from chuk_ai_session_manager.memory.working_set import WorkingSetConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -690,12 +689,8 @@ class TestSearchPages:
 
     async def test_search_with_hints(self):
         vm = MemoryManager(session_id="search-test")
-        vm.create_page(
-            "schema v1", hint="database design", page_id="db1", size_tokens=10
-        )
-        vm.create_page(
-            "api spec", hint="rest api endpoints", page_id="api1", size_tokens=10
-        )
+        vm.create_page("schema v1", hint="database design", page_id="db1", size_tokens=10)
+        vm.create_page("api spec", hint="rest api endpoints", page_id="api1", size_tokens=10)
 
         result = await vm.search_pages("database")
         assert len(result.results) >= 1
@@ -802,9 +797,7 @@ class TestSegmentationHook:
 
         assert sm.vm is not None
         # Check that a SUMMARY page was created in the page store
-        summary_pages = [
-            p for p in sm.vm._page_store.values() if p.page_type == PageType.SUMMARY
-        ]
+        summary_pages = [p for p in sm.vm._page_store.values() if p.page_type == PageType.SUMMARY]
         assert len(summary_pages) >= 1
 
     async def test_segment_pins_summary(self):
@@ -821,9 +814,7 @@ class TestSegmentationHook:
 
         assert sm.vm is not None
         # Find the summary page and verify it is pinned
-        summary_pages = [
-            p for p in sm.vm._page_store.values() if p.page_type == PageType.SUMMARY
-        ]
+        summary_pages = [p for p in sm.vm._page_store.values() if p.page_type == PageType.SUMMARY]
         assert len(summary_pages) >= 1
         for sp in summary_pages:
             assert sm.vm.working_set.is_pinned(sp.page_id)

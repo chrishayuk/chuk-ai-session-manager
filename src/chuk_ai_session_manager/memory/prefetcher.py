@@ -11,7 +11,7 @@ Keep it simple: no ML prediction required.
 """
 
 from collections import Counter
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -27,9 +27,7 @@ class ToolUsagePattern(BaseModel):
     tool_name: str
     call_count: int = Field(default=0)
     last_turn: int = Field(default=0)
-    prereq_pages: List[str] = Field(
-        default_factory=list
-    )  # Pages often read before calling
+    prereq_pages: list[str] = Field(default_factory=list)  # Pages often read before calling
 
 
 class SimplePrefetcher(BaseModel):
@@ -45,16 +43,16 @@ class SimplePrefetcher(BaseModel):
     max_recent_tools: int = Field(default=3)
 
     # Tool usage tracking
-    _tool_usage: Dict[str, ToolUsagePattern] = PrivateAttr(default_factory=dict)
+    _tool_usage: dict[str, ToolUsagePattern] = PrivateAttr(default_factory=dict)
 
     # Recent page accesses per tool (tool_name -> list of page_ids accessed before call)
-    _tool_prereqs: Dict[str, List[str]] = PrivateAttr(default_factory=dict)
+    _tool_prereqs: dict[str, list[str]] = PrivateAttr(default_factory=dict)
 
     # Page access counts (for finding high-value claims)
     _page_access_counts: Counter = PrivateAttr(default_factory=Counter)
 
     # Last segment summary page ID (updated when segments roll)
-    _last_segment_summary_id: Optional[str] = PrivateAttr(default=None)
+    _last_segment_summary_id: str | None = PrivateAttr(default=None)
 
     def record_page_access(self, page_id: str) -> None:
         """Record a page access for statistics."""
@@ -64,7 +62,7 @@ class SimplePrefetcher(BaseModel):
         self,
         tool_name: str,
         turn: int,
-        pages_accessed_before: Optional[List[str]] = None,
+        pages_accessed_before: list[str] | None = None,
     ) -> None:
         """
         Record a tool call and what pages were accessed before it.
@@ -89,14 +87,14 @@ class SimplePrefetcher(BaseModel):
         """Update the last segment summary page ID."""
         self._last_segment_summary_id = page_id
 
-    def get_likely_tools(self, recent_turns: int = 5) -> List[str]:
+    def get_likely_tools(self, recent_turns: int = 5) -> list[str]:
         """Get tools likely to be called based on recent usage."""
         # Sort by recency and frequency
         tools = list(self._tool_usage.values())
         tools.sort(key=lambda t: (t.last_turn, t.call_count), reverse=True)
         return [t.tool_name for t in tools[: self.max_recent_tools]]
 
-    def get_tool_prereq_pages(self, tool_name: str) -> List[str]:
+    def get_tool_prereq_pages(self, tool_name: str) -> list[str]:
         """
         Get pages commonly accessed before calling a tool.
 
@@ -113,8 +111,8 @@ class SimplePrefetcher(BaseModel):
     def get_top_claims(
         self,
         page_table: Optional["PageTable"] = None,
-        limit: Optional[int] = None,
-    ) -> List[str]:
+        limit: int | None = None,
+    ) -> list[str]:
         """
         Get most-referenced claim pages.
 
@@ -124,9 +122,7 @@ class SimplePrefetcher(BaseModel):
             limit = self.max_claims_to_prefetch
 
         # Get top accessed pages
-        top_pages = [
-            page_id for page_id, _ in self._page_access_counts.most_common(limit * 3)
-        ]
+        top_pages = [page_id for page_id, _ in self._page_access_counts.most_common(limit * 3)]
 
         if page_table is None:
             return top_pages[:limit]
@@ -146,14 +142,14 @@ class SimplePrefetcher(BaseModel):
         self,
         session_id: str,
         page_table: Optional["PageTable"] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get pages to prefetch at the start of a turn.
 
         Returns list of page_ids to prefetch.
         """
-        pages_to_prefetch: List[str] = []
-        seen: Set[str] = set()
+        pages_to_prefetch: list[str] = []
+        seen: set[str] = set()
 
         def add_page(page_id: str) -> None:
             if page_id and page_id not in seen:
@@ -183,7 +179,7 @@ class SimplePrefetcher(BaseModel):
         self._page_access_counts.clear()
         self._last_segment_summary_id = None
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get prefetcher statistics."""
         return {
             "tools_tracked": len(self._tool_usage),

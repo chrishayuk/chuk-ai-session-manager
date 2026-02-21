@@ -9,18 +9,18 @@ and how to present it.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
+from chuk_ai_session_manager.procedural_memory.manager import ToolMemoryManager
 from chuk_ai_session_manager.procedural_memory.models import (
-    DeltaKey,
     DeltaChangeKey,
+    DeltaKey,
     SuccessPattern,
     ToolLogEntry,
     ToolPattern,
 )
-from chuk_ai_session_manager.procedural_memory.manager import ToolMemoryManager
 
 
 class FormatterConfig(BaseModel):
@@ -65,7 +65,7 @@ class ProceduralContextFormatter(BaseModel):
         self,
         manager: ToolMemoryManager,
         tool_names: list[str],
-        context_goal: Optional[str] = None,
+        context_goal: str | None = None,
     ) -> str:
         """
         Format procedural memory for specific tools about to be called.
@@ -99,8 +99,8 @@ class ProceduralContextFormatter(BaseModel):
         self,
         manager: ToolMemoryManager,
         tool_name: str,
-        context_goal: Optional[str] = None,
-    ) -> Optional[str]:
+        context_goal: str | None = None,
+    ) -> str | None:
         """Format a single tool's procedural memory."""
         lines = []
 
@@ -167,8 +167,8 @@ class ProceduralContextFormatter(BaseModel):
     def _format_pattern(
         self,
         pattern: ToolPattern,
-        context_goal: Optional[str] = None,
-    ) -> Optional[str]:
+        context_goal: str | None = None,
+    ) -> str | None:
         """Format aggregated patterns."""
         lines = []
 
@@ -183,10 +183,7 @@ class ProceduralContextFormatter(BaseModel):
 
         # Stats (if not compact)
         if not self.config.compact:
-            lines.append(
-                f"  success_rate: {pattern.success_rate:.0%} "
-                f"({pattern.total_calls} calls)"
-            )
+            lines.append(f"  success_rate: {pattern.success_rate:.0%} ({pattern.total_calls} calls)")
 
         # Error patterns with fixes
         if has_errors:
@@ -210,9 +207,7 @@ class ProceduralContextFormatter(BaseModel):
                 lines.append("  <success_hints>")
                 for sp in relevant[-self.config.max_success_patterns :]:
                     if sp.delta_that_fixed:
-                        lines.append(
-                            f"    - Fixed by: {self._format_delta(sp.delta_that_fixed)}"
-                        )
+                        lines.append(f"    - Fixed by: {self._format_delta(sp.delta_that_fixed)}")
                     elif sp.arg_hints:
                         lines.append(f"    - Typical args: {sp.arg_hints}")
                 lines.append("  </success_hints>")
@@ -223,7 +218,7 @@ class ProceduralContextFormatter(BaseModel):
     def _filter_relevant_successes(
         self,
         patterns: list[SuccessPattern],
-        context_goal: Optional[str],
+        context_goal: str | None,
     ) -> list[SuccessPattern]:
         """Filter success patterns to those relevant to current goal."""
         if not context_goal:
@@ -273,9 +268,7 @@ class ProceduralContextFormatter(BaseModel):
                 changes = []
                 for k in changed_keys:
                     v = delta[DeltaKey.CHANGED][k]
-                    changes.append(
-                        f"{k}:{self._abbrev(v[DeltaChangeKey.FROM])}->{self._abbrev(v[DeltaChangeKey.TO])}"
-                    )
+                    changes.append(f"{k}:{self._abbrev(v[DeltaChangeKey.FROM])}->{self._abbrev(v[DeltaChangeKey.TO])}")
                 parts.append(", ".join(changes))
             else:
                 parts.append(f"~{len(changed_keys)} args")
@@ -330,10 +323,7 @@ class ProceduralContextFormatter(BaseModel):
             lines.append("")
             lines.append("  Most used tools:")
             for tool_name, pattern in sorted_tools:
-                lines.append(
-                    f"    - {tool_name}: {pattern.total_calls} calls, "
-                    f"{pattern.success_rate:.0%} success"
-                )
+                lines.append(f"    - {tool_name}: {pattern.total_calls} calls, {pattern.success_rate:.0%} success")
                 if pattern.error_patterns:
                     top_error = pattern.error_patterns[-1]
                     lines.append(f"      last error: {top_error.error_type}")
@@ -376,9 +366,7 @@ class ProceduralContextFormatter(BaseModel):
                 if entry.fixed_by:
                     lines.append(f"    - {entry.id} -> {entry.fixed_by}")
                     if entry.delta_args:
-                        lines.append(
-                            f"      changed: {self._format_delta(entry.delta_args)}"
-                        )
+                        lines.append(f"      changed: {self._format_delta(entry.delta_args)}")
 
         if len(lines) == 1:
             lines.append("  No previous fixes found for this error type.")
@@ -391,7 +379,7 @@ class ProceduralContextFormatter(BaseModel):
         manager: ToolMemoryManager,
         tool_name: str,
         goal: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Format a success template based on past successful calls.
 
